@@ -39,7 +39,7 @@ function Overview() {
   const [loading, setLoading] = useState(true)
   useEffect(() => { load() }, [])
   async function load() {
-    const { data } = await supabase.from("faturas").select("*, bars(nome), fatura_pagamentos(*)").order("vencimento",{ascending:false})
+    const { data } = await supabase.from("faturas").select("*, bars(nome)").order("vencimento",{ascending:false})
     setFaturas(data||[]); setLoading(false)
   }
   if (loading) return <Spinner text="Loading..." />
@@ -123,7 +123,7 @@ function InvoiceList() {
   useEffect(() => { load() }, [])
   async function load() {
     const [fR, bR, vR] = await Promise.all([
-      supabase.from("faturas").select("*, bars(nome), fatura_pagamentos(*)").order("vencimento",{ascending:false}),
+      supabase.from("faturas").select("*, bars(nome)").order("vencimento",{ascending:false}),
       supabase.from("bars").select("*").order("nome"),
       supabase.from("vendas").select("total,data,bar_id").order("data"),
     ])

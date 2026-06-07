@@ -1649,7 +1649,7 @@ function FaturasTab({ bar }) {
 
   async function load() {
     const [fR, vR] = await Promise.all([
-      supabase.from('faturas').select('*, fatura_pagamentos(*)').eq('bar_id', bar.id).order('vencimento', { ascending:false }),
+      supabase.from('faturas').select('*').eq('bar_id', bar.id).order('vencimento', { ascending:false }),
       supabase.from('vendas').select('total,data').eq('bar_id', bar.id).order('data', { ascending:false }),
     ])
     setFaturas(fR.data||[])
