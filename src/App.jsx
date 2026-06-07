@@ -11,9 +11,9 @@ import EstoqueTab from './components/Estoque'
 import PortalCliente from './components/PortalCliente'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
-import Faturas from './components/Faturas'
-import AIAssistant from './components/AIAssistant'
-import BusinessIntel from './components/BusinessIntel'
+//import Faturas from './components/Faturas'
+//import AIAssistant from './components/AIAssistant'
+//import BusinessIntel from './components/BusinessIntel'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel } from './components/utils'
 
@@ -271,9 +271,9 @@ function Shell() {
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
-        {tab==='faturas'   && <Faturas />}
-        {tab==='bi'        && <BusinessIntel />}
-        {tab==='ai'        && <AIAssistant />}
+        {tab==='faturas'   && <div>Invoices coming soon</div>}
+        {tab==='bi'        && <div>Reports coming soon</div>}
+        {tab==='ai'        && <div>AI coming soon</div>}
         {tab==='suppliers' && <Fornecedores />}
         </div>
       </main>
