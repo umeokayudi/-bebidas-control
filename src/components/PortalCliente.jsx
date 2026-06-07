@@ -679,6 +679,43 @@ function OrdersTab({ bar }) {
           )
         })
       }
+
+      {/* Order preview modal */}
+      {orderPreview && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={()=>setOrderPreview(null)}>
+          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'32px', width:'100%', maxWidth:480, maxHeight:'85vh', overflowY:'auto', boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+              <div>
+                <div style={{ fontSize:18, fontWeight:800 }}>Order Details</div>
+                <div style={{ fontSize:12, color:'var(--text2)', marginTop:2 }}>{fmtDate(orderPreview.criado_em?.slice(0,10))}</div>
+              </div>
+              <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20,
+                background: orderPreview.status==='entregue'?'#EAF5F0':'#FDF3E0',
+                color: orderPreview.status==='entregue'?'#1A7A5E':'#8A5A00'
+              }}>{orderPreview.status}</span>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>Items</div>
+              {(orderPreview.pedidos_itens||[]).map(it => (
+                <div key={it.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600 }}>{it.produtos?.nome}</div>
+                    <div style={{ fontSize:11, color:'var(--text2)' }}>¥{(it.preco_unitario||0).toLocaleString()} x {it.qtd}</div>
+                  </div>
+                  <div style={{ fontWeight:700 }}>¥{((it.preco_unitario||0)*it.qtd).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background:'var(--navy)', borderRadius:12, padding:'14px 18px', display:'flex', justifyContent:'space-between', marginBottom:20 }}>
+              <span style={{ color:'rgba(255,255,255,0.7)', fontSize:13 }}>Total</span>
+              <span style={{ color:'var(--gold)', fontWeight:800, fontSize:18 }}>¥{Math.round(orderPreview.total_estimado||0).toLocaleString()}</span>
+            </div>
+            <button onClick={()=>setOrderPreview(null)} style={{ width:'100%', padding:'12px', borderRadius:14, border:'1px solid var(--border)', background:'transparent', fontSize:13, cursor:'pointer' }}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
