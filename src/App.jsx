@@ -28,7 +28,7 @@ const ADMIN_TABS = [
   { id:'products',  label:'Products'   },
   { id:'bars',      label:'Bars'       },
   { id:'usuarios',  label:'Users'      },
-  { id:'faturas',    label:'💰 Invoices'  },
+  { id:'faturas',    label:'💰 Invoices '  },
   { id:'bi',         label:'📊 Reports'   },
   { id:'ai',         label:'🤖 AI'       },
   { id:'suppliers',  label:'Suppliers'  },
