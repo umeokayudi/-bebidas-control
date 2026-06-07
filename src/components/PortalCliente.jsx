@@ -1680,7 +1680,8 @@ function FaturasTab({ bar }) {
     monthlySpend.push(vendas.filter(v=>v.data?.startsWith(mk)).reduce((a,v)=>a+(+v.total||0),0))
   }
   const maxSpend = Math.max(...monthlySpend, 1)
-  const avgMonthly = Math.round(monthlySpend.reduce((a,v)=>a+v,0)/6)
+  const monthsWithData = monthlySpend.filter(v=>v>0).length
+  const avgMonthly = monthsWithData > 0 ? Math.round(monthlySpend.reduce((a,v)=>a+v,0)/monthsWithData) : 0
 
   if (loading) return <Spinner text="Loading..." />
 
