@@ -10,11 +10,11 @@ import RyoshushoTab from './components/Ryoshusho'
 import EstoqueTab from './components/Estoque'
 import PortalCliente from './components/PortalCliente'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
-import Fornecedores from './components/Fornecedores'
-import Faturas from './components/Faturas'
+//import Fornecedores from './components/Fornecedores'
+//import Faturas from './components/Faturas'
 //import Cashflow from './components/Cashflow'
-import AIAssistant from './components/AIAssistant'
-import BusinessIntel from './components/BusinessIntel'
+//import AIAssistant from './components/AIAssistant'
+//import BusinessIntel from './components/BusinessIntel'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel } from './components/utils'
 
@@ -273,11 +273,11 @@ function Shell() {
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
-        {tab==='faturas'   && <Faturas />}
+        {tab==='faturas'  && <div>faturas</div>}
         {tab==='cashflow'  && <div>Cashflow</div>}
         {tab==='bi'        && <BusinessIntel />}
         {tab==='ai'        && <AIAssistant />}
-        {tab==='suppliers' && <Fornecedores />}
+        {tab==='suppliers'  && <div>suppliers</div>}
         </div>
       </main>
     </div>
