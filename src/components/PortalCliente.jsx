@@ -1645,7 +1645,7 @@ function FaturasTab({ bar }) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  useEffect(() => { load() }, [bar])
+  useEffect(()=>{ load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) },[bar])
 
   async function load() {
     const [fR, vR] = await Promise.all([

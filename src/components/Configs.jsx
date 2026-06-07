@@ -195,7 +195,7 @@ export function PedidosAdminTab() {
   const [checklistPedido,setChecklistPedido]=useState(null)
   const [checkedItems,setCheckedItems]=useState({})
 
-  useEffect(()=>{load()},[])
+  useEffect(()=>{ load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) },[])
 
   async function load(){
     const [{data:p}]=await Promise.all([
