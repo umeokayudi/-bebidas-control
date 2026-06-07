@@ -1639,104 +1639,179 @@ function MenuTab({ bar }) {
 // ── FATURAS CLIENTE ───────────────────────────────────────────────────────────
 function FaturasTab({ bar }) {
   const [faturas, setFaturas] = useState([])
+  const [vendas, setVendas] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => { load() }, [bar])
 
   async function load() {
-    const { data } = await supabase
-      .from("faturas")
-      .select("*, fatura_pagamentos(*)")
-      .eq("bar_id", bar.id)
-      .order("vencimento", { ascending: false })
-    setFaturas(data || [])
+    const [fR, vR] = await Promise.all([
+      supabase.from('faturas').select('*, fatura_pagamentos(*)').eq('bar_id', bar.id).order('vencimento', { ascending:false }),
+      supabase.from('vendas').select('total,data').eq('bar_id', bar.id).order('data', { ascending:false }),
+    ])
+    setFaturas(fR.data||[])
+    setVendas(vR.data||[])
     setLoading(false)
   }
 
-  const pending = faturas.filter(f => f.status !== "pago")
-  const totalPending = pending.reduce((a, f) => a + (f.total - f.pago), 0)
+  const filtered = faturas.filter(f => {
+    if (dateFrom && f.periodo_inicio < dateFrom) return false
+    if (dateTo && f.periodo_fim > dateTo) return false
+    return true
+  })
+
+  const pending = filtered.filter(f => f.status !== 'pago')
+  const paid = filtered.filter(f => f.status === 'pago')
+  const totalPending = pending.reduce((a,f) => a+(f.total-f.pago), 0)
+  const totalPaid = paid.reduce((a,f) => a+f.total, 0)
   const overdue = pending.filter(f => new Date(f.vencimento) < new Date())
+  const upcoming = pending.filter(f => new Date(f.vencimento) >= new Date()).sort((a,b)=>new Date(a.vencimento)-new Date(b.vencimento))
+
+  // Monthly spend last 6 months
+  const monthlySpend = []
+  const monthLabels = []
+  for (let i=5; i>=0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth()-i)
+    const mk = d.toISOString().slice(0,7)
+    monthLabels.push(mk.slice(5))
+    monthlySpend.push(vendas.filter(v=>v.data?.startsWith(mk)).reduce((a,v)=>a+(+v.total||0),0))
+  }
+  const maxSpend = Math.max(...monthlySpend, 1)
+  const avgMonthly = Math.round(monthlySpend.reduce((a,v)=>a+v,0)/6)
 
   if (loading) return <Spinner text="Loading..." />
 
   return (
-    <div className="fade-in" style={{ maxWidth:800 }}>
+    <div className="fade-in" style={{ maxWidth:860 }}>
+
+      {/* Overdue alert */}
       {overdue.length > 0 && (
-        <div style={{ background:"linear-gradient(135deg,#ff3b30,#c0392b)", borderRadius:16, padding:"16px 20px", marginBottom:16, boxShadow:"0 4px 20px rgba(255,59,48,0.25)" }}>
-          <div style={{ fontSize:15, fontWeight:700, color:"white", marginBottom:4 }}>🚨 Overdue payment{overdue.length>1?"s":""}</div>
-          <div style={{ fontSize:12, color:"rgba(255,255,255,0.85)" }}>Please contact JBM Drinks to arrange payment</div>
+        <div style={{ background:'linear-gradient(135deg,#ff3b30,#c0392b)', borderRadius:16, padding:'16px 20px', marginBottom:16, boxShadow:'0 4px 20px rgba(255,59,48,0.25)' }}>
+          <div style={{ fontSize:15, fontWeight:700, color:'white', marginBottom:4 }}>🚨 {overdue.length} overdue payment{overdue.length>1?'s':''}</div>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,0.85)' }}>Please contact JBM Drinks — {overdue.map(f=>fmtYen(f.total-f.pago)).join(', ')} due</div>
         </div>
       )}
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+      {/* KPIs */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
         {[
-          { label:"Total pending", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"💰" },
-          { label:"Overdue", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"⚠️" },
-          { label:"Total invoices", value:faturas.length, color:"var(--navy)", icon:"🧾" },
-        ].map(k => (
-          <div key={k.label} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:14, padding:"16px" }}>
-            <div style={{ fontSize:22, marginBottom:6 }}>{k.icon}</div>
-            <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.value}</div>
-            <div style={{ fontSize:11, color:"var(--text2)", textTransform:"uppercase", letterSpacing:"0.05em", marginTop:4 }}>{k.label}</div>
+          { label:'Pending', value:fmtYen(totalPending), color:totalPending>0?'var(--red)':'var(--green)', icon:'⏳' },
+          { label:'Paid total', value:fmtYen(totalPaid), color:'var(--green)', icon:'✅' },
+          { label:'Overdue', value:overdue.length, color:overdue.length>0?'var(--red)':'var(--green)', icon:'🚨' },
+          { label:'Avg/month', value:fmtYen(avgMonthly), color:'var(--navy)', icon:'📊' },
+        ].map(k=>(
+          <div key={k.label} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px' }}>
+            <div style={{ fontSize:18, marginBottom:4 }}>{k.icon}</div>
+            <div style={{ fontSize:18, fontWeight:800, color:k.color, lineHeight:1 }}>{k.value}</div>
+            <div style={{ fontSize:10, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:4 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Invoice history</div>
-      {faturas.length === 0 ? <Empty text="No invoices yet" icon="🧾" /> : (
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {faturas.map(f => {
+      {/* Monthly spend chart */}
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px', marginBottom:16 }}>
+        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Monthly spend — last 6 months</div>
+        <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:80 }}>
+          {monthlySpend.map((v,i) => {
+            const pct = Math.max(v/maxSpend*100, v>0?4:0)
+            const isCurrent = i===5
+            return (
+              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                <div style={{ fontSize:9, color:'var(--text2)', fontWeight:600 }}>{v>0?Math.round(v/1000)+'k':''}</div>
+                <div style={{ width:'100%', height:pct+'%', minHeight:v>0?3:0, background:isCurrent?'var(--navy)':'var(--border)', borderRadius:'4px 4px 0 0' }}/>
+                <div style={{ fontSize:10, color:isCurrent?'var(--navy)':'var(--text3)', fontWeight:isCurrent?700:400 }}>{monthLabels[i]}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Upcoming payments */}
+      {upcoming.length > 0 && (
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px', marginBottom:16 }}>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Upcoming payments</div>
+          {upcoming.map(f => {
+            const daysLeft = Math.ceil((new Date(f.vencimento)-new Date())/(1000*60*60*24))
             const remaining = f.total - f.pago
-            const pct = f.total > 0 ? Math.round(f.pago / f.total * 100) : 0
-            const isOverdue = f.status === "pendente" && new Date(f.vencimento) < new Date()
+            return (
+              <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
+                <div style={{ width:44, height:44, borderRadius:12, background:daysLeft<=5?'#fef2f2':'#f0fdf4', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?'var(--red)':'var(--green)', lineHeight:1 }}>{daysLeft}</div>
+                  <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase' }}>days</div>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:600 }}>Due {fmtDate(f.vencimento)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>{fmtDate(f.periodo_inicio)} → {fmtDate(f.periodo_fim)}</div>
+                </div>
+                <div style={{ fontSize:16, fontWeight:800, color:'var(--red)' }}>{fmtYen(remaining)}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Date filter */}
+      <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:16, flexWrap:'wrap' }}>
+        <div style={{ fontSize:13, fontWeight:600, color:'var(--text2)' }}>Filter:</div>
+        <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{ padding:'7px 10px', borderRadius:8, fontSize:12 }} />
+        <span style={{ color:'var(--text2)', fontSize:12 }}>to</span>
+        <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{ padding:'7px 10px', borderRadius:8, fontSize:12 }} />
+        {(dateFrom||dateTo) && <button onClick={()=>{setDateFrom('');setDateTo('')}} style={{ fontSize:12, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Clear</button>}
+        <span style={{ fontSize:12, color:'var(--text2)', marginLeft:'auto' }}>{filtered.length} invoice{filtered.length!==1?'s':''}</span>
+      </div>
+
+      {/* Invoice list */}
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Invoice history</div>
+      {filtered.length === 0 ? <Empty text="No invoices found" icon="🧾" /> : (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {filtered.map(f => {
+            const remaining = f.total - f.pago
+            const pct = f.total > 0 ? Math.round(f.pago/f.total*100) : 0
+            const isOverdue = f.status==='pendente' && new Date(f.vencimento) < new Date()
             const payments = f.fatura_pagamentos || []
             return (
-              <div key={f.id} style={{ background:"var(--bg2)", border:"1px solid", borderColor:isOverdue?"rgba(255,59,48,0.3)":"var(--border)", borderRadius:14, padding:"16px 20px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+              <div key={f.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor:isOverdue?'rgba(255,59,48,0.3)':'var(--border)', borderRadius:14, padding:'14px 18px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700 }}>Period: {fmtDate(f.periodo_inicio)} → {fmtDate(f.periodo_fim)}</div>
-                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:2 }}>Due: {fmtDate(f.vencimento)}</div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(f.periodo_inicio)} → {fmtDate(f.periodo_fim)}</div>
+                    <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>Due: {fmtDate(f.vencimento)}</div>
                   </div>
-                  <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20,
-                    background:f.status==="pago"?"#f0fdf4":isOverdue?"#fef2f2":"#EAF0FA",
-                    color:f.status==="pago"?"var(--green)":isOverdue?"var(--red)":"var(--navy)" }}>
-                    {f.status==="pago"?"✅ Paid":isOverdue?"🚨 Overdue":"⏳ Pending"}
-                  </span>
-                </div>
-
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ height:6, background:"var(--bg3)", borderRadius:3, overflow:"hidden", marginBottom:4 }}>
-                    <div style={{ height:"100%", width:pct+"%", background:f.status==="pago"?"var(--green)":"var(--gold)", borderRadius:3 }}/>
-                  </div>
-                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
-                    <span style={{ color:"var(--text2)" }}>Paid: {fmtYen(f.pago)} ({pct}%)</span>
-                    <span style={{ fontWeight:700, color:"var(--navy)" }}>Total: {fmtYen(f.total)}</span>
+                  <div style={{ textAlign:'right' }}>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20,
+                      background:f.status==='pago'?'#f0fdf4':isOverdue?'#fef2f2':'#EAF0FA',
+                      color:f.status==='pago'?'var(--green)':isOverdue?'var(--red)':'var(--navy)' }}>
+                      {f.status==='pago'?'✅ Paid':isOverdue?'🚨 Overdue':'⏳ Pending'}
+                    </span>
+                    <div style={{ fontSize:16, fontWeight:800, color:'var(--navy)', marginTop:6 }}>{fmtYen(f.total)}</div>
                   </div>
                 </div>
-
-                {remaining > 0 && (
-                  <div style={{ fontSize:13, fontWeight:700, color:"var(--red)", marginBottom:8 }}>
-                    Remaining: {fmtYen(remaining)}
-                  </div>
-                )}
-
+                <div style={{ height:4, background:'var(--bg3)', borderRadius:2, overflow:'hidden', marginBottom:6 }}>
+                  <div style={{ height:'100%', width:pct+'%', background:f.status==='pago'?'var(--green)':'var(--gold)', borderRadius:2 }}/>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--text2)', marginBottom:payments.length>0?8:0 }}>
+                  <span>Paid: {fmtYen(f.pago)} ({pct}%)</span>
+                  {remaining > 0 && <span style={{ color:'var(--red)', fontWeight:600 }}>Remaining: {fmtYen(remaining)}</span>}
+                </div>
                 {payments.length > 0 && (
-                  <button onClick={()=>setSelected(selected===f.id?null:f.id)}
-                    style={{ fontSize:11, color:"var(--text2)", background:"none", border:"none", cursor:"pointer", padding:0 }}>
-                    {selected===f.id?"▲ Hide":"▼ Show"} {payments.length} payment{payments.length>1?"s":""}
-                  </button>
-                )}
-
-                {selected === f.id && (
-                  <div style={{ marginTop:10, borderTop:"1px solid var(--border)", paddingTop:10 }}>
-                    {payments.map(p => (
-                      <div key={p.id} style={{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"4px 0", color:"var(--text2)" }}>
-                        <span>{fmtDate(p.data)} · {p.metodo}</span>
-                        <span style={{ fontWeight:600, color:"var(--green)" }}>{fmtYen(p.valor)}</span>
+                  <>
+                    <button onClick={()=>setSelected(selected===f.id?null:f.id)}
+                      style={{ fontSize:11, color:'var(--text2)', background:'none', border:'none', cursor:'pointer', padding:0 }}>
+                      {selected===f.id?'▲ Hide':'▼ Show'} {payments.length} payment{payments.length>1?'s':''}
+                    </button>
+                    {selected===f.id && (
+                      <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)' }}>
+                        {payments.map(p=>(
+                          <div key={p.id} style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'4px 0', color:'var(--text2)' }}>
+                            <span>{fmtDate(p.data)} · {p.metodo} {p.notas?'· '+p.notas:''}</span>
+                            <span style={{ fontWeight:600, color:'var(--green)' }}>{fmtYen(p.valor)}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )
@@ -1746,6 +1821,7 @@ function FaturasTab({ bar }) {
     </div>
   )
 }
+
 
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 import { NotificationBell } from './Notifications'
