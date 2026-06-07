@@ -1,5 +1,6 @@
 import { LogoSidebar } from './components/Logo'
-import { useNotifications, NotificationBell } from './components/Notifications'
+const useNotifications = () => ({ notifs:[], unread:0, markRead:()=>{}, markAllRead:()=>{}, deleteNotif:()=>{}, deleteAll:()=>{} })
+const NotificationBell = () => null
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth, LoginPage } from './components/Auth'
 import { supabase } from './lib/supabase'
