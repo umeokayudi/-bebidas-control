@@ -1,0 +1,176 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from './Auth'
+import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, SectionTitle, DelBtn, MetricCard } from './utils'
+
+export default function VendasTab() {
+  const { user } = useAuth()
+  const [vendas,   setVendas]   = useState([])
+  const [produtos, setProdutos] = useState([])
+  const [bars,     setBars]     = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [filterMonth, setFilterMonth] = useState('')
+  const [filterBar,   setFilterBar]   = useState('')
+  const [form, setForm] = useState({ data: new Date().toISOString().slice(0,10), bar_id: '', obs: '', itens: [] })
+
+  useEffect(() => { loadAll() }, [])
+
+  async function loadAll() {
+    setLoading(true)
+    const [{ data: v }, { data: p }, { data: b }] = await Promise.all([
+      supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').order('data', { ascending: false }),
+      supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
+      supabase.from('bars').select('*').order('nome')
+    ])
+    setVendas(v || [])
+    setProdutos(p || [])
+    setBars(b || [])
+    if (b?.length && !form.bar_id) setForm(f => ({ ...f, bar_id: b[0].id }))
+    setLoading(false)
+  }
+
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const months = [...new Set(vendas.map(v => monthKey(v.data)))].sort().reverse()
+
+  const filtered = vendas.filter(v =>
+    (!filterMonth || monthKey(v.data) === filterMonth) &&
+    (!filterBar   || v.bar_id === filterBar)
+  )
+
+  const totalReceita = filtered.reduce((a,v) => a + (+v.total||0), 0)
+
+  const totalVendaForm = form.itens.reduce((a, it) => {
+    const p = produtos.find(x => x.id === it.produto_id)
+    return a + (p ? p.preco_venda * it.qtd : 0)
+  }, 0)
+
+  async function saveVenda() {
+    if (!form.itens.length) return alert('Adicione pelo menos um item')
+    if (!form.bar_id) return alert('Selecione o bar')
+    setSaving(true)
+    const { data: venda, error } = await supabase.from('vendas').insert({
+      data: form.data, bar_id: form.bar_id,
+      total: totalVendaForm, obs: form.obs, criado_por: user.id
+    }).select().single()
+    if (!error) {
+      await supabase.from('vendas_itens').insert(
+        form.itens.map(it => {
+          const p = produtos.find(x => x.id === it.produto_id)
+          return { venda_id: venda.id, produto_id: it.produto_id, qtd: it.qtd, preco_unitario: p?.preco_venda || 0 }
+        })
+      )
+    }
+    setSaving(false)
+    setForm({ data: new Date().toISOString().slice(0,10), bar_id: bars[0]?.id || '', obs: '', itens: [] })
+    loadAll()
+  }
+
+  async function deleteVenda(id) {
+    if (!confirm('Remover esta venda?')) return
+    await supabase.from('vendas').delete().eq('id', id)
+    loadAll()
+  }
+
+  return (
+    <div className="fade-in">
+      <div className="card">
+        <SectionTitle>Register sale</SectionTitle>
+        <div className="grid3" style={{ marginBottom: 12 }}>
+          <div><label className="form-label">Data</label>
+            <input type="date" value={form.data} onChange={e=>setF('data',e.target.value)} /></div>
+          <div><label className="form-label">Bar</label>
+            <select value={form.bar_id} onChange={e=>setF('bar_id',e.target.value)}>
+              {bars.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+            </select></div>
+          <div><label className="form-label">Observação</label>
+            <input type="text" value={form.obs} onChange={e=>setF('obs',e.target.value)} /></div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <label className="form-label" style={{ margin:0 }}>Itens vendidos</label>
+            <button style={{ padding:'4px 10px', fontSize:11 }}
+              onClick={() => setF('itens', [...form.itens, { produto_id: produtos[0]?.id || '', qtd: 1 }])}>
+              + Item
+            </button>
+          </div>
+          {form.itens.map((it, i) => {
+            const prod = produtos.find(p => p.id === it.produto_id)
+            return (
+              <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 80px 1fr 36px', gap:6, marginBottom:6, alignItems:'center' }}>
+                <select value={it.produto_id} onChange={e=>{
+                  const a=[...form.itens]; a[i]={...a[i],produto_id:e.target.value}; setF('itens',a)
+                }}>
+                  {produtos.map(p=><option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+                <input type="number" value={it.qtd} min={1} onChange={e=>{
+                  const a=[...form.itens]; a[i]={...a[i],qtd:+e.target.value}; setF('itens',a)
+                }}/>
+                <span style={{ fontSize:13, color:'var(--text2)' }}>
+                  {prod ? fmtYen(prod.preco_venda * it.qtd) : '—'}
+                </span>
+                <button onClick={()=>setF('itens',form.itens.filter((_,j)=>j!==i))}
+                  style={{ padding:0, fontSize:14 }}>✕</button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontSize:14 }}>Total: <strong>{fmtYen(totalVendaForm)}</strong></div>
+          <button className="btn-primary" onClick={saveVenda} disabled={saving}>
+            {saving ? <><span className="spinner" />Saving...</> : 'Save sale'}
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <SectionTitle style={{ margin:0 }}>Sales history</SectionTitle>
+          <div style={{ display:'flex', gap:8 }}>
+            <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{ width:'auto' }}>
+              <option value="">All months</option>
+              {months.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+            <select value={filterBar} onChange={e=>setFilterBar(e.target.value)} style={{ width:'auto' }}>
+              <option value="">All bars</option>
+              {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom:14 }}>
+          <MetricCard label="Total vendido" value={fmtYen(totalReceita)} color="var(--blue)" />
+        </div>
+
+        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="No sales recorded" /> : (
+          <table>
+            <thead>
+              <tr><th>Data</th><th>Bar</th><th>Itens</th><th>Total</th><th>Obs</th><th></th></tr>
+            </thead>
+            <tbody>
+              {filtered.map(v => {
+                const bar = bars.find(b => b.id === v.bar_id)
+                return (
+                  <tr key={v.id}>
+                    <td style={{ whiteSpace:'nowrap' }}>{fmtDate(v.data)}</td>
+                    <td><Badge color={bar?.cor||'var(--blue)'}>{bar?.nome||'?'}</Badge></td>
+                    <td style={{ fontSize:12, color:'var(--text2)', maxWidth:200 }}>
+                      {(v.vendas_itens||[]).map(it=>
+                        `${it.produtos?.nome||'?'} ×${it.qtd}`
+                      ).join(' · ')}
+                    </td>
+                    <td style={{ fontWeight:700 }}>{fmtYen(v.total)}</td>
+                    <td style={{ color:'var(--text2)' }}>{v.obs||'—'}</td>
+                    <td><DelBtn onClick={()=>deleteVenda(v.id)} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
