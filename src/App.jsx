@@ -11,6 +11,7 @@ import EstoqueTab from './components/Estoque'
 import PortalCliente from './components/PortalCliente'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
+import Faturas from './components/Faturas'
 import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import { PedidosAdminTab } from './components/Configs'
@@ -27,6 +28,7 @@ const ADMIN_TABS = [
   { id:'products',  label:'Products'   },
   { id:'bars',      label:'Bars'       },
   { id:'usuarios',  label:'Users'      },
+  { id:'faturas',    label:'💰 Invoices'  },
   { id:'bi',         label:'📊 Reports'   },
   { id:'ai',         label:'🤖 AI'       },
   { id:'suppliers',  label:'Suppliers'  },
@@ -269,6 +271,7 @@ function Shell() {
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
+        {tab==='faturas'   && <Faturas />}
         {tab==='bi'        && <BusinessIntel />}
         {tab==='ai'        && <AIAssistant />}
         {tab==='suppliers' && <Fornecedores />}
