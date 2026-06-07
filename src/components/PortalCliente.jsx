@@ -1635,6 +1635,118 @@ function MenuTab({ bar }) {
 }
 
 
+
+// ── FATURAS CLIENTE ───────────────────────────────────────────────────────────
+function FaturasTab({ bar }) {
+  const [faturas, setFaturas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(null)
+
+  useEffect(() => { load() }, [bar])
+
+  async function load() {
+    const { data } = await supabase
+      .from("faturas")
+      .select("*, fatura_pagamentos(*)")
+      .eq("bar_id", bar.id)
+      .order("vencimento", { ascending: false })
+    setFaturas(data || [])
+    setLoading(false)
+  }
+
+  const pending = faturas.filter(f => f.status !== "pago")
+  const totalPending = pending.reduce((a, f) => a + (f.total - f.pago), 0)
+  const overdue = pending.filter(f => new Date(f.vencimento) < new Date())
+
+  if (loading) return <Spinner text="Loading..." />
+
+  return (
+    <div className="fade-in" style={{ maxWidth:800 }}>
+      {overdue.length > 0 && (
+        <div style={{ background:"linear-gradient(135deg,#ff3b30,#c0392b)", borderRadius:16, padding:"16px 20px", marginBottom:16, boxShadow:"0 4px 20px rgba(255,59,48,0.25)" }}>
+          <div style={{ fontSize:15, fontWeight:700, color:"white", marginBottom:4 }}>🚨 Overdue payment{overdue.length>1?"s":""}</div>
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.85)" }}>Please contact JBM Drinks to arrange payment</div>
+        </div>
+      )}
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:20 }}>
+        {[
+          { label:"Total pending", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"💰" },
+          { label:"Overdue", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"⚠️" },
+          { label:"Total invoices", value:faturas.length, color:"var(--navy)", icon:"🧾" },
+        ].map(k => (
+          <div key={k.label} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:14, padding:"16px" }}>
+            <div style={{ fontSize:22, marginBottom:6 }}>{k.icon}</div>
+            <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.value}</div>
+            <div style={{ fontSize:11, color:"var(--text2)", textTransform:"uppercase", letterSpacing:"0.05em", marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Invoice history</div>
+      {faturas.length === 0 ? <Empty text="No invoices yet" icon="🧾" /> : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {faturas.map(f => {
+            const remaining = f.total - f.pago
+            const pct = f.total > 0 ? Math.round(f.pago / f.total * 100) : 0
+            const isOverdue = f.status === "pendente" && new Date(f.vencimento) < new Date()
+            const payments = f.fatura_pagamentos || []
+            return (
+              <div key={f.id} style={{ background:"var(--bg2)", border:"1px solid", borderColor:isOverdue?"rgba(255,59,48,0.3)":"var(--border)", borderRadius:14, padding:"16px 20px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>Period: {fmtDate(f.periodo_inicio)} → {fmtDate(f.periodo_fim)}</div>
+                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:2 }}>Due: {fmtDate(f.vencimento)}</div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20,
+                    background:f.status==="pago"?"#f0fdf4":isOverdue?"#fef2f2":"#EAF0FA",
+                    color:f.status==="pago"?"var(--green)":isOverdue?"var(--red)":"var(--navy)" }}>
+                    {f.status==="pago"?"✅ Paid":isOverdue?"🚨 Overdue":"⏳ Pending"}
+                  </span>
+                </div>
+
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ height:6, background:"var(--bg3)", borderRadius:3, overflow:"hidden", marginBottom:4 }}>
+                    <div style={{ height:"100%", width:pct+"%", background:f.status==="pago"?"var(--green)":"var(--gold)", borderRadius:3 }}/>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
+                    <span style={{ color:"var(--text2)" }}>Paid: {fmtYen(f.pago)} ({pct}%)</span>
+                    <span style={{ fontWeight:700, color:"var(--navy)" }}>Total: {fmtYen(f.total)}</span>
+                  </div>
+                </div>
+
+                {remaining > 0 && (
+                  <div style={{ fontSize:13, fontWeight:700, color:"var(--red)", marginBottom:8 }}>
+                    Remaining: {fmtYen(remaining)}
+                  </div>
+                )}
+
+                {payments.length > 0 && (
+                  <button onClick={()=>setSelected(selected===f.id?null:f.id)}
+                    style={{ fontSize:11, color:"var(--text2)", background:"none", border:"none", cursor:"pointer", padding:0 }}>
+                    {selected===f.id?"▲ Hide":"▼ Show"} {payments.length} payment{payments.length>1?"s":""}
+                  </button>
+                )}
+
+                {selected === f.id && (
+                  <div style={{ marginTop:10, borderTop:"1px solid var(--border)", paddingTop:10 }}>
+                    {payments.map(p => (
+                      <div key={p.id} style={{ display:"flex", justifyContent:"space-between", fontSize:12, padding:"4px 0", color:"var(--text2)" }}>
+                        <span>{fmtDate(p.data)} · {p.metodo}</span>
+                        <span style={{ fontWeight:600, color:"var(--green)" }}>{fmtYen(p.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 import { NotificationBell } from './Notifications'
 
@@ -1648,6 +1760,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
     { id:'inventory',  label:'Inventory',  icon:'📊' },
     { id:'pricing',    label:'Pricing',    icon:'💰' },
     { id:'menu',       label:'Menu',       icon:'🍹' },
+    { id:'faturas',    label:'Invoices',   icon:'💰' },
   ]
 
   return (
@@ -1688,6 +1801,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='inventory'  && <InventoryTab bar={bar} onOrder={()=>setTab('orders')} />}
         {tab==='pricing'    && <PricingTab bar={bar} />}
         {tab==='menu'       && <MenuTab bar={bar} />}
+        {tab==='faturas'    && <FaturasTab bar={bar} />}
       </main>
     </div>
   )
