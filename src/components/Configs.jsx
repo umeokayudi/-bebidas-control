@@ -271,6 +271,48 @@ export function PedidosAdminTab() {
       )
     }
     await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:"Delivered"}).catch(()=>{})
+
+    // Auto-add to invoice for current billing period
+    try {
+      const today = new Date()
+      const day = today.getDate()
+      const year = today.getFullYear()
+      const month = today.getMonth()
+      let periodStart, periodEnd, dueDate
+      if (day <= 5) {
+        periodStart = new Date(year,month,1).toISOString().slice(0,10)
+        periodEnd = new Date(year,month,5).toISOString().slice(0,10)
+        dueDate = new Date(year,month,20).toISOString().slice(0,10)
+      } else if (day <= 20) {
+        periodStart = new Date(year,month,6).toISOString().slice(0,10)
+        periodEnd = new Date(year,month,20).toISOString().slice(0,10)
+        dueDate = new Date(year,month+1,5).toISOString().slice(0,10)
+      } else {
+        periodStart = new Date(year,month,21).toISOString().slice(0,10)
+        periodEnd = new Date(year,month+1,0).toISOString().slice(0,10)
+        dueDate = new Date(year,month+1,20).toISOString().slice(0,10)
+      }
+      // Find existing invoice for this period and bar
+      const {data:existingFatura} = await supabase.from("faturas")
+        .select("*").eq("bar_id",pedido.bar_id).eq("periodo_inicio",periodStart).eq("periodo_fim",periodEnd).single()
+      if (existingFatura) {
+        // Update total
+        await supabase.from("faturas").update({ total: existingFatura.total + pedido.total_estimado }).eq("id",existingFatura.id)
+      } else {
+        // Create new invoice
+        await supabase.from("faturas").insert({
+          bar_id: pedido.bar_id,
+          periodo_inicio: periodStart,
+          periodo_fim: periodEnd,
+          vencimento: dueDate,
+          total: pedido.total_estimado,
+          pago: 0,
+          status: "pendente",
+          notas: "Auto-generated"
+        })
+      }
+    } catch(e) { console.error("Invoice auto-create failed:", e) }
+
     load()
   }
 
