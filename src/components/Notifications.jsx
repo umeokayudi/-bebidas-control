@@ -46,7 +46,7 @@ const TIPO_ICON = {
   pedido_cancelado:  { icon: '❌', color: '#C0392B', bg: '#FBEAEA' },
 }
 
-export function NotificationBell({ notifs, unread, markRead, markAllRead }) {
+export function NotificationBell({ notifs, unread, markRead, markAllRead, deleteNotif, deleteAll, onNavigate }) {
   const [open, setOpen] = useState(false)
 
   function timeAgo(iso) {
@@ -101,6 +101,7 @@ export function NotificationBell({ notifs, unread, markRead, markAllRead }) {
             }}>
               <span style={{ fontSize:13, fontWeight:700 }}>Notifications</span>
               {unread > 0 && (
+                {notifs.some(n=>n.lida) && deleteAll && <button onClick={deleteAll} style={{ fontSize:11, color:'var(--text2)', background:'none', border:'none', cursor:'pointer', padding:'4px 8px' }}>🗑 Clear read</button>}
                 <button onClick={markAllRead} style={{
                   fontSize:11, color:'var(--blue)', border:'none',
                   background:'none', cursor:'pointer', fontWeight:600
@@ -115,18 +116,15 @@ export function NotificationBell({ notifs, unread, markRead, markAllRead }) {
             ) : notifs.map(n => {
               const t = TIPO_ICON[n.tipo] || { icon:'🔔', color:'var(--text2)', bg:'var(--bg3)' }
               return (
-                <div key={n.id} onClick={() => markRead(n.id)} style={{
+                <div key={n.id} style={{
                   padding:'12px 16px', borderBottom:'1px solid var(--border)',
                   display:'flex', gap:10, alignItems:'flex-start',
                   background: n.lida ? 'transparent' : 'rgba(193,156,86,0.05)',
-                  cursor:'pointer', transition:'background 0.15s'
+                  transition:'background 0.15s'
                 }}>
-                  <div style={{
-                    width:32, height:32, borderRadius:8, flexShrink:0,
-                    background:t.bg, display:'flex', alignItems:'center',
-                    justifyContent:'center', fontSize:14
-                  }}>{t.icon}</div>
-                  <div style={{ flex:1, minWidth:0 }}>
+                  <div onClick={() => { markRead(n.id); if(onNavigate&&n.link) onNavigate(n.link) }}
+                    style={{ width:32, height:32, borderRadius:8, flexShrink:0, background:t.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, cursor:'pointer' }}>{t.icon}</div>
+                  <div style={{ flex:1, minWidth:0, cursor:'pointer' }} onClick={() => { markRead(n.id); if(onNavigate&&n.link) onNavigate(n.link) }}>
                     <div style={{ fontSize:12, fontWeight: n.lida ? 500 : 700, marginBottom:2 }}>
                       {n.titulo}
                     </div>

@@ -195,7 +195,7 @@ function Shell() {
   const [bar, setBar] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pedidosPendentes, setPedidosPendentes] = useState(0)
-  const { notifs, unread, markRead, markAllRead } = useNotifications()
+  const { notifs, unread, markRead, markAllRead, deleteNotif, deleteAll } = useNotifications()
 
   useEffect(() => {
     if (perfil?.role === 'cliente' && perfil.bar_id) {
@@ -254,7 +254,7 @@ function Shell() {
             </div>
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
-            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead}/>
+            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={setTab}/>
           </div>
           <button onClick={signOut} style={{width:'100%',padding:'7px',fontSize:11,color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,background:'transparent',letterSpacing:'0.04em',textTransform:'uppercase'}}>Sign out</button>
         </div>

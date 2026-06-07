@@ -1866,7 +1866,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Client portal</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
           <div style={{marginBottom:8}}>
-            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead}/>
+            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={setTab}/>
           </div>
           <button onClick={signOut} style={{width:'100%',padding:'7px',fontSize:11,color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,background:'transparent',textTransform:'uppercase',letterSpacing:'0.04em'}}>Sign out</button>
         </div>
