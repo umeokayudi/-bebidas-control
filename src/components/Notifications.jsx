@@ -100,13 +100,13 @@ export function NotificationBell({ notifs, unread, markRead, markAllRead, delete
               display:'flex', justifyContent:'space-between', alignItems:'center'
             }}>
               <span style={{ fontSize:13, fontWeight:700 }}>Notifications</span>
-              {unread > 0 && (
+              <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                 {notifs.some(n=>n.lida) && deleteAll && <button onClick={deleteAll} style={{ fontSize:11, color:'var(--text2)', background:'none', border:'none', cursor:'pointer', padding:'4px 8px' }}>🗑 Clear read</button>}
-                <button onClick={markAllRead} style={{
+                {unread > 0 && <button onClick={markAllRead} style={{
                   fontSize:11, color:'var(--blue)', border:'none',
                   background:'none', cursor:'pointer', fontWeight:600
-                }}>Mark all read</button>
-              )}
+                }}>Mark all read</button>}
+              </div>
             </div>
 
             {notifs.length === 0 ? (
