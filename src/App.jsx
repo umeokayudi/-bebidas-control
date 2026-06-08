@@ -22,6 +22,7 @@ import PortalCliente from './components/PortalCliente'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
+import Cashflow from './components/Cashflow'
 import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import { PedidosAdminTab } from './components/Configs'
@@ -282,6 +283,7 @@ function Shell() {
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
         {tab==='faturas'   && <Faturas />}
+        {tab==='cashflow'   && <Cashflow />}
         {tab==='bi'        && <BusinessIntel />}
         {tab==='ai'        && <AIAssistant />}
         {tab==='suppliers' && <Fornecedores />}
