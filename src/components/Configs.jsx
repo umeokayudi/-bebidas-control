@@ -399,7 +399,8 @@ export function PedidosAdminTab() {
         titulo:'Order confirmed',mensagem:'Your order is being prepared.'
       }).catch(()=>{})
     }
-    load()
+    // Update local state immediately for real-time feel
+    setPedidos(prev => prev.map(p => p.id===id ? {...p, status} : p))
     load()
   }
 
@@ -531,7 +532,10 @@ export function PedidosAdminTab() {
                   {p.status==='pendente'&&<>
                     <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>Confirm</button>
                     <button onClick={()=>updateStatus(p.id,'cancelado')} className="btn-danger" style={{padding:'6px 14px',fontSize:11,borderRadius:8}}>Cancel</button>
-                    <button onClick={async()=>{ if(!confirm('Delete this order?'))return; await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); load() }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600}}>🗑 Delete</button>
+                  </>}
+                  <button onClick={async()=>{ if(!confirm('Delete this order?'))return; setPedidos(prev=>prev.filter(x=>x.id!==p.id)); await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600,cursor:'pointer'}}>🗑</button>
+                  {p.status==='pendente'&&<>
+                  </>}
                   </>}
                   {p.status==='confirmado'&&(
                     <button onClick={()=>openChecklist(p)} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--green)',color:'white',border:'none',fontWeight:600}}>&#10003; Mark delivered</button>
