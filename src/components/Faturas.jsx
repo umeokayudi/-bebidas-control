@@ -33,12 +33,14 @@ function Overview() {
   const [vendas, setVendas] = useState([])
   const [loading, setLoading] = useState(true)
   useEffect(() => { load() }, [])
+  const [pagamentos, setPagamentos] = useState([])
   async function load() {
-    const [fR, vR] = await Promise.all([
+    const [fR, vR, pR] = await Promise.all([
       supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false}),
       supabase.from('vendas').select('total,data,bar_id').order('data'),
+      supabase.from('fatura_pagamentos').select('*, faturas(*, bars(nome))').eq('confirmado',false).order('criado_em',{ascending:false}),
     ])
-    setFaturas(fR.data||[]); setVendas(vR.data||[]); setLoading(false)
+    setFaturas(fR.data||[]); setVendas(vR.data||[]); setPagamentos(pR.data||[]); setLoading(false)
   }
   if (loading) return <Spinner text="Loading..." />
 
