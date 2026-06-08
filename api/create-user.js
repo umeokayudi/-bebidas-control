@@ -6,31 +6,48 @@ export default async function handler(req, res) {
   const { email, password, nome, role, bar_id } = req.body
   if (!email || !password || !nome || !role) return res.status(400).json({ error: 'Missing fields' })
 
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  // Use service role to create user directly via admin API
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { nome }
-  })
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': serviceKey,
+        'Authorization': `Bearer ${serviceKey}`
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { nome }
+      })
+    })
 
-  if (error) return res.status(400).json({ error: error.message })
+    const data = await response.json()
+    if (!response.ok) return res.status(400).json({ error: data.message || data.msg || JSON.stringify(data) })
 
-  const { error: perfilError } = await supabase.from('perfis').upsert({
-    id: data.user.id,
-    nome,
-    email,
-    role,
-    bar_id: bar_id || null
-  })
+    const uid = data.id
 
-  if (perfilError) return res.status(400).json({ error: perfilError.message })
+    const perfilRes = await fetch(`${supabaseUrl}/rest/v1/perfis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': serviceKey,
+        'Authorization': `Bearer ${serviceKey}`,
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ id: uid, nome, email, role, bar_id: bar_id || null })
+    })
 
-  return res.status(200).json({ success: true, id: data.user.id })
+    if (!perfilRes.ok) {
+      const perfilErr = await perfilRes.json()
+      return res.status(400).json({ error: perfilErr.message || 'Perfil creation failed' })
+    }
+
+    return res.status(200).json({ success: true, id: uid })
+  } catch(e) {
+    return res.status(500).json({ error: e.message })
+  }
 }
