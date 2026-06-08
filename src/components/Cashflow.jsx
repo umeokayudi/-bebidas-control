@@ -9,7 +9,7 @@ export default function Cashflow() {
       <div style={{ fontSize:20, fontWeight:800, marginBottom:4 }}>Cash Flow</div>
       <div style={{ fontSize:13, color:'var(--text2)', marginBottom:16 }}>Track money in (bar payments) and money out (supplier purchases)</div>
       <div style={{ display:'flex', gap:8, marginBottom:24 }}>
-        {[['overview','📊 Overview'],['in','💚 Money In'],['out','🔴 Money Out'],['purchases','🛒 Purchases']].map(([id,label]) => (
+        {[['overview','📊 Overview'],['in','💚 Money In'],['out','🔴 Money Out'],['purchases','🛒 Purchases'],['caixa','💵 Caixa'],['calendario','📅 Calendar']].map(([id,label]) => (
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'8px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', background:tab===id?'var(--navy)':'var(--bg3)', color:tab===id?'white':'var(--text2)', border:'none' }}>{label}</button>
         ))}
       </div>
@@ -17,6 +17,8 @@ export default function Cashflow() {
       {tab==='in'        && <MoneyIn />}
       {tab==='out'       && <MoneyOut />}
       {tab==='purchases' && <PurchasePayments />}
+      {tab==='caixa' && <Caixa />}
+      {tab==='calendario' && <Calendario />}
     </div>
   )
 }
@@ -318,6 +320,217 @@ function PurchasePayments() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function Caixa() {
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState(false)
+  const [form, setForm] = useState({ tipo:'entrada', valor:'', descricao:'', metodo:'Cash', data:new Date().toISOString().slice(0,10) })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { load() }, [])
+  async function load() {
+    const { data } = await supabase.from('caixa_movimentos').select('*').order('data',{ascending:false}).limit(100)
+    setEntries(data||[])
+    setLoading(false)
+  }
+  async function save() {
+    setSaving(true)
+    await supabase.from('caixa_movimentos').insert({ ...form, valor:+form.valor })
+    setSaving(false); setModal(false); setForm({ tipo:'entrada', valor:'', descricao:'', metodo:'Cash', data:new Date().toISOString().slice(0,10) }); load()
+  }
+
+  const totalIn = entries.filter(e=>e.tipo==='entrada').reduce((a,e)=>a+(+e.valor||0),0)
+  const totalOut = entries.filter(e=>e.tipo==='saida').reduce((a,e)=>a+(+e.valor||0),0)
+  const balance = totalIn - totalOut
+
+  if (loading) return <Spinner text="Loading..." />
+  return (
+    <div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
+        {[
+          { label:'Total in', value:fmtYen(totalIn), color:'var(--green)', icon:'💚' },
+          { label:'Total out', value:fmtYen(totalOut), color:'var(--red)', icon:'🔴' },
+          { label:'Balance', value:fmtYen(balance), color:balance>=0?'var(--green)':'var(--red)', icon:'💰' },
+        ].map(k=>(
+          <div key={k.label} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'16px' }}>
+            <div style={{ fontSize:22, marginBottom:4 }}>{k.icon}</div>
+            <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.value}</div>
+            <div style={{ fontSize:11, color:'var(--text2)', textTransform:'uppercase', marginTop:4 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        <div style={{ fontSize:16, fontWeight:700 }}>Cash movements</div>
+        <button className="btn-primary" onClick={()=>setModal(true)} style={{ padding:'8px 16px', fontSize:12, borderRadius:10 }}>+ Add movement</button>
+      </div>
+      {entries.length===0?<Empty text="No movements" icon="💵" />:(
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {entries.map(e=>(
+            <div key={e.id} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:e.tipo==='entrada'?'#f0fdf4':'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+                {e.tipo==='entrada'?'↑':'↓'}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:600 }}>{e.descricao}</div>
+                <div style={{ fontSize:11, color:'var(--text2)' }}>{fmtDate(e.data)} · {e.metodo}</div>
+              </div>
+              <div style={{ fontSize:15, fontWeight:800, color:e.tipo==='entrada'?'var(--green)':'var(--red)' }}>
+                {e.tipo==='entrada'?'+':'-'}{fmtYen(e.valor)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {modal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'28px', width:'100%', maxWidth:380, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:20 }}>Add cash movement</div>
+            <div style={{ marginBottom:12 }}>
+              <label className="form-label">Type</label>
+              <select value={form.tipo} onChange={e=>setForm({...form,tipo:e.target.value})}>
+                <option value="entrada">Entrada (in)</option>
+                <option value="saida">Saída (out)</option>
+              </select>
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label className="form-label">Amount (¥)</label>
+              <input type="number" value={form.valor} onChange={e=>setForm({...form,valor:e.target.value})} autoFocus />
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label className="form-label">Description</label>
+              <input value={form.descricao} onChange={e=>setForm({...form,descricao:e.target.value})} placeholder="e.g. Atomic payment, Costco purchase..." />
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label className="form-label">Method</label>
+              <select value={form.metodo} onChange={e=>setForm({...form,metodo:e.target.value})}>
+                {['Cash','Bank Transfer','Card'].map(m=><option key={m}>{m}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <label className="form-label">Date</label>
+              <input type="date" value={form.data} onChange={e=>setForm({...form,data:e.target.value})} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:8 }}>
+              <button onClick={()=>setModal(false)} style={{ padding:'11px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancel</button>
+              <button className="btn-primary" onClick={save} disabled={saving||!form.valor||!form.descricao} style={{ padding:'11px', borderRadius:12 }}>{saving?'Saving...':'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Calendario() {
+  const [faturas, setFaturas] = useState([])
+  const [compras, setCompras] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+
+  useEffect(() => { load() }, [])
+  async function load() {
+    const [fR, cR] = await Promise.all([
+      supabase.from('faturas').select('*, bars(nome)').eq('status','pendente').order('vencimento'),
+      supabase.from('compras').select('*').eq('status_pagamento','pendente').order('data'),
+    ])
+    setFaturas(fR.data||[])
+    setCompras(cR.data||[])
+    setLoading(false)
+  }
+
+  const year = currentMonth.getFullYear()
+  const month = currentMonth.getMonth()
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month+1, 0).getDate()
+  const monthStr = currentMonth.toISOString().slice(0,7)
+
+  // Build events map
+  const events = {}
+  faturas.forEach(f => {
+    if (f.vencimento?.startsWith(monthStr)) {
+      const day = +f.vencimento.slice(8,10)
+      if (!events[day]) events[day] = []
+      events[day].push({ type:'in', label:f.bars?.nome, amount:f.total-f.pago, color:'var(--green)' })
+    }
+  })
+  compras.forEach(c => {
+    const payDate = c.data_pagamento || c.data
+    if (payDate?.startsWith(monthStr)) {
+      const day = +payDate.slice(8,10)
+      if (!events[day]) events[day] = []
+      events[day].push({ type:'out', label:c.fornecedor||'Supplier', amount:c.total_pago, color:'var(--red)' })
+    }
+  })
+
+  const today = new Date().getDate()
+  const isCurrentMonth = new Date().getMonth()===month && new Date().getFullYear()===year
+
+  if (loading) return <Spinner text="Loading..." />
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+        <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{ padding:'8px 14px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:14 }}>←</button>
+        <div style={{ fontSize:16, fontWeight:700 }}>{currentMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+        <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{ padding:'8px 14px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:14 }}>→</button>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display:'flex', gap:16, marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'var(--green)' }}/> Money in (invoices due)</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'var(--red)' }}/> Money out (supplier payments)</div>
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--bg3)' }}>
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
+            <div key={d} style={{ padding:'8px', textAlign:'center', fontSize:11, fontWeight:700, color:'var(--text2)' }}>{d}</div>
+          ))}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
+          {Array.from({length:firstDay}).map((_,i)=>(
+            <div key={'empty'+i} style={{ padding:'8px', minHeight:60, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)' }}/>
+          ))}
+          {Array.from({length:daysInMonth}).map((_,i)=>{
+            const day = i+1
+            const dayEvents = events[day]||[]
+            const isToday = isCurrentMonth && day===today
+            return (
+              <div key={day} style={{ padding:'6px', minHeight:60, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:isToday?'rgba(193,156,86,0.08)':'transparent' }}>
+                <div style={{ fontSize:12, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)', marginBottom:2 }}>{day}</div>
+                {dayEvents.map((ev,ei)=>(
+                  <div key={ei} style={{ fontSize:9, fontWeight:600, padding:'2px 4px', borderRadius:4, marginBottom:2, background:ev.color==='var(--green)'?'#f0fdf4':'#fef2f2', color:ev.color, lineHeight:1.3 }}>
+                    {ev.type==='in'?'↑':'↓'} {ev.label?.slice(0,8)} {Math.round(ev.amount/1000)}k
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Upcoming list */}
+      <div style={{ marginTop:20 }}>
+        <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>All upcoming events</div>
+        {[...faturas.map(f=>({ date:f.vencimento, label:f.bars?.nome, amount:f.total-f.pago, type:'in', note:'Invoice due' })),
+          ...compras.map(c=>({ date:c.data_pagamento||c.data, label:c.fornecedor||'Supplier', amount:c.total_pago, type:'out', note:'Purchase payment' }))
+        ].sort((a,b)=>a.date?.localeCompare(b.date)).map((ev,i)=>(
+          <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
+            <div>
+              <span style={{ fontWeight:600 }}>{fmtDate(ev.date)}</span>
+              <span style={{ color:'var(--text2)', marginLeft:8 }}>{ev.label}</span>
+              <span style={{ color:'var(--text3)', marginLeft:8, fontSize:11 }}>{ev.note}</span>
+            </div>
+            <span style={{ fontWeight:700, color:ev.type==='in'?'var(--green)':'var(--red)' }}>
+              {ev.type==='in'?'+':'-'}{fmtYen(ev.amount)}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
