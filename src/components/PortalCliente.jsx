@@ -1827,7 +1827,7 @@ function FaturasTab({ bar }) {
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 import { NotificationBell } from './Notifications'
 
-export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead }) {
+export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
   const [tab, setTab] = useState('home')
 
   const NAV = [
