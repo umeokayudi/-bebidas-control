@@ -100,7 +100,14 @@ function Dashboard({ onNav }) {
     const receitaMes=salesMes.reduce((a,v)=>a+(+v.total||0),0)
     const lucroMes=receitaMes-custoMes
     const margem=receitaMes>0?Math.round(lucroMes/receitaMes*100):0
-    const markup=custoMes>0?Math.round((receitaMes/custoMes-1)*100):0
+    // Weighted avg margin based on products sold this month
+    const allItems = (salesMes||[]).flatMap(v=>v.vendas_itens||[])
+    const totalRev = allItems.reduce((a,it)=>a+(+it.preco_unitario||0)*(+it.qtd||0),0)
+    const totalCost = allItems.reduce((a,it)=>{
+      const prod = (products||[]).find(p=>p.id===it.produto_id)
+      return a + (+prod?.custo||0)*(+it.qtd||0)
+    },0)
+    const markup = totalRev>0?Math.round((totalRev-totalCost)/totalRev*100):0
     const porBar=(bars||[]).map(bar=>{
       const vBar=salesMes.filter(v=>v.bar_id===bar.id)
       const receita=vBar.reduce((a,v)=>a+(+v.total||0),0)
