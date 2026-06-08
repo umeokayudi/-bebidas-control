@@ -186,10 +186,6 @@ export function UsuariosTab() {
   const [saving, setSaving] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState({ nome:'', email:'', role:'cliente', bar_id:'' })
-  const [showNew, setShowNew] = useState(false)
-  const [newPw, setNewPw] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [creating, setCreating] = useState(false)
   const [msg, setMsg] = useState('')
 
   useEffect(() => { load() }, [])
@@ -263,20 +259,21 @@ export function UsuariosTab() {
             <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} disabled={creating||!newEmail||!newPw||!form.nome}
               onClick={async()=>{
                 setCreating(true)
-                const {data,error} = await supabase.auth.admin.createUser({
-                  email: newEmail, password: newPw, email_confirm: true,
-                  user_metadata: { nome: form.nome }
-                })
-                if (error) { setMsg('Error: '+error.message); setCreating(false); return }
-                await supabase.from('perfis').upsert({
-                  id: data.user.id, nome: form.nome, email: newEmail,
-                  role: form.role, bar_id: form.bar_id||null
-                })
-                setMsg('User created: '+newEmail)
-                setShowNew(false); setNewEmail(''); setNewPw('')
-                setForm({nome:'',email:'',role:'cliente',bar_id:''})
-                setCreating(false); load()
-                setTimeout(()=>setMsg(''),4000)
+                try {
+                  const res = await fetch('/api/create-user', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ email: newEmail, password: newPw, nome: form.nome, role: form.role, bar_id: form.bar_id||null })
+                  })
+                  const json = await res.json()
+                  if (!res.ok) { setMsg('Error: '+(json.error||'unknown')); setCreating(false); return }
+                  setMsg('User created: '+newEmail)
+                  setShowNew(false); setNewEmail(''); setNewPw('')
+                  setForm({nome:'',email:'',role:'cliente',bar_id:''})
+                  load()
+                  setTimeout(()=>setMsg(''),4000)
+                } catch(e) { setMsg('Error: '+e.message) }
+                setCreating(false)
               }}>
               {creating ? 'Creating...' : 'Create'}
             </button>
