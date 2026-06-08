@@ -186,6 +186,10 @@ export function UsuariosTab() {
   const [saving, setSaving] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState({ nome:'', email:'', role:'cliente', bar_id:'' })
+  const [showNew, setShowNew] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [creating, setCreating] = useState(false)
   const [msg, setMsg] = useState('')
 
   useEffect(() => { load() }, [])
