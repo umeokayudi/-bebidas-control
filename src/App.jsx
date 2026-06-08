@@ -80,6 +80,7 @@ function Dashboard({ onNav }) {
   useEffect(()=>{ loadStats() },[])
 
   async function loadStats() {
+    try {
     const now = new Date()
     const mesAtual = now.toISOString().slice(0,7)
     const [{ data:purchases },{ data:sales },{ data:products },{ data:bars },{ data:pedidos }] = await Promise.all([
@@ -120,6 +121,7 @@ function Dashboard({ onNav }) {
               totalVendas:salesMes.length,totalCompras:purchasesMes.length,
               pedidosPendentes:(pedidos||[]).length})
     setLoading(false)
+    } catch(e) { console.error('loadStats error',e); setLoading(false) }
   }
 
   if(loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:300,color:'var(--text2)'}}><span className="spinner"/>Carregando...</div>

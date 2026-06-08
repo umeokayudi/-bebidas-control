@@ -180,10 +180,169 @@ export function BarsTab() {
 
 // ── USUÁRIOS (admin only) ─────────────────────────────────────────────────────
 export function UsuariosTab() {
+  const [users, setUsers] = useState([])
+  const [bars, setBars] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState({ nome:'', email:'', role:'cliente', bar_id:'' })
+  const [showNew, setShowNew] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    const [{ data: u }, { data: b }] = await Promise.all([
+      supabase.from('perfis').select('*').order('nome'),
+      supabase.from('bars').select('id,nome').order('nome'),
+    ])
+    setUsers(u || [])
+    setBars(b || [])
+    setLoading(false)
+  }
+
+  async function saveEdit(id) {
+    setSaving(true)
+    await supabase.from('perfis').update({
+      nome: form.nome,
+      role: form.role,
+      bar_id: form.bar_id || null,
+    }).eq('id', id)
+    setSaving(false)
+    setEditId(null)
+    load()
+  }
+
+  async function deleteUser(id) {
+    if (!confirm('Delete this user?')) return
+    await supabase.from('perfis').delete().eq('id', id)
+    load()
+  }
+
+  function startEdit(u) {
+    setEditId(u.id)
+    setForm({ nome: u.nome||'', email: u.email||'', role: u.role||'cliente', bar_id: u.bar_id||'' })
+  }
+
+  const roleColor = { admin:'var(--gold)', staff:'var(--navy)', cliente:'var(--green)' }
+
+  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>Loading...</div>
+
   return (
-    <div className="card fade-in">
-      <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>Users</div>
-      <div style={{fontSize:13,color:'var(--text2)'}}>Coming soon — user management</div>
+    <div className="fade-in">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+        <div style={{fontSize:18,fontWeight:800,color:'var(--navy)'}}>Users <span style={{fontSize:13,fontWeight:400,color:'var(--text3)'}}>({users.length})</span></div>
+        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>setShowNew(v=>!v)}>+ New user</button>
+      </div>
+
+      {msg && <div style={{background:'var(--green)',color:'white',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:13}}>{msg}</div>}
+
+      {showNew && (
+        <div className="card" style={{marginBottom:20,background:'var(--bg2)',border:'1px solid rgba(193,156,86,0.2)'}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:'var(--navy)'}}>Create new user</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+            <input className="input" placeholder="Full name" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/>
+            <input className="input" placeholder="Email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
+            <input className="input" placeholder="Password" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
+            <select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
+              <option value="admin">Admin</option>
+              <option value="staff">Staff</option>
+              <option value="cliente">Cliente</option>
+            </select>
+            {form.role==='cliente' && (
+              <select className="input" value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})}>
+                <option value="">— Select bar —</option>
+                {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+              </select>
+            )}
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} disabled={creating||!newEmail||!newPw||!form.nome}
+              onClick={async()=>{
+                setCreating(true)
+                const {data,error} = await supabase.auth.admin.createUser({
+                  email: newEmail, password: newPw, email_confirm: true,
+                  user_metadata: { nome: form.nome }
+                })
+                if (error) { setMsg('Error: '+error.message); setCreating(false); return }
+                await supabase.from('perfis').upsert({
+                  id: data.user.id, nome: form.nome, email: newEmail,
+                  role: form.role, bar_id: form.bar_id||null
+                })
+                setMsg('User created: '+newEmail)
+                setShowNew(false); setNewEmail(''); setNewPw('')
+                setForm({nome:'',email:'',role:'cliente',bar_id:''})
+                setCreating(false); load()
+                setTimeout(()=>setMsg(''),4000)
+              }}>
+              {creating ? 'Creating...' : 'Create'}
+            </button>
+            <button onClick={()=>setShowNew(false)} style={{fontSize:12,padding:'8px 16px',background:'var(--bg3)',border:'none',borderRadius:8,cursor:'pointer',color:'var(--text2)'}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr style={{background:'var(--bg2)',borderBottom:'1px solid var(--border)'}}>
+              {['Name','Email','Role','Bar','Actions'].map(h=>(
+                <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.05em'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u,i)=>(
+              <tr key={u.id} style={{borderBottom:'1px solid var(--border)',background:i%2===0?'white':'var(--bg)'}}>
+                {editId===u.id ? (
+                  <>
+                    <td style={{padding:'8px 14px'}}><input className="input" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/></td>
+                    <td style={{padding:'8px 14px',fontSize:12,color:'var(--text3)'}}>{u.email}</td>
+                    <td style={{padding:'8px 14px'}}>
+                      <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
+                        <option value="admin">Admin</option>
+                        <option value="staff">Staff</option>
+                        <option value="cliente">Cliente</option>
+                      </select>
+                    </td>
+                    <td style={{padding:'8px 14px'}}>
+                      <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})}>
+                        <option value="">—</option>
+                        {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
+                      </select>
+                    </td>
+                    <td style={{padding:'8px 14px'}}>
+                      <div style={{display:'flex',gap:6}}>
+                        <button className="btn-primary" style={{fontSize:11,padding:'4px 10px'}} disabled={saving} onClick={()=>saveEdit(u.id)}>{saving?'...':'Save'}</button>
+                        <button onClick={()=>setEditId(null)} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>Cancel</button>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{padding:'10px 14px',fontSize:13,fontWeight:600}}>{u.nome||'—'}</td>
+                    <td style={{padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>{u.email||'—'}</td>
+                    <td style={{padding:'10px 14px'}}>
+                      <span style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:20,background:`${roleColor[u.role]||'#ccc'}20`,color:roleColor[u.role]||'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>{u.role||'—'}</span>
+                    </td>
+                    <td style={{padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>{bars.find(b=>b.id===u.bar_id)?.nome||'—'}</td>
+                    <td style={{padding:'10px 14px'}}>
+                      <div style={{display:'flex',gap:6}}>
+                        <button onClick={()=>startEdit(u)} style={{fontSize:11,padding:'4px 10px',background:'var(--navy)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Edit</button>
+                        <button onClick={()=>deleteUser(u.id)} style={{fontSize:11,padding:'4px 10px',background:'var(--red)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Del</button>
+                      </div>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {users.length===0 && <div style={{padding:32,textAlign:'center',color:'var(--text3)',fontSize:13}}>No users found</div>}
+      </div>
     </div>
   )
 }
