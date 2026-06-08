@@ -2015,12 +2015,16 @@ function CalendarioTab({ bar }) {
                   <span style={{ fontSize:13, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)',
                     width:24, height:24, borderRadius:'50%', display:'inline-flex', alignItems:'center', justifyContent:'center',
                     background:isToday?'var(--navy)':'transparent' }}>{day}</span>
-                  {dayEvents.map((ev,ei)=>(
-                    <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:3,
-                      background:'#fef2f2', color:'#dc2626', fontWeight:600 }}>
-                      💳 {Math.round(ev.amount/1000)}k due
-                    </div>
-                  ))}
+                  {dayEvents.map((ev,ei)=>{
+                    const daysLeft = Math.ceil((new Date(ev.date)-today)/(1000*60*60*24))
+                    return (
+                      <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:3,
+                        background:'#fef2f2', color:'#dc2626', fontWeight:600, lineHeight:1.4 }}>
+                        💳 {Math.round(ev.amount/1000)}k
+                        <span style={{ display:'block', fontSize:8 }}>{daysLeft===0?'today':daysLeft+'d left'}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )

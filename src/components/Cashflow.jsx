@@ -547,13 +547,17 @@ function Calendario() {
                   </div>
                   {hasIn && <div style={{ height:4, background:'#86efac', borderRadius:2, marginBottom:2 }}/>}
                   {hasOut && <div style={{ height:4, background:'#fca5a5', borderRadius:2 }}/>}
-                  {dayEvents.slice(0,2).map((ev,ei)=>(
-                    <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:2,
-                      background:ev.type==='in'?'#f0fdf4':'#fef2f2', color:ev.type==='in'?'#16a34a':'#dc2626',
-                      fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {ev.type==='in'?'↑':'↓'} {Math.round(ev.amount/1000)}k
-                    </div>
-                  ))}
+                  {dayEvents.slice(0,2).map((ev,ei)=>{
+                    const daysLeft = Math.ceil((new Date(ev.date)-today)/(1000*60*60*24))
+                    return (
+                      <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:2,
+                        background:ev.type==='in'?'#f0fdf4':'#fef2f2', color:ev.type==='in'?'#16a34a':'#dc2626',
+                        fontWeight:600, lineHeight:1.4 }}>
+                        {ev.type==='in'?'↑':'↓'} {Math.round(ev.amount/1000)}k
+                        {daysLeft>=0 && <span style={{ display:'block', fontSize:8, opacity:0.8 }}>{daysLeft===0?'today':daysLeft+'d'}</span>}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
