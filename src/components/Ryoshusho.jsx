@@ -246,6 +246,9 @@ export default function RyoshushoTab() {
                         : '—'}
                     </td>
                     <td style={{ fontWeight:700 }}>{fmtYen(r.total)}</td>
+                    <td>
+                      <button onClick={async()=>{ if(!confirm('Delete this ryoshusho?'))return; await supabase.from('ryoshusho').delete().eq('id',r.id); setHistory(prev=>prev.filter(x=>x.id!==r.id)) }} style={{padding:'3px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',cursor:'pointer'}}>🗑</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
