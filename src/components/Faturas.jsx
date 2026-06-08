@@ -321,6 +321,7 @@ function InvoiceList() {
                     {periodVendas.length>0&&<button onClick={()=>setExpanded(expanded===f.id?null:f.id)} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>
                       {expanded===f.id?'▲ Hide':'▼ Show'} {periodVendas.length} deliveries
                     </button>}
+                    <button onClick={async()=>{ if(!confirm('Delete this invoice?'))return; await supabase.from('fatura_pagamentos').delete().eq('fatura_id',f.id); await supabase.from('faturas').delete().eq('id',f.id); setFaturas(prev=>prev.filter(x=>x.id!==f.id)) }} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'#7f1d1d', color:'white', cursor:'pointer', fontWeight:600 }}>🗑</button>
                   </div>
                 </div>
                 {expanded===f.id && (
