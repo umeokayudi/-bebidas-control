@@ -43,6 +43,7 @@ const ADMIN_TABS = [
   { id:'bi',         label:'📊 Reports'   },
   { id:'ai',         label:'🤖 AI'       },
   { id:'suppliers',  label:'Suppliers'  },
+  { id:'cashflow',   label:'💸 Cash Flow' },
 ]
 
 const STAFF_TABS = [
