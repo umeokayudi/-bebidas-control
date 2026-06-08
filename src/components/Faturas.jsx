@@ -331,8 +331,7 @@ function InvoiceList() {
                         <div>
                           <span style={{ fontWeight:600 }}>{fmtDate(v.data)}</span>
                           <span style={{ color:'var(--text2)', marginLeft:8 }}>
-                            {(v.vendas_itens||[]).slice(0,3).map(it=>it.produtos?.nome+'×'+it.qtd).join(', ')}
-                            {(v.vendas_itens||[]).length>3?' ...':''}
+                            {(v.vendas_itens||[]).map(it=>it.produtos?.nome+'×'+it.qtd).join(', ')}
                           </span>
                         </div>
                         <span style={{ fontWeight:700 }}>{fmtYen(v.total)}</span>
