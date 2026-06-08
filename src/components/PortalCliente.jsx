@@ -1877,8 +1877,7 @@ function FaturasTab({ bar }) {
                 {image?(
                   <div>
                     <img src={image} alt="receipt" style={{ maxHeight:150, maxWidth:"100%", borderRadius:8, marginBottom:8 }} />
-                    {scanning&&<div style={{ fontSize:12, color:"var(--text2)" }}>🤖 AI scanning...</div>}
-                    {scannedData&&<div style={{ fontSize:12, color:"var(--green)", fontWeight:600 }}>✅ AI detected: {fmtYen(scannedData.valor)}</div>}
+                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>Receipt uploaded ✓</div>
                   </div>
                 ):(
                   <div>
@@ -1891,7 +1890,7 @@ function FaturasTab({ bar }) {
                   onChange={e=>{
                     const file = e.target.files[0]; if (!file) return
                     const reader = new FileReader()
-                    reader.onload = ev => { setImage(ev.target.result); scanReceipt(ev.target.result) }
+                    reader.onload = ev => { setImage(ev.target.result) }
                     reader.readAsDataURL(file)
                   }}
                 />
