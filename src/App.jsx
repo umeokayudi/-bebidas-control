@@ -83,9 +83,9 @@ function Dashboard({ onNav }) {
     const now = new Date()
     const mesAtual = now.toISOString().slice(0,7)
     const [{ data:purchases },{ data:sales },{ data:products },{ data:bars },{ data:pedidos }] = await Promise.all([
-      supabase.from('purchases').select('*').order('data'),
-      supabase.from('sales').select('*, sales_itens(*, products(*))').order('data'),
-      supabase.from('products').select('*').eq('ativo',true),
+      supabase.from('compras').select('*').order('data'),
+      supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').order('data'),
+      supabase.from('produtos').select('*').eq('ativo',true),
       supabase.from('bars').select('*'),
       supabase.from('pedidos').select('*').eq('status','pendente'),
     ])
