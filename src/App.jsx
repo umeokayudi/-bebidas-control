@@ -104,11 +104,11 @@ function Dashboard({ onNav }) {
     const porBar=(bars||[]).map(bar=>{
       const vBar=salesMes.filter(v=>v.bar_id===bar.id)
       const receita=vBar.reduce((a,v)=>a+(+v.total||0),0)
-      const custo=vBar.reduce((a,v)=>a+(v.sales_itens||[]).reduce((b,it)=>b+((it.products?.custo||0)*it.qtd),0),0)
+      const custo=vBar.reduce((a,v)=>a+(v.vendas_itens||[]).reduce((b,it)=>b+((it.produtos?.custo||0)*it.qtd),0),0)
       return {...bar,receita,lucro:receita-custo,sales:vBar.length}
     })
     const prodMap={}
-    salesMes.forEach(v=>(v.sales_itens||[]).forEach(it=>{
+    salesMes.forEach(v=>(v.vendas_itens||[]).forEach(it=>{
       const pid=it.produto_id
       if(!prodMap[pid])prodMap[pid]={nome:it.products?.nome||'?',qtd:0,receita:0}
       prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd
