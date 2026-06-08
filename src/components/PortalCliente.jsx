@@ -1924,6 +1924,133 @@ function FaturasTab({ bar }) {
 }
 
 
+
+// ── CALENDARIO CLIENTE ───────────────────────────────────────────────────────
+function CalendarioTab({ bar }) {
+  const [faturas, setFaturas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [popup, setPopup] = useState(null)
+  const [selectedDay, setSelectedDay] = useState(null)
+
+  useEffect(() => { load() }, [bar])
+  async function load() {
+    const { data } = await supabase.from('faturas').select('*').eq('bar_id', bar.id).order('vencimento')
+    setFaturas(data||[])
+    setLoading(false)
+  }
+
+  const year = currentMonth.getFullYear()
+  const month = currentMonth.getMonth()
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month+1, 0).getDate()
+  const monthStr = currentMonth.toISOString().slice(0,7)
+  const today = new Date()
+  const isCurrentMonth = today.getMonth()===month && today.getFullYear()===year
+
+  const events = {}
+  faturas.forEach(f => {
+    if (f.vencimento?.startsWith(monthStr)) {
+      const day = +f.vencimento.slice(8,10)
+      if (!events[day]) events[day] = []
+      events[day].push({ amount:(+f.total||0)-(+f.pago||0), status:f.status, date:f.vencimento, periodo:f.periodo_inicio+' to '+f.periodo_fim })
+    }
+  })
+
+  const upcoming = faturas.filter(f=>f.status!=='pago'&&f.vencimento>=today.toISOString().slice(0,10))
+    .sort((a,b)=>a.vencimento.localeCompare(b.vencimento))
+
+  if (loading) return <Spinner text="Loading..." />
+
+  return (
+    <div className="fade-in" style={{ maxWidth:800 }}>
+      {/* Upcoming banner */}
+      {upcoming.length>0 && (
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
+          <div style={{ fontSize:13, fontWeight:700, marginBottom:10 }}>⚡ Upcoming payments</div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {upcoming.slice(0,4).map((f,i)=>{
+              const daysLeft = Math.ceil((new Date(f.vencimento)-today)/(1000*60*60*24))
+              const remaining = (+f.total||0)-(+f.pago||0)
+              return (
+                <div key={i} style={{ background:daysLeft<=5?'#fef2f2':'#f0fdf4', border:'1px solid', borderColor:daysLeft<=5?'#fca5a5':'#86efac', borderRadius:12, padding:'10px 14px', minWidth:140 }}>
+                  <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?'var(--red)':'var(--green)' }}>{fmtYen(remaining)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>Due {fmtDate(f.vencimento)}</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:daysLeft<=5?'var(--red)':'var(--text2)', marginTop:4 }}>
+                    {daysLeft===0?'Today!':daysLeft===1?'Tomorrow':'In '+daysLeft+' days'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Calendar nav */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>←</button>
+        <div style={{ fontSize:16, fontWeight:700 }}>{currentMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+        <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>→</button>
+      </div>
+
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden', marginBottom:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--navy)' }}>
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
+            <div key={d} style={{ padding:'10px', textAlign:'center', fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>{d}</div>
+          ))}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
+          {Array.from({length:firstDay}).map((_,i)=>(
+            <div key={'e'+i} style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:'var(--bg3)' }}/>
+          ))}
+          {Array.from({length:daysInMonth}).map((_,i)=>{
+            const day = i+1
+            const dayEvents = events[day]||[]
+            const isToday = isCurrentMonth && day===today.getDate()
+            return (
+              <div key={day} onClick={()=>{ if(dayEvents.length>0){ setSelectedDay(day); setPopup(dayEvents) }}}
+                style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
+                  background:isToday?'rgba(193,156,86,0.1)':'transparent', cursor:dayEvents.length>0?'pointer':'default' }}>
+                <div style={{ padding:'6px 8px' }}>
+                  <span style={{ fontSize:13, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)',
+                    width:24, height:24, borderRadius:'50%', display:'inline-flex', alignItems:'center', justifyContent:'center',
+                    background:isToday?'var(--navy)':'transparent' }}>{day}</span>
+                  {dayEvents.map((ev,ei)=>(
+                    <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:3,
+                      background:'#fef2f2', color:'#dc2626', fontWeight:600 }}>
+                      💳 {Math.round(ev.amount/1000)}k due
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {popup && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={()=>setPopup(null)}>
+          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'24px', width:'100%', maxWidth:360, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>
+              {currentMonth.toLocaleDateString('en-US',{month:'long'})} {selectedDay}
+            </div>
+            {popup.map((ev,i)=>(
+              <div key={i} style={{ padding:'12px 0', borderBottom:'1px solid var(--border)' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'var(--red)', marginBottom:4 }}>Payment due: {fmtYen(ev.amount)}</div>
+                <div style={{ fontSize:12, color:'var(--text2)' }}>Period: {ev.periodo}</div>
+                <div style={{ fontSize:12, color:ev.status==='pago'?'var(--green)':'var(--amber)', fontWeight:600, marginTop:4, textTransform:'capitalize' }}>{ev.status}</div>
+              </div>
+            ))}
+            <button onClick={()=>setPopup(null)} style={{ width:'100%', marginTop:16, padding:'12px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 import { NotificationBell } from './Notifications'
 
@@ -1938,6 +2065,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
     { id:'pricing',    label:'Pricing',    icon:'💰' },
     { id:'menu',       label:'Menu',       icon:'🍹' },
     { id:'faturas',    label:'Invoices',   icon:'💰' },
+    { id:'calendario',  label:'Calendar',   icon:'📅' },
   ]
 
   return (
@@ -1979,6 +2107,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='pricing'    && <PricingTab bar={bar} />}
         {tab==='menu'       && <MenuTab bar={bar} />}
         {tab==='faturas'    && <FaturasTab bar={bar} />}
+        {tab==='calendario'  && <CalendarioTab bar={bar} />}
       </main>
     </div>
   )

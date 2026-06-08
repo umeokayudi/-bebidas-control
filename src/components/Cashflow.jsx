@@ -430,12 +430,14 @@ function Calendario() {
   const [compras, setCompras] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [selectedDay, setSelectedDay] = useState(null)
+  const [popup, setPopup] = useState(null)
 
   useEffect(() => { load() }, [])
   async function load() {
     const [fR, cR] = await Promise.all([
-      supabase.from('faturas').select('*, bars(nome)').eq('status','pendente').order('vencimento'),
-      supabase.from('compras').select('*').eq('status_pagamento','pendente').order('data'),
+      supabase.from('faturas').select('*, bars(nome)').order('vencimento'),
+      supabase.from('compras').select('*').order('data'),
     ])
     setFaturas(fR.data||[])
     setCompras(cR.data||[])
@@ -447,14 +449,15 @@ function Calendario() {
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month+1, 0).getDate()
   const monthStr = currentMonth.toISOString().slice(0,7)
+  const today = new Date()
+  const isCurrentMonth = today.getMonth()===month && today.getFullYear()===year
 
-  // Build events map
   const events = {}
   faturas.forEach(f => {
     if (f.vencimento?.startsWith(monthStr)) {
       const day = +f.vencimento.slice(8,10)
       if (!events[day]) events[day] = []
-      events[day].push({ type:'in', label:f.bars?.nome, amount:f.total-f.pago, color:'var(--green)' })
+      events[day].push({ type:'in', label:f.bars?.nome, amount:(+f.total||0)-(+f.pago||0), status:f.status, date:f.vencimento, note:'Invoice due' })
     }
   })
   compras.forEach(c => {
@@ -462,75 +465,139 @@ function Calendario() {
     if (payDate?.startsWith(monthStr)) {
       const day = +payDate.slice(8,10)
       if (!events[day]) events[day] = []
-      events[day].push({ type:'out', label:c.fornecedor||'Supplier', amount:c.total_pago, color:'var(--red)' })
+      events[day].push({ type:'out', label:c.fornecedor||'Supplier', amount:+c.total_pago||0, status:c.status_pagamento, date:payDate, note:'Purchase' })
     }
   })
 
-  const today = new Date().getDate()
-  const isCurrentMonth = new Date().getMonth()===month && new Date().getFullYear()===year
+  // Next 3 upcoming events
+  const allEvents = [
+    ...faturas.filter(f=>f.status!=='pago').map(f=>({ date:f.vencimento, label:f.bars?.nome, amount:(+f.total||0)-(+f.pago||0), type:'in', note:'Invoice due' })),
+    ...compras.filter(c=>c.status_pagamento==='pendente').map(c=>({ date:c.data_pagamento||c.data, label:c.fornecedor||'Supplier', amount:+c.total_pago||0, type:'out', note:'Purchase' }))
+  ].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+
+  const nextEvents = allEvents.filter(e=>e.date>=today.toISOString().slice(0,10)).slice(0,5)
 
   if (loading) return <Spinner text="Loading..." />
+
   return (
     <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-        <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{ padding:'8px 14px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:14 }}>←</button>
+      {/* Next payments banner */}
+      {nextEvents.length>0 && (
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
+          <div style={{ fontSize:13, fontWeight:700, marginBottom:10 }}>⚡ Next upcoming events</div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {nextEvents.map((ev,i)=>{
+              const daysLeft = Math.ceil((new Date(ev.date)-today)/(1000*60*60*24))
+              return (
+                <div key={i} style={{ background:ev.type==='in'?'#f0fdf4':'#fef2f2', border:'1px solid', borderColor:ev.type==='in'?'#86efac':'#fca5a5', borderRadius:12, padding:'10px 14px', minWidth:140 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:ev.type==='in'?'var(--green)':'var(--red)', marginBottom:2 }}>{ev.type==='in'?'↑ IN':'↓ OUT'}</div>
+                  <div style={{ fontSize:13, fontWeight:700 }}>{fmtYen(ev.amount)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>{ev.label}</div>
+                  <div style={{ fontSize:11, color:daysLeft<=3?'var(--red)':'var(--text2)', fontWeight:daysLeft<=3?700:400, marginTop:4 }}>
+                    {daysLeft===0?'Today':daysLeft===1?'Tomorrow':'In '+daysLeft+' days'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Calendar header */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>←</button>
         <div style={{ fontSize:16, fontWeight:700 }}>{currentMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-        <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{ padding:'8px 14px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:14 }}>→</button>
+        <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>→</button>
       </div>
 
-      {/* Legend */}
-      <div style={{ display:'flex', gap:16, marginBottom:16 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'var(--green)' }}/> Money in (invoices due)</div>
-        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'var(--red)' }}/> Money out (supplier payments)</div>
+      <div style={{ display:'flex', gap:12, marginBottom:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#86efac' }}/> Money in</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#fca5a5' }}/> Money out</div>
       </div>
 
       {/* Calendar grid */}
-      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--bg3)' }}>
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden', marginBottom:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--navy)' }}>
           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
-            <div key={d} style={{ padding:'8px', textAlign:'center', fontSize:11, fontWeight:700, color:'var(--text2)' }}>{d}</div>
+            <div key={d} style={{ padding:'10px', textAlign:'center', fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>{d}</div>
           ))}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
           {Array.from({length:firstDay}).map((_,i)=>(
-            <div key={'empty'+i} style={{ padding:'8px', minHeight:60, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)' }}/>
+            <div key={'e'+i} style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:'var(--bg3)' }}/>
           ))}
           {Array.from({length:daysInMonth}).map((_,i)=>{
             const day = i+1
             const dayEvents = events[day]||[]
-            const isToday = isCurrentMonth && day===today
+            const isToday = isCurrentMonth && day===today.getDate()
+            const hasIn = dayEvents.some(e=>e.type==='in')
+            const hasOut = dayEvents.some(e=>e.type==='out')
             return (
-              <div key={day} style={{ padding:'6px', minHeight:60, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:isToday?'rgba(193,156,86,0.08)':'transparent' }}>
-                <div style={{ fontSize:12, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)', marginBottom:2 }}>{day}</div>
-                {dayEvents.map((ev,ei)=>(
-                  <div key={ei} style={{ fontSize:9, fontWeight:600, padding:'2px 4px', borderRadius:4, marginBottom:2, background:ev.color==='var(--green)'?'#f0fdf4':'#fef2f2', color:ev.color, lineHeight:1.3 }}>
-                    {ev.type==='in'?'↑':'↓'} {ev.label?.slice(0,8)} {Math.round(ev.amount/1000)}k
+              <div key={day} onClick={()=>{ if(dayEvents.length>0){ setSelectedDay(day); setPopup(dayEvents) }}}
+                style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
+                  background:isToday?'rgba(193,156,86,0.1)':'transparent',
+                  cursor:dayEvents.length>0?'pointer':'default',
+                  transition:'background 0.15s' }}>
+                <div style={{ padding:'6px 8px' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                    <span style={{ fontSize:13, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)',
+                      width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                      background:isToday?'var(--navy)':'transparent' }}>{day}</span>
+                    {dayEvents.length>0 && <span style={{ fontSize:10, color:'var(--text3)' }}>{dayEvents.length}</span>}
                   </div>
-                ))}
+                  {hasIn && <div style={{ height:4, background:'#86efac', borderRadius:2, marginBottom:2 }}/>}
+                  {hasOut && <div style={{ height:4, background:'#fca5a5', borderRadius:2 }}/>}
+                  {dayEvents.slice(0,2).map((ev,ei)=>(
+                    <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:2,
+                      background:ev.type==='in'?'#f0fdf4':'#fef2f2', color:ev.type==='in'?'#16a34a':'#dc2626',
+                      fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {ev.type==='in'?'↑':'↓'} {Math.round(ev.amount/1000)}k
+                    </div>
+                  ))}
+                </div>
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Upcoming list */}
-      <div style={{ marginTop:20 }}>
-        <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>All upcoming events</div>
-        {[...faturas.map(f=>({ date:f.vencimento, label:f.bars?.nome, amount:f.total-f.pago, type:'in', note:'Invoice due' })),
-          ...compras.map(c=>({ date:c.data_pagamento||c.data, label:c.fornecedor||'Supplier', amount:c.total_pago, type:'out', note:'Purchase payment' }))
-        ].sort((a,b)=>a.date?.localeCompare(b.date)).map((ev,i)=>(
-          <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
-            <div>
-              <span style={{ fontWeight:600 }}>{fmtDate(ev.date)}</span>
-              <span style={{ color:'var(--text2)', marginLeft:8 }}>{ev.label}</span>
-              <span style={{ color:'var(--text3)', marginLeft:8, fontSize:11 }}>{ev.note}</span>
+      {/* Popup */}
+      {popup && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={()=>setPopup(null)}>
+          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'24px', width:'100%', maxWidth:380, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>
+              {currentMonth.toLocaleDateString('en-US',{month:'long'})} {selectedDay}, {year}
             </div>
-            <span style={{ fontWeight:700, color:ev.type==='in'?'var(--green)':'var(--red)' }}>
-              {ev.type==='in'?'+':'-'}{fmtYen(ev.amount)}
-            </span>
+            {popup.map((ev,i)=>(
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', padding:'12px 0', borderBottom:'1px solid var(--border)' }}>
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                    <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20,
+                      background:ev.type==='in'?'#f0fdf4':'#fef2f2', color:ev.type==='in'?'var(--green)':'var(--red)' }}>
+                      {ev.type==='in'?'↑ RECEIVE':'↓ PAY'}
+                    </span>
+                    {ev.status && <span style={{ fontSize:10, color:'var(--text3)' }}>{ev.status}</span>}
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{ev.label}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>{ev.note}</div>
+                </div>
+                <div style={{ fontSize:16, fontWeight:800, color:ev.type==='in'?'var(--green)':'var(--red)' }}>
+                  {ev.type==='in'?'+':'-'}{fmtYen(ev.amount)}
+                </div>
+              </div>
+            ))}
+            <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:12, paddingTop:12, borderTop:'2px solid var(--border)' }}>
+              <span>Net</span>
+              <span style={{ color:popup.reduce((a,e)=>a+(e.type==='in'?e.amount:-e.amount),0)>=0?'var(--green)':'var(--red)' }}>
+                {fmtYen(popup.reduce((a,e)=>a+(e.type==='in'?e.amount:-e.amount),0))}
+              </span>
+            </div>
+            <button onClick={()=>setPopup(null)} style={{ width:'100%', marginTop:16, padding:'12px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:13 }}>Close</button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
