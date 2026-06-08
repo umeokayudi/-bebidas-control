@@ -92,11 +92,11 @@ function Dashboard({ onNav }) {
     const meses=[]
     for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push(d.toISOString().slice(0,7))}
     const receitaPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(sales||[]).filter(v=>v.data?.startsWith(m)).reduce((a,v)=>a+(+v.total||0),0)}))
-    const custoPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(purchases||[]).filter(c=>c.data?.startsWith(m)).reduce((a,c)=>a+(+c.total_real||0),0)}))
+    const custoPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(purchases||[]).filter(c=>c.data?.startsWith(m)).reduce((a,c)=>a+(+c.total_pago||0),0)}))
     const lucroPorMes=meses.map((m,i)=>({label:monthLabel(m).split('/')[0],value:receitaPorMes[i].value-custoPorMes[i].value}))
     const purchasesMes=(purchases||[]).filter(c=>c.data?.startsWith(mesAtual))
     const salesMes=(sales||[]).filter(v=>v.data?.startsWith(mesAtual))
-    const custoMes=purchasesMes.reduce((a,c)=>a+(+c.total_real||0),0)
+    const custoMes=purchasesMes.reduce((a,c)=>a+(+c.total_pago||0),0)
     const receitaMes=salesMes.reduce((a,v)=>a+(+v.total||0),0)
     const lucroMes=receitaMes-custoMes
     const margem=receitaMes>0?Math.round(lucroMes/receitaMes*100):0
