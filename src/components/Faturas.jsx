@@ -96,6 +96,31 @@ function Overview() {
         ))}
       </div>
 
+      {/* Pending client payments */}
+      {pagamentos.length>0 && (
+        <div style={{ background:'linear-gradient(135deg,#fffbeb,#fef3c7)', border:'1px solid #fcd34d', borderRadius:16, padding:'20px', marginBottom:16 }}>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>🔔 {pagamentos.length} payment{pagamentos.length>1?'s':''} waiting confirmation</div>
+          {pagamentos.map(p=>(
+            <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid rgba(0,0,0,0.06)' }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:600 }}>{p.faturas?.bars?.nome} — {fmtYen(p.valor)}</div>
+                <div style={{ fontSize:11, color:'var(--text2)' }}>{fmtDate(p.data)} · {p.metodo} {p.notas?'· '+p.notas:''}</div>
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                {p.comprovante_url && <a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:12, color:'var(--navy)', fontWeight:600, padding:'5px 10px', borderRadius:8, border:'1px solid var(--border)', background:'white', textDecoration:'none' }}>📎 Receipt</a>}
+                <button onClick={async()=>{
+                  const f = p.faturas
+                  const newPago = (+f.pago||0)+(+p.valor||0)
+                  await supabase.from('fatura_pagamentos').update({ confirmado:true, confirmado_em:new Date().toISOString() }).eq('id',p.id)
+                  await supabase.from('faturas').update({ pago:newPago, status:newPago>=(+f.total||0)?'pago':'parcial' }).eq('id',f.id)
+                  load()
+                }} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'#16a34a', color:'white', cursor:'pointer', fontWeight:700 }}>Confirm</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Weekly chart */}
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px', marginBottom:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
