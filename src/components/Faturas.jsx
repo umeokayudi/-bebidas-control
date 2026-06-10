@@ -36,7 +36,7 @@ function Overview() {
   const [pagamentos, setPagamentos] = useState([])
   async function load() {
     const [fR, vR, pR] = await Promise.all([
-      supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false}),
+      supabase.from('faturas').select('*, bars(nome)').order('data_vencimento',{ascending:false}),
       supabase.from('vendas').select('total,data,bar_id').order('data'),
       supabase.from('fatura_pagamentos').select('*, faturas(*, bars(nome))').eq('confirmado',false).order('criado_em',{ascending:false}),
     ])
@@ -46,8 +46,8 @@ function Overview() {
 
   const pending = faturas.filter(f=>f.status!=='pago')
   const totalPending = pending.reduce((a,f)=>a+(f.total-f.pago),0)
-  const overdue = pending.filter(f=>new Date(f.vencimento)<new Date())
-  const upcoming = pending.filter(f=>new Date(f.vencimento)>=new Date()).sort((a,b)=>new Date(a.vencimento)-new Date(b.vencimento))
+  const overdue = pending.filter(f=>new Date(f.data_vencimento)<new Date())
+  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.vencimento))
 
   // Weekly spend chart - last 8 weeks
   const weeks = []
@@ -112,7 +112,7 @@ function Overview() {
                   const f = p.faturas
                   const newPago = (+f.pago||0)+(+p.valor||0)
                   await supabase.from('fatura_pagamentos').update({ confirmado:true, confirmado_em:new Date().toISOString() }).eq('id',p.id)
-                  await supabase.from('faturas').update({ pago:newPago, status:newPago>=(+f.total||0)?'pago':'parcial' }).eq('id',f.id)
+                  await supabase.from('faturas').update({ pago:newPago, status:newPago>=(+f.valor||0)?'pago':'parcial' }).eq('id',f.id)
                   load()
                 }} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'#16a34a', color:'white', cursor:'pointer', fontWeight:700 }}>Confirm</button>
               </div>
@@ -171,7 +171,7 @@ function Overview() {
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px' }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Upcoming payments</div>
           {upcoming.map(f => {
-            const daysLeft = Math.ceil((new Date(f.vencimento)-new Date())/(1000*60*60*24))
+            const daysLeft = Math.ceil((new Date(f.data_vencimento)-new Date())/(1000*60*60*24))
             return (
               <div key={f.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
                 <div style={{ width:44, height:44, borderRadius:12, background:daysLeft<=5?'#fef2f2':'#f0fdf4', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -180,7 +180,7 @@ function Overview() {
                 </div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:600 }}>{f.bars?.nome}</div>
-                  <div style={{ fontSize:11, color:'var(--text2)' }}>Due {fmtDate(f.vencimento)} · {fmtDate(f.periodo_inicio)} → {fmtDate(f.periodo_fim)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>Due {fmtDate(f.data_vencimento)} · {fmtDate(f.data_emissao)} → {fmtDate(f.data_vencimento)}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:16, fontWeight:800, color:'var(--red)' }}>{fmtYen(f.total-(f.pago||0))}</div>
@@ -211,7 +211,7 @@ function InvoiceList() {
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, bR, vR] = await Promise.all([
-      supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false}),
+      supabase.from('faturas').select('*, bars(nome)').order('data_vencimento',{ascending:false}),
       supabase.from('bars').select('*').order('nome'),
       supabase.from('vendas').select('*, vendas_itens(qtd,preco_unitario,produtos(nome))').order('data',{ascending:false}),
     ])
@@ -223,7 +223,7 @@ function InvoiceList() {
     if (!selBar) return; setSaving(true)
     const period = getBillingPeriod(new Date().toISOString().slice(0,10))
     const total = vendas.filter(v=>v.bar_id===selBar&&v.data>=period.start&&v.data<=period.end).reduce((a,v)=>a+(+v.total||0),0)
-    await supabase.from('faturas').insert({ bar_id:selBar, valor:total, periodo_inicio:period.start, periodo_fim:period.end, vencimento:period.due, total, pago:0, status:'pendente' })
+    await supabase.from('faturas').insert({ bar_id:selBar, valor:total, data_emissao:period.start, data_data_vencimento:period.end, data_vencimento:period.due, total, pago:0, status:'pendente' })
     setSaving(false); setShowForm(false); load()
   }
   async function registerPayment() {
@@ -231,7 +231,7 @@ function InvoiceList() {
     const valor = +payForm.valor
     await supabase.from('fatura_pagamentos').insert({ fatura_id:payModal.id, valor, metodo:payForm.metodo, notas:payForm.notas, data:new Date().toISOString().slice(0,10) })
     const newPago = (payModal.pago||0)+valor
-    await supabase.from('faturas').update({ pago:newPago, status:newPago>=payModal.total?'pago':'parcial' }).eq('id',payModal.id)
+    await supabase.from('faturas').update({ pago:newPago, status:newPago>=payModal.valor?'pago':'parcial' }).eq('id',payModal.id)
     setSaving(false); setPayModal(null); setPayForm({ valor:'', metodo:'Cash', notas:'' }); load()
   }
   async function generateRyoshusho(fatura) {
@@ -289,16 +289,16 @@ function InvoiceList() {
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {filtered.map(f => {
             const remaining = (f.total||0)-(f.pago||0)
-            const pct = f.total>0?Math.round((f.pago||0)/f.total*100):0
-            const isOverdue = f.status==='pendente'&&new Date(f.vencimento)<new Date()
-            const periodVendas = vendas.filter(v=>v.bar_id===f.bar_id&&v.data>=f.periodo_inicio&&v.data<=f.periodo_fim)
+            const pct = f.valor>0?Math.round((f.pago||0)/f.total*100):0
+            const isOverdue = f.status==='pendente'&&new Date(f.data_vencimento)<new Date()
+            const periodVendas = vendas.filter(v=>v.bar_id===f.bar_id&&v.data>=f.data_emissao&&v.data<=f.data_vencimento)
             return (
               <div key={f.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor:isOverdue?'rgba(255,59,48,0.3)':'var(--border)', borderRadius:14, overflow:'hidden' }}>
                 <div style={{ padding:'14px 18px' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
                     <div>
                       <div style={{ fontSize:14, fontWeight:700 }}>{f.bars?.nome}</div>
-                      <div style={{ fontSize:12, color:'var(--text2)' }}>{fmtDate(f.periodo_inicio)} → {fmtDate(f.periodo_fim)} · Due {fmtDate(f.vencimento)}</div>
+                      <div style={{ fontSize:12, color:'var(--text2)' }}>{fmtDate(f.data_emissao)} → {fmtDate(f.data_vencimento)} · Due {fmtDate(f.data_vencimento)}</div>
                     </div>
                     <div style={{ textAlign:'right' }}>
                       <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:f.status==='pago'?'#f0fdf4':isOverdue?'#fef2f2':'#EAF0FA', color:f.status==='pago'?'var(--green)':isOverdue?'var(--red)':'var(--navy)' }}>
@@ -353,7 +353,7 @@ function InvoiceList() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
           <div style={{ background:'var(--bg2)', borderRadius:20, padding:'28px', width:'100%', maxWidth:400, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}>
             <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>{payModal.bars?.nome}</div>
-            <div style={{ fontSize:12, color:'var(--text2)', marginBottom:20 }}>Total: {fmtYen(payModal.total)} · Remaining: {fmtYen((payModal.total||0)-(payModal.pago||0))}</div>
+            <div style={{ fontSize:12, color:'var(--text2)', marginBottom:20 }}>Total: {fmtYen(payModal.valor)} · Remaining: {fmtYen((payModal.valor||0)-(payModal.pago||0))}</div>
             <div style={{ marginBottom:12 }}><label className="form-label">Amount (¥)</label><input type="number" value={payForm.valor} onChange={e=>setPayForm({...payForm,valor:e.target.value})} autoFocus /></div>
             <div style={{ marginBottom:12 }}><label className="form-label">Method</label><select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value})}>{['Cash','Bank Transfer','Card'].map(m=><option key={m}>{m}</option>)}</select></div>
             <div style={{ marginBottom:20 }}><label className="form-label">Notes</label><input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} /></div>

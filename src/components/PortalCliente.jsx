@@ -1710,14 +1710,14 @@ function FaturasTab({ bar }) {
   }
 
   const filtered = faturas.filter(f => {
-    if (dateFrom && f.periodo_inicio < dateFrom) return false
-    if (dateTo && f.periodo_fim > dateTo) return false
+    if (dateFrom && f.data_emissao < dateFrom) return false
+    if (dateTo && f.data_vencimento > dateTo) return false
     return true
   })
   const pending = filtered.filter(f=>f.status!=="pago")
-  const totalPending = pending.reduce((a,f)=>a+(+f.total||0)-(+f.pago||0),0)
-  const overdue = pending.filter(f=>new Date(f.vencimento)<new Date())
-  const upcoming = pending.filter(f=>new Date(f.vencimento)>=new Date()).sort((a,b)=>new Date(a.vencimento)-new Date(b.vencimento))
+  const totalPending = pending.reduce((a,f)=>a+(+f.valor||0)-(+f.pago||0),0)
+  const overdue = pending.filter(f=>new Date(f.data_vencimento)<new Date())
+  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.vencimento))
   const monthlySpend = []
   const monthLabels = []
   for (let i=5; i>=0; i--) {
@@ -1741,7 +1741,7 @@ function FaturasTab({ bar }) {
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:20 }}>
         {[
           { label:"Pending", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
-          { label:"Paid total", value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+(+f.total||0),0)), color:"var(--green)", icon:"✅" },
+          { label:"Paid total", value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+(+f.valor||0),0)), color:"var(--green)", icon:"✅" },
           { label:"Overdue", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
           { label:"Avg/month", value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
         ].map(k=>(
@@ -1768,8 +1768,8 @@ function FaturasTab({ bar }) {
         <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Upcoming payments</div>
           {upcoming.map(f => {
-            const daysLeft = Math.ceil((new Date(f.vencimento)-new Date())/(1000*60*60*24))
-            const remaining = (+f.total||0)-(+f.pago||0)
+            const daysLeft = Math.ceil((new Date(f.data_vencimento)-new Date())/(1000*60*60*24))
+            const remaining = (+f.valor||0)-(+f.pago||0)
             const fp = pagamentos.filter(p=>p.fatura_id===f.id&&!p.confirmado)
             return (
               <div key={f.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border)" }}>
@@ -1778,8 +1778,8 @@ function FaturasTab({ bar }) {
                   <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>days</div>
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>Due {fmtDate(f.vencimento)}</div>
-                  <div style={{ fontSize:11, color:"var(--text2)" }}>{fmtDate(f.periodo_inicio)} to {fmtDate(f.periodo_fim)}</div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>Due {fmtDate(f.data_vencimento)}</div>
+                  <div style={{ fontSize:11, color:"var(--text2)" }}>{fmtDate(f.data_emissao)} to {fmtDate(f.data_vencimento)}</div>
                   {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>⏳ Payment pending confirmation</div>}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
@@ -1801,23 +1801,23 @@ function FaturasTab({ bar }) {
       {filtered.length===0?<Empty text="No invoices" icon="🧾" />:(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {filtered.map(f => {
-            const remaining = (+f.total||0)-(+f.pago||0)
+            const remaining = (+f.valor||0)-(+f.pago||0)
             const pct = f.total>0?Math.round((+f.pago||0)/(+f.total)*100):0
-            const isOverdue = f.status==="pendente"&&new Date(f.vencimento)<new Date()
+            const isOverdue = f.status==="pendente"&&new Date(f.data_vencimento)<new Date()
             const fp = pagamentos.filter(p=>p.fatura_id===f.id)
             const pendingP = fp.filter(p=>!p.confirmado)
             return (
               <div key={f.id} style={{ background:"var(--bg2)", border:"1px solid", borderColor:isOverdue?"rgba(255,59,48,0.3)":"var(--border)", borderRadius:14, padding:"14px 18px" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(f.periodo_inicio)} to {fmtDate(f.periodo_fim)}</div>
-                    <div style={{ fontSize:11, color:"var(--text2)" }}>Due: {fmtDate(f.vencimento)}</div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(f.data_emissao)} to {fmtDate(f.data_vencimento)}</div>
+                    <div style={{ fontSize:11, color:"var(--text2)" }}>Due: {fmtDate(f.data_vencimento)}</div>
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:f.status==="pago"?"#f0fdf4":isOverdue?"#fef2f2":"#EAF0FA", color:f.status==="pago"?"var(--green)":isOverdue?"var(--red)":"var(--navy)" }}>
                       {f.status==="pago"?"✅ Paid":isOverdue?"🚨 Overdue":"⏳ Pending"}
                     </span>
-                    <div style={{ fontSize:16, fontWeight:800, color:"var(--navy)", marginTop:4 }}>{fmtYen(+f.total||0)}</div>
+                    <div style={{ fontSize:16, fontWeight:800, color:"var(--navy)", marginTop:4 }}>{fmtYen(+f.valor||0)}</div>
                   </div>
                 </div>
                 <div style={{ height:4, background:"var(--bg3)", borderRadius:2, overflow:"hidden", marginBottom:6 }}>
@@ -1935,7 +1935,7 @@ function CalendarioTab({ bar }) {
 
   useEffect(() => { load() }, [bar])
   async function load() {
-    const { data } = await supabase.from('faturas').select('*').eq('bar_id', bar.id).order('vencimento')
+    const { data } = await supabase.from('faturas').select('*').eq('bar_id', bar.id).order('data_vencimento')
     setFaturas(data||[])
     setLoading(false)
   }
@@ -1950,15 +1950,15 @@ function CalendarioTab({ bar }) {
 
   const events = {}
   faturas.forEach(f => {
-    if (f.vencimento?.startsWith(monthStr)) {
-      const day = +f.vencimento.slice(8,10)
+    if (f.data_vencimento?.startsWith(monthStr)) {
+      const day = +f.data_vencimento.slice(8,10)
       if (!events[day]) events[day] = []
-      events[day].push({ amount:(+f.total||0)-(+f.pago||0), status:f.status, date:f.vencimento, periodo:f.periodo_inicio+' to '+f.periodo_fim })
+      events[day].push({ amount:(+f.valor||0)-(+f.pago||0), status:f.status, date:f.data_vencimento, periodo:f.data_emissao||'' })
     }
   })
 
-  const upcoming = faturas.filter(f=>f.status!=='pago'&&f.vencimento>=today.toISOString().slice(0,10))
-    .sort((a,b)=>a.vencimento.localeCompare(b.vencimento))
+  const upcoming = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento>=today.toISOString().slice(0,10))
+    .sort((a,b)=>a.data_vencimento.localeCompare(b.vencimento))
 
   if (loading) return <Spinner text="Loading..." />
 
@@ -1970,12 +1970,12 @@ function CalendarioTab({ bar }) {
           <div style={{ fontSize:13, fontWeight:700, marginBottom:10 }}>⚡ Upcoming payments</div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {upcoming.slice(0,4).map((f,i)=>{
-              const daysLeft = Math.ceil((new Date(f.vencimento)-today)/(1000*60*60*24))
-              const remaining = (+f.total||0)-(+f.pago||0)
+              const daysLeft = Math.ceil((new Date(f.data_vencimento)-today)/(1000*60*60*24))
+              const remaining = (+f.valor||0)-(+f.pago||0)
               return (
                 <div key={i} style={{ background:daysLeft<=5?'#fef2f2':'#f0fdf4', border:'1px solid', borderColor:daysLeft<=5?'#fca5a5':'#86efac', borderRadius:12, padding:'10px 14px', minWidth:140 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?'var(--red)':'var(--green)' }}>{fmtYen(remaining)}</div>
-                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>Due {fmtDate(f.vencimento)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>Due {fmtDate(f.data_vencimento)}</div>
                   <div style={{ fontSize:11, fontWeight:700, color:daysLeft<=5?'var(--red)':'var(--text2)', marginTop:4 }}>
                     {daysLeft===0?'Today!':daysLeft===1?'Tomorrow':'In '+daysLeft+' days'}
                   </div>
