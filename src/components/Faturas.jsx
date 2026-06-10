@@ -32,7 +32,7 @@ function Overview() {
   const [faturas, setFaturas] = useState([])
   const [vendas, setVendas] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   const [pagamentos, setPagamentos] = useState([])
   async function load() {
     const [fR, vR, pR] = await Promise.all([
@@ -208,7 +208,7 @@ function InvoiceList() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [expanded, setExpanded] = useState(null)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, bR, vR] = await Promise.all([
       supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false}),
@@ -371,7 +371,7 @@ function InvoiceList() {
 function PaymentList() {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const { data } = await supabase.from('fatura_pagamentos').select('*, faturas(*, bars(nome))').order('criado_em',{ascending:false}).limit(100)
     setPayments(data||[]); setLoading(false)

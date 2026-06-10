@@ -128,15 +128,13 @@ export default function RyoshushoTab() {
       emitNome + (emitEnd ? '&#12288;' + emitEnd : '') + (emitTel ? '&#12288;TEL:' + emitTel : '') +
       '</div></body></html>'
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = numero + '.html'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const printWin = window.open('', '_blank', 'width=800,height=600')
+    printWin.document.write(html)
+    printWin.document.close()
+    printWin.focus()
+    setTimeout(() => {
+      printWin.print()
+    }, 500)
 
     setGenerating(false)
     loadAll()

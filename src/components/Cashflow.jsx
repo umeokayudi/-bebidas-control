@@ -26,7 +26,7 @@ export default function Cashflow() {
 function CashflowOverview() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, cR] = await Promise.all([
       supabase.from('faturas').select('*').order('vencimento'),
@@ -146,7 +146,7 @@ function CashflowOverview() {
 function MoneyIn() {
   const [faturas, setFaturas] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const { data } = await supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false})
     setFaturas(data||[]); setLoading(false)
@@ -200,7 +200,7 @@ function MoneyIn() {
 function MoneyOut() {
   const [compras, setCompras] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const { data } = await supabase.from('compras').select('*').order('data',{ascending:false}).limit(100)
     setCompras(data||[]); setLoading(false)
@@ -252,7 +252,7 @@ function PurchasePayments() {
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState({ data_pagamento:'', metodo:'Card', status_pagamento:'pago' })
   const [saving, setSaving] = useState(false)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const { data } = await supabase.from('compras').select('*').order('data',{ascending:false}).limit(100)
     setCompras(data||[]); setLoading(false)
@@ -331,7 +331,7 @@ function Caixa() {
   const [form, setForm] = useState({ tipo:'entrada', valor:'', descricao:'', metodo:'Cash', data:new Date().toISOString().slice(0,10) })
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const { data } = await supabase.from('caixa_movimentos').select('*').order('data',{ascending:false}).limit(100)
     setEntries(data||[])
@@ -433,7 +433,7 @@ function Calendario() {
   const [selectedDay, setSelectedDay] = useState(null)
   const [popup, setPopup] = useState(null)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, cR] = await Promise.all([
       supabase.from('faturas').select('*, bars(nome)').order('vencimento'),

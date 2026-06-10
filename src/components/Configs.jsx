@@ -390,6 +390,22 @@ export function PedidosAdminTab() {
           titulo:'Order delivered',
           mensagem:'Delivered. Total: \u00a5'+Math.round(pedido.total_estimado).toLocaleString()
         }).catch(()=>{})
+        // Auto-generate fatura
+        const hoje = new Date().toISOString().slice(0,10)
+        const dia = new Date().getDate()
+        const venc = dia<=5
+          ? new Date(new Date().getFullYear(),new Date().getMonth(),20).toISOString().slice(0,10)
+          : new Date(new Date().getFullYear(),new Date().getMonth()+1,20).toISOString().slice(0,10)
+        await supabase.from('faturas').insert({
+          bar_id: pedido.bar_id,
+          total: pedido.total_estimado,
+          pago: 0,
+          status: 'pendente',
+          periodo_inicio: hoje,
+          periodo_fim: hoje,
+          vencimento: venc,
+          pedido_id: pedido.id
+        }).catch(()=>{})
       }
     }
     if(status==='confirmado'){
