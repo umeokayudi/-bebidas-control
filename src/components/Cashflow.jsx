@@ -378,6 +378,7 @@ function Caixa() {
                 <div style={{ fontSize:13, fontWeight:600 }}>{e.descricao}</div>
                 <div style={{ fontSize:11, color:'var(--text2)' }}>{fmtDate(e.data)} · {e.metodo}</div>
               </div>
+              <button onClick={async()=>{ if(!confirm('Delete?'))return; await supabase.from('caixa_movimentos').delete().eq('id',e.id); setEntries(prev=>prev.filter(x=>x.id!==e.id)) }} style={{padding:'4px 8px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',cursor:'pointer',marginRight:8}}>🗑</button>
               <div style={{ fontSize:15, fontWeight:800, color:e.tipo==='entrada'?'var(--green)':'var(--red)' }}>
                 {e.tipo==='entrada'?'+':'-'}{fmtYen(e.valor)}
               </div>
