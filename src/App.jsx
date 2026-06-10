@@ -113,7 +113,7 @@ function Dashboard({ onNav }) {
     salesMes.forEach(v=>(v.vendas_itens||[]).forEach(it=>{
       const pid=it.produto_id
       if(!prodMap[pid])prodMap[pid]={nome:it.produtos?.nome||'?',qtd:0,receita:0,custo:0}
-      const bp=(barPricing||[]).find(x=>x.produto_id===pid); const custoUnit=bp&&bp.drinks_por_garrafa>0?(it.produtos?.preco_venda||0)/bp.drinks_por_garrafa:0; prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd;prodMap[pid].custo+=custoUnit*it.qtd
+      const custoUnit=(it.produtos?.custo||0); prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd;prodMap[pid].custo+=custoUnit*it.qtd
     }))
     const topProdutos=Object.values(prodMap).sort((a,b)=>b.receita-a.receita).slice(0,5)
     const topLucro=Object.values(prodMap).map(p=>({...p,lucro:p.receita-p.custo})).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
