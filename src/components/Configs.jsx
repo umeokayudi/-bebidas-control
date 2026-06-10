@@ -398,14 +398,12 @@ export function PedidosAdminTab() {
           : new Date(new Date().getFullYear(),new Date().getMonth()+1,20).toISOString().slice(0,10)
         await supabase.from('faturas').insert({
           bar_id: pedido.bar_id,
-          total: pedido.total_estimado,
-          pago: 0,
+          venda_id: venda?.id || null,
+          valor: pedido.total_estimado,
           status: 'pendente',
-          periodo_inicio: hoje,
-          periodo_fim: hoje,
-          vencimento: venc,
-          pedido_id: pedido.id
-        }).catch(()=>{})
+          data_emissao: hoje,
+          data_vencimento: venc
+        }).catch((e)=>{ console.error('auto-fatura error:', e) })
       }
     }
     if(status==='confirmado'){
