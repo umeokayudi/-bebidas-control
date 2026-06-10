@@ -491,6 +491,24 @@ function OrdersTab({ bar }) {
     setLoading(false)
   }
 
+  const [viewMode, setViewMode] = React.useState('list')
+  const [summaryMes, setSummaryMes] = React.useState('')
+
+  // Monthly summary aggregation
+  const allMeses = [...new Set(pedidos.map(p=>p.criado_em?.slice(0,7)).filter(Boolean))].sort().reverse()
+  const mesFiltro = summaryMes || (allMeses[0]||'')
+  const pedidosMes = pedidos.filter(p=>p.criado_em?.startsWith(mesFiltro))
+  const prodMap = {}
+  pedidosMes.forEach(p=>(p.pedidos_itens||[]).forEach(it=>{
+    const pid = it.produto_id
+    const pr = it.produtos
+    if (!prodMap[pid]) prodMap[pid] = { nome:pr?.nome||'?', categoria:pr?.categoria||'—', volume_ml:pr?.volume_ml||0, preco_unit:pr?.preco_venda||0, qtd:0, total:0 }
+    prodMap[pid].qtd += it.qtd
+    prodMap[pid].total += (pr?.preco_venda||0) * it.qtd
+  }))
+  const summaryList = Object.values(prodMap).sort((a,b)=>b.total-a.total)
+  const summaryTotal = summaryList.reduce((a,p)=>a+p.total,0)
+
   const totalOrder = items.reduce((a, it) => {
     const p = produtos.find(x => x.id === it.produto_id)
     return a + (p ? p.preco_venda * it.qtd : 0)
@@ -542,10 +560,57 @@ function OrdersTab({ bar }) {
     <div className="fade-in">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <SectionTitle>My orders</SectionTitle>
-        <button className="btn-primary" onClick={() => setShowForm(x => !x)} style={{ padding:'9px 18px', borderRadius:10 }}>
-          {showForm ? 'Cancel' : '+ New order'}
-        </button>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={()=>setViewMode(v=>v==='list'?'summary':'list')} style={{padding:'9px 18px',borderRadius:10,fontSize:12,fontWeight:600,border:'1px solid var(--border)',background:'var(--bg2)',cursor:'pointer'}}>
+            {viewMode==='list'?'📊 Monthly summary':'📋 Order list'}
+          </button>
+          <button className="btn-primary" onClick={() => setShowForm(x => !x)} style={{ padding:'9px 18px', borderRadius:10 }}>
+            {showForm ? 'Cancel' : '+ New order'}
+          </button>
+        </div>
       </div>
+
+      {viewMode==='summary' && (
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <div style={{fontSize:14,fontWeight:700}}>Monthly order summary</div>
+            <select value={mesFiltro} onChange={e=>setSummaryMes(e.target.value)} style={{padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',fontSize:12}}>
+              {allMeses.map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          {summaryList.length===0 ? <div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:20}}>No orders this month</div> : <>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead>
+                  <tr style={{background:'var(--bg3)',borderBottom:'2px solid var(--border)'}}>
+                    {['Product','Category','Vol/unit','Qty','Unit cost','Total'].map(h=>(
+                      <th key={h} style={{padding:'8px 12px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.04em'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryList.map((p,i)=>(
+                    <tr key={i} style={{borderBottom:'1px solid var(--border)',background:i%2===0?'white':'var(--bg)'}}>
+                      <td style={{padding:'8px 12px',fontWeight:600}}>{p.nome}</td>
+                      <td style={{padding:'8px 12px',color:'var(--text2)'}}>{p.categoria}</td>
+                      <td style={{padding:'8px 12px',color:'var(--text2)'}}>{p.volume_ml>0?p.volume_ml+'ml':'—'}</td>
+                      <td style={{padding:'8px 12px',fontWeight:700}}>{p.qtd}</td>
+                      <td style={{padding:'8px 12px',color:'var(--text2)'}}>{fmtYen(p.preco_unit)}</td>
+                      <td style={{padding:'8px 12px',fontWeight:700,color:'var(--navy)'}}>{fmtYen(p.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{borderTop:'2px solid var(--border)',background:'var(--bg2)'}}>
+                    <td colSpan={5} style={{padding:'10px 12px',fontWeight:700,fontSize:13}}>Total</td>
+                    <td style={{padding:'10px 12px',fontWeight:800,fontSize:14,color:'var(--navy)'}}>{fmtYen(summaryTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>}
+        </div>
+      )}
 
       {showForm && (
         <div className="card" style={{ marginBottom:16 }}>
