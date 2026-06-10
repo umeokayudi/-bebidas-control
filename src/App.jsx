@@ -115,6 +115,12 @@ function Dashboard({ onNav }) {
       prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd;prodMap[pid].custo+=(it.produtos?.preco_venda||0)/Math.max(1,(it.produtos?.drinks_por_garrafa||1))*it.qtd
     }))
     const topProdutos=Object.values(prodMap).sort((a,b)=>b.receita-a.receita).slice(0,5)
+    const topLucro=(products||[]).map(p=>{
+      const vendido=salesMes.reduce((a,v)=>a+(v.vendas_itens||[]).filter(it=>it.produto_id===p.id).reduce((b,it)=>b+it.qtd,0),0)
+      const receita=vendido*p.preco_venda
+      const custo=vendido*p.custo
+      return {...p,vendido,receita,custo,lucro:receita-custo}
+    }).filter(p=>p.vendido>0).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
     const topLucro=Object.values(prodMap).map(p=>({...p,lucro:p.receita-p.custo})).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
     const ultimasCompras=(purchases||[]).slice(-4).reverse()
     setStats({custoMes,receitaMes,lucroMes,margem,markup,porBar,topProdutos,ultimasCompras,
@@ -202,6 +208,23 @@ function Dashboard({ onNav }) {
                 <div style={{fontSize:12,fontWeight:600}}>{p.nome}</div>
                 <div style={{fontSize:10,color:'var(--text3)'}}>{p.qtd} un. · receita {fmtYen(p.receita)}</div>
               </div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontWeight:700,fontSize:12,color:'var(--green)'}}>{fmtYen(p.lucro)}</div>
+              <div style={{fontSize:10,color:'var(--text3)'}}>{p.receita>0?Math.round(p.lucro/p.receita*100):0}% margin</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
+        {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
+        :(stats.topLucro||[]).map((p,i)=>(
+          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--green)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'white':'var(--text3)'}}>{i+1}</div>
+              <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.vendido} un. · receita {fmtYen(p.receita)}</div></div>
             </div>
             <div style={{textAlign:'right'}}>
               <div style={{fontWeight:700,fontSize:12,color:'var(--green)'}}>{fmtYen(p.lucro)}</div>
