@@ -670,11 +670,20 @@ function OrdersTab({ bar }) {
                   </span>
                 ))}
               </div>
-              <button onClick={()=>setOrderPreview(p)} style={{
-                fontSize:11, padding:'5px 12px', borderRadius:8,
-                border:'1px solid var(--border)', background:'transparent',
-                cursor:'pointer', color:'var(--text2)', fontWeight:600
-              }}>📋 View order details</button>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>setOrderPreview(p)} style={{
+                  fontSize:11, padding:'5px 12px', borderRadius:8,
+                  border:'1px solid var(--border)', background:'transparent',
+                  cursor:'pointer', color:'var(--text2)', fontWeight:600
+                }}>📋 View order details</button>
+                {p.status==='pendente'&&(
+                  <button onClick={async()=>{ if(!confirm('Cancel this order?'))return; await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); setPedidos(prev=>prev.filter(x=>x.id!==p.id)) }} style={{
+                    fontSize:11, padding:'5px 12px', borderRadius:8,
+                    border:'none', background:'#fef2f2',
+                    cursor:'pointer', color:'var(--red)', fontWeight:600
+                  }}>🗑 Cancel</button>
+                )}
+              </div>
             </div>
           )
         })
