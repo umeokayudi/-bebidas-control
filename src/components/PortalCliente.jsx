@@ -491,8 +491,8 @@ function OrdersTab({ bar }) {
     setLoading(false)
   }
 
-  const [viewMode, setViewMode] = React.useState('list')
-  const [summaryMes, setSummaryMes] = React.useState('')
+  const [viewMode, setViewMode] = useState('list')
+  const [summaryMes, setSummaryMes] = useState('')
 
   // Monthly summary aggregation
   const allMeses = [...new Set(pedidos.map(p=>p.criado_em?.slice(0,7)).filter(Boolean))].sort().reverse()
