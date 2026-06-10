@@ -29,7 +29,7 @@ function CashflowOverview() {
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, cR] = await Promise.all([
-      supabase.from('faturas').select('*').order('vencimento'),
+      supabase.from('faturas').select('*').order('data_vencimento'),
       supabase.from('compras').select('*').order('data'),
     ])
     setData({ faturas: fR.data||[], compras: cR.data||[] })
@@ -41,8 +41,8 @@ function CashflowOverview() {
   const today = new Date().toISOString().slice(0,10)
 
   // Money in - paid invoices
-  const paidIn = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.total||0),0)
-  const pendingIn = faturas.filter(f=>f.status!=='pago').reduce((a,f)=>a+((+f.total||0)-(+f.pago||0)),0)
+  const paidIn = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.valor||0),0)
+  const pendingIn = faturas.filter(f=>f.status!=='pago').reduce((a,f)=>a+((+f.valor||0)-(+f.pago||0)),0)
 
   // Money out - purchases
   const paidOut = compras.filter(c=>c.status_pagamento==='pago'||!c.status_pagamento).reduce((a,c)=>a+(+c.total_pago||0),0)
@@ -58,7 +58,7 @@ function CashflowOverview() {
     const start = new Date(end); start.setDate(start.getDate()-6)
     const s = start.toISOString().slice(0,10)
     const e = end.toISOString().slice(0,10)
-    const inAmt = faturas.filter(f=>f.status==='pago'&&f.vencimento>=s&&f.vencimento<=e).reduce((a,f)=>a+(+f.total||0),0)
+    const inAmt = faturas.filter(f=>f.status==='pago'&&f.data_vencimento>=s&&f.data_vencimento<=e).reduce((a,f)=>a+(+f.valor||0),0)
     const outAmt = compras.filter(c=>(c.data_pagamento||c.data)>=s&&(c.data_pagamento||c.data)<=e).reduce((a,c)=>a+(+c.total_pago||0),0)
     weeks.push({ label: start.toLocaleDateString('en-US',{month:'short',day:'numeric'}), in:inAmt, out:outAmt, net:inAmt-outAmt })
   }
@@ -69,7 +69,7 @@ function CashflowOverview() {
   for (let i=0; i<30; i++) {
     const d = new Date(); d.setDate(d.getDate()+i)
     const ds = d.toISOString().slice(0,10)
-    const inAmt = faturas.filter(f=>f.status!=='pago'&&f.vencimento===ds).reduce((a,f)=>a+((+f.total||0)-(+f.pago||0)),0)
+    const inAmt = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento===ds).reduce((a,f)=>a+((+f.valor||0)-(+f.pago||0)),0)
     const outAmt = compras.filter(c=>c.status_pagamento==='pendente'&&(c.data_pagamento||c.data)===ds).reduce((a,c)=>a+(+c.total_pago||0),0)
     if (inAmt>0||outAmt>0) next30.push({ date:ds, in:inAmt, out:outAmt })
   }
@@ -152,8 +152,8 @@ function MoneyIn() {
     setFaturas(data||[]); setLoading(false)
   }
   if (loading) return <Spinner text="Loading..." />
-  const total = faturas.reduce((a,f)=>a+(+f.total||0),0)
-  const paid = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.total||0),0)
+  const total = faturas.reduce((a,f)=>a+(+f.valor||0),0)
+  const paid = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.valor||0),0)
   return (
     <div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
@@ -170,14 +170,14 @@ function MoneyIn() {
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
         {faturas.map(f=>{
-          const pct = f.total>0?Math.round((f.pago||0)/f.total*100):0
-          const isOverdue = f.status!=='pago'&&new Date(f.vencimento)<new Date()
+          const pct = f.valor>0?Math.round((f.pago||0)/f.total*100):0
+          const isOverdue = f.status!=='pago'&&new Date(f.data_vencimento)<new Date()
           return (
             <div key={f.id} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 16px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                 <div>
                   <div style={{ fontSize:13, fontWeight:700 }}>{f.bars?.nome}</div>
-                  <div style={{ fontSize:11, color:'var(--text2)' }}>Due {fmtDate(f.vencimento)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>Due {fmtDate(f.data_vencimento)}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:15, fontWeight:800 }}>{fmtYen(f.total||0)}</div>
@@ -437,7 +437,7 @@ function Calendario() {
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, cR] = await Promise.all([
-      supabase.from('faturas').select('*, bars(nome)').order('vencimento'),
+      supabase.from('faturas').select('*, bars(nome)').order('data_vencimento'),
       supabase.from('compras').select('*').order('data'),
     ])
     setFaturas(fR.data||[])
@@ -455,10 +455,10 @@ function Calendario() {
 
   const events = {}
   faturas.forEach(f => {
-    if (f.vencimento?.startsWith(monthStr)) {
-      const day = +f.vencimento.slice(8,10)
+    if (f.data_vencimento?.startsWith(monthStr)) {
+      const day = +f.data_vencimento.slice(8,10)
       if (!events[day]) events[day] = []
-      events[day].push({ type:'in', label:f.bars?.nome, amount:(+f.total||0)-(+f.pago||0), status:f.status, date:f.vencimento, note:'Invoice due' })
+      events[day].push({ type:'in', label:f.bars?.nome, amount:(+f.valor||0)-(+f.pago||0), status:f.status, date:f.data_vencimento, note:'Invoice due' })
     }
   })
   compras.forEach(c => {
@@ -472,7 +472,7 @@ function Calendario() {
 
   // Next 3 upcoming events
   const allEvents = [
-    ...faturas.filter(f=>f.status!=='pago').map(f=>({ date:f.vencimento, label:f.bars?.nome, amount:(+f.total||0)-(+f.pago||0), type:'in', note:'Invoice due' })),
+    ...faturas.filter(f=>f.status!=='pago').map(f=>({ date:f.data_vencimento, label:f.bars?.nome, amount:(+f.valor||0)-(+f.pago||0), type:'in', note:'Invoice due' })),
     ...compras.filter(c=>c.status_pagamento==='pendente').map(c=>({ date:c.data_pagamento||c.data, label:c.fornecedor||'Supplier', amount:+c.total_pago||0, type:'out', note:'Purchase' }))
   ].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
 
