@@ -97,7 +97,7 @@ function Dashboard({ onNav }) {
     const lucroPorMes=meses.map((m,i)=>({label:monthLabel(m).split('/')[0],value:receitaPorMes[i].value-custoPorMes[i].value}))
     const purchasesMes=(purchases||[]).filter(c=>c.data?.startsWith(mesAtual))
     const salesMes=(sales||[]).filter(v=>v.data?.startsWith(mesAtual))
-    const custoMes=salesMes.reduce((a,v)=>a+(v.vendas_itens||[]).reduce((b,it)=>b+((it.produtos?.custo||0)*it.qtd),0),0)
+    const custoMes=purchasesMes.reduce((a,c)=>a+(+c.total_pago||0),0)
     const receitaMes=salesMes.reduce((a,v)=>a+(+v.total||0),0)
     const lucroMes=receitaMes-custoMes
     const margem=receitaMes>0?Math.round(lucroMes/receitaMes*100):0
@@ -105,14 +105,14 @@ function Dashboard({ onNav }) {
     const porBar=(bars||[]).map(bar=>{
       const vBar=salesMes.filter(v=>v.bar_id===bar.id)
       const receita=vBar.reduce((a,v)=>a+(+v.total||0),0)
-      const custo=vBar.reduce((a,v)=>a+(v.vendas_itens||[]).reduce((b,it)=>b+((it.produtos?.custo||0)*it.qtd),0),0)
+      const custo=0
       return {...bar,receita,lucro:receita-custo,sales:vBar.length}
     })
     const prodMap={}
     salesMes.forEach(v=>(v.vendas_itens||[]).forEach(it=>{
       const pid=it.produto_id
       if(!prodMap[pid])prodMap[pid]={nome:it.produtos?.nome||'?',qtd:0,receita:0,custo:0}
-      prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd;prodMap[pid].custo+=(it.produtos?.custo||0)*it.qtd
+      prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd;prodMap[pid].custo+=(it.produtos?.preco_venda||0)/Math.max(1,(it.produtos?.drinks_por_garrafa||1))*it.qtd
     }))
     const topProdutos=Object.values(prodMap).sort((a,b)=>b.receita-a.receita).slice(0,5)
     const topLucro=Object.values(prodMap).map(p=>({...p,lucro:p.receita-p.custo})).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
