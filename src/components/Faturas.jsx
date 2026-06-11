@@ -201,6 +201,7 @@ function InvoiceList() {
   const [vendas, setVendas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [customDue, setCustomDue] = useState('')
   const [payModal, setPayModal] = useState(null)
   const [payForm, setPayForm] = useState({ valor:'', metodo:'Cash', notas:'' })
   const [saving, setSaving] = useState(false)
@@ -222,6 +223,7 @@ function InvoiceList() {
   async function generateInvoice() {
     if (!selBar) return; setSaving(true)
     const period = getBillingPeriod(new Date().toISOString().slice(0,10))
+    const venc = customDue || period.due
     const total = vendas.filter(v=>v.bar_id===selBar&&v.data>=period.start&&v.data<=period.end).reduce((a,v)=>a+(+v.total||0),0)
     await supabase.from('faturas').insert({ bar_id:selBar, valor:total, data_emissao:period.start, data_data_vencimento:period.end, data_vencimento:period.due, total, pago:0, status:'pendente' })
     setSaving(false); setShowForm(false); load()
