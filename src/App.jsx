@@ -121,7 +121,6 @@ function Dashboard({ onNav }) {
       const custo=vendido*p.custo
       return {...p,vendido,receita,custo,lucro:receita-custo}
     }).filter(p=>p.vendido>0).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
-    const topLucro=Object.values(prodMap).map(p=>({...p,lucro:p.receita-p.custo})).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
     const ultimasCompras=(purchases||[]).slice(-4).reverse()
     setStats({custoMes,receitaMes,lucroMes,margem,markup,porBar,topProdutos,ultimasCompras,
               receitaPorMes,lucroPorMes,topLucro,totalProdutos:(products||[]).length,
@@ -197,27 +196,7 @@ function Dashboard({ onNav }) {
         </div>
       </div>
 
-      <div className="card" style={{marginBottom:16}}>
-        <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
-        {stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
-        :stats.topLucro.map((p,i)=>(
-          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--green)':i===1?'rgba(26,107,74,0.15)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'white':i===1?'var(--green)':'var(--text3)'}}>{i+1}</div>
-              <div>
-                <div style={{fontSize:12,fontWeight:600}}>{p.nome}</div>
-                <div style={{fontSize:10,color:'var(--text3)'}}>{p.qtd} un. · receita {fmtYen(p.receita)}</div>
-              </div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontWeight:700,fontSize:12,color:'var(--green)'}}>{fmtYen(p.lucro)}</div>
-              <div style={{fontSize:10,color:'var(--text3)'}}>{p.receita>0?Math.round(p.lucro/p.receita*100):0}% margin</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card" style={{marginBottom:16}}>
+            <div className="card" style={{marginBottom:16}}>
         <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
         {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
         :(stats.topLucro||[]).map((p,i)=>(
