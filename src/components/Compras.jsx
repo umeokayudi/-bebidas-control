@@ -12,6 +12,7 @@ export default function ComprasTab() {
   const [compras, setCompras] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
+  const [fornecedores, setFornecedores] = useState([])
   const [scanning, setScanning] = useState(false)
   const [imgSrc,   setImgSrc]   = useState(null)
   const [scanned,  setScanned]  = useState(null)
@@ -22,13 +23,17 @@ export default function ComprasTab() {
     return {
       data: new Date().toISOString().slice(0,10),
       fornecedor: '', pagamento: 'Dinheiro',
-      pontos_ganhos: 0, desconto_pontos: 0,
+      pontos_ganhos: 0, desconto_pontos: 0, tipo_ponto: '', data_pagamento: '', foto_url: '',
       subtotal: 0, total_pago: 0, obs: '',
       itens: []
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadFornecedores() }, [])
+  async function loadFornecedores() {
+    const { data } = await supabase.from('fornecedores').select('id,nome').order('nome')
+    setFornecedores(data||[])
+  }
 
   async function load() {
     setLoading(true)
@@ -91,6 +96,9 @@ export default function ComprasTab() {
       total_pago:      +form.total_pago,
       total_real,
       pontos_ganhos:   +form.pontos_ganhos,
+      tipo_ponto:      form.tipo_ponto||null,
+      data_pagamento:  form.data_pagamento||null,
+      foto_url:        form.foto_url||null,
       obs:             form.obs,
       criado_por:      user.id
     }).select().single()
@@ -111,6 +119,17 @@ export default function ComprasTab() {
             .eq('id', prods[0].id)
         }
       }
+    }
+    // Auto cashflow entry
+    const hoje = form.data_pagamento || form.data
+    if (hoje) {
+      await supabase.from('caixa_movimentos').insert({
+        tipo: 'saida',
+        valor: total_real,
+        descricao: 'Compra: ' + form.fornecedor,
+        metodo: form.pagamento,
+        data: hoje
+      }).catch(()=>{})
     }
     setSaving(false)
     setForm(defaultForm()); setImgSrc(null); setScanned(null)
@@ -171,7 +190,10 @@ export default function ComprasTab() {
           <div><label className="form-label">Data</label>
             <input type="date" value={form.data} onChange={e=>setF('data',e.target.value)} /></div>
           <div><label className="form-label">Supplier</label>
-            <input type="text" value={form.fornecedor} onChange={e=>setF('fornecedor',e.target.value)} placeholder="Distributor..." /></div>
+            <select value={form.fornecedor} onChange={e=>setF('fornecedor',e.target.value)}>
+              <option value="">— Select supplier —</option>
+              {fornecedores.map(f=><option key={f.id} value={f.nome}>{f.nome}</option>)}
+            </select></div>
           <div><label className="form-label">Pagamento</label>
             <select value={form.pagamento} onChange={e=>setF('pagamento',e.target.value)}>
               {PAGAMENTOS.map(p => <option key={p}>{p}</option>)}
@@ -186,6 +208,29 @@ export default function ComprasTab() {
             <input type="number" value={form.total_pago} onChange={e=>setF('total_pago',e.target.value)} /></div>
           <div><label className="form-label">Pontos ganhos</label>
             <input type="number" value={form.pontos_ganhos} onChange={e=>setF('pontos_ganhos',e.target.value)} /></div>
+          <div><label className="form-label">Tipo de ponto</label>
+            <select value={form.tipo_ponto} onChange={e=>setF('tipo_ponto',e.target.value)}>
+              <option value="">Nenhum</option>
+              <option value="T-Point">T-Point</option>
+              <option value="Rakuten">Rakuten</option>
+              <option value="Waon">Waon</option>
+              <option value="Nanaco">Nanaco</option>
+              <option value="PayPay">PayPay</option>
+              <option value="Outro">Outro</option>
+            </select></div>
+          <div><label className="form-label">Data de pagamento</label>
+            <input type="date" value={form.data_pagamento} onChange={e=>setF('data_pagamento',e.target.value)} /></div>
+        </div>
+        <div style={{marginBottom:12}}>
+          <label className="form-label">Foto do recibo</label>
+          <input type="file" accept="image/*" onChange={async e=>{
+            const file = e.target.files[0]
+            if (!file) return
+            const reader = new FileReader()
+            reader.onload = ev => setF('foto_url', ev.target.result)
+            reader.readAsDataURL(file)
+          }} />
+          {form.foto_url && <img src={form.foto_url} style={{marginTop:8,maxWidth:200,borderRadius:8}} alt="recibo"/>}
         </div>
         <div style={{ marginBottom: 12 }}>
           <label className="form-label">Observação</label>
@@ -267,7 +312,9 @@ export default function ComprasTab() {
                     {+c.desconto_pontos > 0 ? `-${fmtYen(c.desconto_pontos)}` : '—'}
                   </td>
                   <td style={{ fontWeight:700 }}>{fmtYen(c.total_real)}</td>
-                  <td>{+c.pontos_ganhos > 0 ? `+${c.pontos_ganhos}` : '—'}</td>
+                  <td>{+c.pontos_ganhos > 0 ? `+${c.pontos_ganhos}${c.tipo_ponto?' ('+c.tipo_ponto+')':''}` : '—'}</td>
+                  <td>{c.data_pagamento ? fmtDate(c.data_pagamento) : '—'}</td>
+                  <td>{c.foto_url ? <a href={c.foto_url} target="_blank" style={{fontSize:11}}>📷</a> : '—'}</td>
                   <td>{(c.compras_itens || []).length}</td>
                   <td><DelBtn onClick={() => deleteCompra(c.id)} /></td>
                 </tr>
