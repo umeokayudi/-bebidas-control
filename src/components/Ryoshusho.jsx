@@ -67,9 +67,12 @@ export default function RyoshushoTab() {
   }
 
   const items = getItems()
-  const subtotal = items.reduce((a, it) => a + it.preco * it.qtd, 0)
-  const tax = Math.round(subtotal * TAX_RATE)
-  const total = subtotal + tax
+  // Preços cadastrados são 税込 (zeikomi)
+  // Na nota: mostrar 税別 (zeibetsu) = preco / 1.1
+  const totalZeikomi = items.reduce((a, it) => a + it.preco * it.qtd, 0)
+  const subtotal = Math.round(totalZeikomi / 1.1)
+  const tax = totalZeikomi - subtotal
+  const total = totalZeikomi
   const bar = bars.find(b => b.id === barId)
 
   async function saveAndDownload() {
@@ -94,8 +97,8 @@ export default function RyoshushoTab() {
 
     const rows = items.map(it =>
       '<tr><td>' + it.nome + '</td><td style="text-align:center">' + it.qtd +
-      '</td><td style="text-align:right">&#165;' + Number(it.preco).toLocaleString('ja-JP') +
-      '</td><td style="text-align:right">&#165;' + Number(it.preco * it.qtd).toLocaleString('ja-JP') + '</td></tr>'
+      '</td><td style="text-align:right">&#165;' + Number(Math.round(it.preco / 1.1)).toLocaleString('ja-JP') +
+      '</td><td style="text-align:right">&#165;' + Number(Math.round(it.preco / 1.1 * it.qtd)).toLocaleString('ja-JP') + '</td></tr>'
     ).join('')
 
     const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + numero + '</title>' +
@@ -204,7 +207,7 @@ export default function RyoshushoTab() {
               : items.map((it, i) => (
                 <div key={i} style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
                   <span>{it.nome} &times; {it.qtd}</span>
-                  <span>{fmtYen(it.preco * it.qtd)}</span>
+                  <span>{fmtYen(Math.round(it.preco / 1.1) * it.qtd)}</span>
                 </div>
               ))
             }
