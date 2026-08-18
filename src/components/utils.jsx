@@ -12,6 +12,17 @@ export const monthLabel = mk => {
 export const PAGAMENTOS = ['Cash','Credit card','Debit card','PIX','Transfer','Points/Credit','Mixed']
 export const CATEGORIAS = ['Water','Soda','Juice','Energy Drink','Beer','Sake','Shochu','Vodka','Gin','Tequila','Whisky','Japanese Whisky','Spirits','Champagne','Wine','Others']
 
+// Inventory categories JBM sells to bars (excludes POS/menu imports)
+export const SUPPLIER_CATEGORIES = CATEGORIAS
+export const NON_SUPPLIER_CATEGORIES = ['Highball', 'Food', 'Bottle', 'Premium', 'Soft', 'suco', 'cha', 'licor', 'rum', 'mixer', 'vinho', 'Cerveja', 'Soft Drinks', 'Liqueurs', 'Gin Base', 'Wine Base']
+
+export function isSupplierProduct(p) {
+  if (!p || p.ativo === false) return false
+  if (NON_SUPPLIER_CATEGORIES.includes(p.categoria)) return false
+  if (p.preco_venda === 1000 || p.preco_venda === 2000) return false
+  return SUPPLIER_CATEGORIES.includes(p.categoria)
+}
+
 // ── Metric Card ───────────────────────────────────────────────────────────────
 export function MetricCard({ label, value, sub, color = 'blue', icon }) {
   return (
