@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, Spinner, Empty, SectionTitle } from './utils'
+import { fmtYen, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
 
 export default function BusinessIntel() {
   const [tab, setTab] = useState('profit')
@@ -276,10 +276,10 @@ function WeeklyReport() {
       supabase.from('vendas').select('total').gte('data',prevStr).lt('data',weekStr),
     ])
 
-    const vendas = vR.data||[]
+    const vendas = filterSupplierVendas(vR.data||[])
     const compras = cR.data||[]
     const movs = mR.data||[]
-    const prevVendas = pR.data||[]
+    const prevVendas = filterSupplierVendas(pR.data||[])
 
     const totalRevenue = vendas.reduce((a,v)=>a+(+v.total||0),0)
     const totalCost = compras.reduce((a,c)=>a+(+c.total_pago||0),0)
@@ -383,7 +383,7 @@ function CustomPeriodReport() {
       supabase.from('estoque_movimentos').select('*, produtos(nome,categoria)').gte('criado_em',from+'T00:00:00').lte('criado_em',to+'T23:59:59'),
     ])
 
-    const vendas = vR.data||[]
+    const vendas = filterSupplierVendas(vR.data||[])
     const compras = cR.data||[]
     const movs = mR.data||[]
 

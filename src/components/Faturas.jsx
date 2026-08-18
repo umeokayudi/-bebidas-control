@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, fmtDate, Spinner, Empty } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, filterSupplierVendas } from './utils'
 
 function getBillingPeriod(date) {
   const d = new Date(date)
@@ -40,7 +40,7 @@ function Overview() {
       supabase.from('vendas').select('total,data,bar_id').order('data'),
       supabase.from('fatura_pagamentos').select('*, faturas(*, bars(nome))').eq('confirmado',false).order('criado_em',{ascending:false}),
     ])
-    setFaturas(fR.data||[]); setVendas(vR.data||[]); setPagamentos(pR.data||[]); setLoading(false)
+    setFaturas(fR.data||[]); setVendas(filterSupplierVendas(vR.data||[])); setPagamentos(pR.data||[]); setLoading(false)
   }
   if (loading) return <Spinner text="Loading..." />
 
@@ -216,7 +216,7 @@ function InvoiceList() {
       supabase.from('bars').select('*').order('nome'),
       supabase.from('vendas').select('*, vendas_itens(qtd,preco_unitario,produtos(nome))').order('data',{ascending:false}),
     ])
-    setFaturas(fR.data||[]); setBars(bR.data||[]); setVendas(vR.data||[])
+    setFaturas(fR.data||[]); setBars(bR.data||[]); setVendas(filterSupplierVendas(vR.data||[]))
     if (bR.data?.length>0 && !selBar) setSelBar(bR.data[0].id)
     setLoading(false)
   }

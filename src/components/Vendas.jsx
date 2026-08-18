@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
-import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, SectionTitle, DelBtn, MetricCard, isSupplierProduct } from './utils'
+import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, SectionTitle, DelBtn, MetricCard, isSupplierProduct, filterSupplierVendas } from './utils'
 
 export default function VendasTab() {
   const { user } = useAuth()
@@ -23,7 +23,7 @@ export default function VendasTab() {
       supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
       supabase.from('bars').select('*').order('nome')
     ])
-    setVendas(v || [])
+    setVendas(filterSupplierVendas(v || []))
     setProdutos((p || []).filter(isSupplierProduct))
     setBars(b || [])
     if (b?.length && !form.bar_id) setForm(f => ({ ...f, bar_id: b[0].id }))
@@ -51,7 +51,7 @@ export default function VendasTab() {
     setSaving(true)
     const { data: venda, error } = await supabase.from('vendas').insert({
       data: form.data, bar_id: form.bar_id,
-      total: totalVendaForm, obs: form.obs, criado_por: user.id
+      total: totalVendaForm, obs: form.obs || 'Entrega fornecedor', criado_por: user.id, origem: 'fornecedor'
     }).select().single()
     if (!error) {
       await supabase.from('vendas_itens').insert(

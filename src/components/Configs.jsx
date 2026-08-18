@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
-import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS } from './utils'
+import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas } from './utils'
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────────
 export function ProductsTab() {
@@ -124,7 +124,7 @@ export function BarsTab() {
       supabase.from('bars').select('*').order('nome'),
       supabase.from('vendas').select('bar_id, total')
     ])
-    setBars(b||[]); setSales(v||[])
+    setBars(b||[]); setSales(filterSupplierVendas(v||[]))
     setLoading(false)
   }
 
@@ -446,7 +446,8 @@ export function PedidosAdminTab() {
           bar_id:pedido.bar_id,
           total:pedido.total_estimado,
           obs:'Auto: order '+pedido.id.slice(0,8),
-          criado_por:pedido.criado_por
+          criado_por:pedido.criado_por,
+          origem:'fornecedor'
         }).select().single()
         if(venda&&pedido.pedidos_itens&&pedido.pedidos_itens.length>0){
           await supabase.from('vendas_itens').insert(
@@ -509,7 +510,8 @@ export function PedidosAdminTab() {
     const {data:venda}=await supabase.from("vendas").insert({
       data:new Date().toISOString().slice(0,10),
       bar_id:pedido.bar_id,total:pedido.total_estimado,
-      obs:"Auto: order "+id.slice(0,8),criado_por:pedido.criado_por
+      obs:"Auto: order "+id.slice(0,8),criado_por:pedido.criado_por,
+      origem:'fornecedor'
     }).select().single()
     if(venda&&pedido.pedidos_itens&&pedido.pedidos_itens.length>0){
       await supabase.from("vendas_itens").insert(
