@@ -27,11 +27,11 @@ export function AuthProvider({ children }) {
   async function loadPerfil(uid) {
     let { data } = await supabase.from('perfis').select('*').eq('id', uid).single()
     if (!data) {
-      // Perfil não existe — cria automaticamente
       const { data: user } = await supabase.auth.getUser()
       await supabase.from('perfis').insert({
         id: uid,
-        nome: user?.user?.email?.split('@')[0] || 'Usuário',
+        nome: user?.user?.user_metadata?.nome || user?.user?.email?.split('@')[0] || 'Usuário',
+        email: user?.user?.email || null,
         role: 'funcionario'
       })
       const { data: newPerfil } = await supabase.from('perfis').select('*').eq('id', uid).single()
