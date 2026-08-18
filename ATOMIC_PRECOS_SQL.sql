@@ -22,7 +22,8 @@ where ativo = true
   )
   and preco_venda not in (1000, 2000);
 
--- 3. Nota: preços de VENDA do bar (menu/copo) ficam em drink_menu e bar_pricing.
---    Pedidos ao fornecedor JBM usam produtos.preco_venda (tax included).
+-- 3. Nota: faturas Atomic listam preço 税別 (sem imposto).
+--    produtos.preco_venda = 税込 (zeikomi) = round(zeibetsu × 1.1)
+--    Menu/copo do bar → drink_menu / bar_pricing (separado)
 
 select 'Atomic supplier catalog ready' as status;
