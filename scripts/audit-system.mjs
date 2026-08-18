@@ -47,6 +47,21 @@ async function main() {
 
     const { count: bpCount } = await sb.from('bar_pricing').select('*', { count: 'exact', head: true }).eq('bar_id', barId)
     checks.push({ name: 'Bar POS pricing', ok: (bpCount || 0) >= 10, detail: `${bpCount || 0} products with POS drink prices` })
+
+    const { data: vendasIds } = await sb.from('vendas').select('id').eq('bar_id', barId)
+    const ids = (vendasIds || []).map(v => v.id)
+    let missingPricing = 0
+    if (ids.length) {
+      const { data: itens } = await sb.from('vendas_itens').select('produto_id').in('venda_id', ids)
+      const { data: bp } = await sb.from('bar_pricing').select('produto_id,drinks_por_garrafa,preco_drink').eq('bar_id', barId)
+      const okIds = new Set((bp || []).filter(r => r.preco_drink > 0 && r.drinks_por_garrafa > 0).map(r => r.produto_id))
+      const purchased = new Set((itens || []).map(i => i.produto_id).filter(Boolean))
+      missingPricing = [...purchased].filter(id => !okIds.has(id)).length
+    }
+    checks.push({ name: 'Purchased SKUs with POS price', ok: missingPricing === 0, detail: missingPricing ? `${missingPricing} missing` : 'all purchased SKUs priced' })
+
+    const { count: fatCount } = await sb.from('faturas').select('*', { count: 'exact', head: true }).eq('bar_id', barId)
+    checks.push({ name: 'Atomic invoices', ok: (fatCount || 0) > 0, detail: `${fatCount || 0} invoice(s)` })
   }
 
   try {

@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 const PREFERRED = [
   'gemini-3.7-flash',
   'gemini-3.6-flash',
@@ -7,7 +9,11 @@ const PREFERRED = [
   'gemini-2.5-flash-lite',
 ]
 
+const SECRET_BUCKET = 'system-private'
+const SECRET_FILE = 'gemini_api_key.txt'
+
 let cachedModels = null
+let cachedKey = null
 
 function rankModel(name) {
   let s = 0
@@ -21,6 +27,27 @@ function rankModel(name) {
   if (/preview/i.test(name)) s -= 5
   if (/1\.5|2\.0/.test(name)) s -= 200
   return s
+}
+
+async function resolveGeminiKey() {
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY
+  if (cachedKey) return cachedKey
+
+  const url = process.env.VITE_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) return null
+
+  try {
+    const sb = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    const { data, error } = await sb.storage.from(SECRET_BUCKET).download(SECRET_FILE)
+    if (error || !data) return null
+    cachedKey = (await data.text()).trim()
+    return cachedKey || null
+  } catch {
+    return null
+  }
 }
 
 async function fetchAvailableModels(key) {
@@ -54,10 +81,10 @@ async function callModel(key, model, body) {
 }
 
 export async function geminiGenerate(body) {
-  const key = process.env.GEMINI_API_KEY
+  const key = await resolveGeminiKey()
   if (!key) {
     throw new Error(
-      'GEMINI_API_KEY is not configured. In Vercel: Settings → Environment Variables → add GEMINI_API_KEY (https://aistudio.google.com/apikey)'
+      'GEMINI_API_KEY is not configured. Set GEMINI_API_KEY in Vercel or run: node scripts/set-gemini-secret.mjs'
     )
   }
 
@@ -77,4 +104,4 @@ export async function geminiGenerate(body) {
   throw new Error(`Gemini API error: ${lastErr}`)
 }
 
-export const API_BUILD = '2026-08-18-jbm'
+export const API_BUILD = '2026-08-18-jbm-v2'
