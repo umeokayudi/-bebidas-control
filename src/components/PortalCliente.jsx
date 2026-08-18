@@ -616,7 +616,7 @@ function OrdersTab({ bar }) {
         <div className="card" style={{ marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>New order for JBM Drinks</div>
           <div style={{ fontSize:12, color:'var(--text2)', marginBottom:16 }}>
-            Supplier price list (tax included) — menu/POS drinks are not shown here
+            Supplier price list — 税込 (10% tax included). Menu/POS drinks are not shown here.
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
             <div>

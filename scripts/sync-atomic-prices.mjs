@@ -9,7 +9,12 @@ const sb = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qaXJna3F0cXZ1Z3FrdHl1aGVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NTkwNTIsImV4cCI6MjA5NjEzNTA1Mn0.nRiZHav9wAY2HRKrO66W9HhY3R5wGZHMM8UH5W4PK_M'
 )
 
-// Canonical supplier catalog — Price Per Unit (tax included), from consolidated Atomic invoices
+// Catalog = 税別 (pre-tax / zeibetsu) from Atomic invoices.
+// preco_venda in DB = 税込 (zeikomi) = round(zeibetsu × 1.1)
+const TAX_RATE = 1.1
+const toZeikomi = n => Math.round(+n * TAX_RATE)
+
+// Canonical supplier catalog — zeibetsu (sem imposto)
 const CATALOG = {
   'Asahi Beer 330ml': { price: 258, category: 'Beer' },
   'Apple Juice': { price: 295, category: 'Juice' },
@@ -20,7 +25,7 @@ const CATALOG = {
   'Bols Peach': { price: 1982, category: 'Others' },
   'Bols Triple Sec': { price: 2190, category: 'Others' },
   'Bombay Sapphire 1.75L': { price: 4400, category: 'Gin' },
-  'Budweiser 330ml': { price: 313, category: 'Beer' },
+  'Budweiser 330ml': { price: 285, category: 'Beer' },
   'Campari': { price: 2280, category: 'Others' },
   'Chandon Brut': { price: 3000, category: 'Champagne' },
   'Chita': { price: 6600, category: 'Japanese Whisky' },
@@ -95,19 +100,28 @@ const CATALOG = {
   'Don Julio 1942': { price: 21980, category: 'Tequila' },
   'Champagne House': { price: 600, category: 'Champagne' },
   'Xarope Simples': { price: 500, category: 'Others' },
+  'Coca Cola 500ml': { price: 152, category: 'Soda' },
+  'Red Wine 5L': { price: 3000, category: 'Wine' },
+  'Red Wine Segonzac La Foret': { price: 1800, category: 'Wine' },
+  'Cranberry Juice 2.83L': { price: 1800, category: 'Juice' },
+  'Cranberry Juice 5.66L': { price: 3900, category: 'Juice' },
+  'Tequila Anejo 1L': { price: 4500, category: 'Tequila' },
+  'Soda Case (35 units)': { price: 2691, category: 'Soda' },
+  'Green Tea': { price: 1200, category: 'Others' },
 }
 
+// zeibetsu — converted to zeikomi on insert
 const NEW_PRODUCTS = [
-  { nome: 'Beefeater', categoria: 'Gin', preco_venda: 1980 },
-  { nome: 'Don Julio 1942', categoria: 'Tequila', preco_venda: 21980 },
-  { nome: 'Red Wine 5L', categoria: 'Wine', preco_venda: 3300 },
-  { nome: 'Red Wine Segonzac La Foret', categoria: 'Wine', preco_venda: 1980 },
-  { nome: 'Cranberry Juice 2.83L', categoria: 'Juice', preco_venda: 1980 },
-  { nome: 'Cranberry Juice 5.66L', categoria: 'Juice', preco_venda: 4290 },
-  { nome: 'Tequila Anejo 1L', categoria: 'Tequila', preco_venda: 4950 },
-  { nome: 'Soda Case (35 units)', categoria: 'Soda', preco_venda: 2960 },
-  { nome: 'Green Tea', categoria: 'Others', preco_venda: 1320 },
-  { nome: 'Coca Cola 500ml', categoria: 'Soda', preco_venda: 167 },
+  { nome: 'Beefeater', categoria: 'Gin', zeibetsu: 1980 },
+  { nome: 'Don Julio 1942', categoria: 'Tequila', zeibetsu: 21980 },
+  { nome: 'Red Wine 5L', categoria: 'Wine', zeibetsu: 3000 },
+  { nome: 'Red Wine Segonzac La Foret', categoria: 'Wine', zeibetsu: 1800 },
+  { nome: 'Cranberry Juice 2.83L', categoria: 'Juice', zeibetsu: 1800 },
+  { nome: 'Cranberry Juice 5.66L', categoria: 'Juice', zeibetsu: 3900 },
+  { nome: 'Tequila Anejo 1L', categoria: 'Tequila', zeibetsu: 4500 },
+  { nome: 'Soda Case (35 units)', categoria: 'Soda', zeibetsu: 2691 },
+  { nome: 'Green Tea', categoria: 'Others', zeibetsu: 1200 },
+  { nome: 'Coca Cola 500ml', categoria: 'Soda', zeibetsu: 152 },
 ]
 
 // POS / bar menu items — not supplier inventory (mixed from POS import)
@@ -156,11 +170,12 @@ async function main() {
     const key = findCatalogKey(name)
     if (key) {
       const { price, category } = CATALOG[key]
-      const patch = { preco_venda: price, ativo: true }
+      const zeikomi = toZeikomi(price)
+      const patch = { preco_venda: zeikomi, ativo: true }
       if (category) patch.categoria = category
-      if (p.preco_venda !== price || p.categoria !== category || p.ativo === false) {
+      if (p.preco_venda !== zeikomi || p.categoria !== category || p.ativo === false) {
         await sb.from('produtos').update(patch).eq('id', p.id)
-        console.log(`UPDATE: ${name} → ¥${price} (${category})`)
+        console.log(`UPDATE: ${name} → ¥${zeikomi} zeikomi (¥${price} +10%) (${category})`)
         updated++
       }
     } else if (p.preco_venda === 1000 || p.preco_venda === 2000) {
@@ -175,9 +190,12 @@ async function main() {
 
   for (const np of NEW_PRODUCTS) {
     if (byName.has(norm(np.nome))) continue
-    const { error: insErr } = await sb.from('produtos').insert({ ...np, custo: 0, ativo: true })
+    const preco_venda = toZeikomi(np.zeibetsu)
+    const { error: insErr } = await sb.from('produtos').insert({
+      nome: np.nome, categoria: np.categoria, preco_venda, custo: 0, ativo: true
+    })
     if (insErr) console.error('INSERT FAIL:', np.nome, insErr.message)
-    else { console.log('INSERT:', np.nome, '¥' + np.preco_venda); inserted++ }
+    else { console.log('INSERT:', np.nome, '¥' + preco_venda + ' zeikomi'); inserted++ }
   }
 
   // Fix trailing-space duplicates

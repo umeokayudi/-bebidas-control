@@ -19,7 +19,6 @@ export const NON_SUPPLIER_CATEGORIES = ['Highball', 'Food', 'Bottle', 'Premium',
 export function isSupplierProduct(p) {
   if (!p || p.ativo === false) return false
   if (NON_SUPPLIER_CATEGORIES.includes(p.categoria)) return false
-  if (p.preco_venda === 1000 || p.preco_venda === 2000) return false
   return SUPPLIER_CATEGORIES.includes(p.categoria)
 }
 
