@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
-import { fmtYen, fmtDate, Spinner, Empty, SectionTitle } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct } from './utils'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pending',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -486,7 +486,7 @@ function OrdersTab({ bar }) {
       supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
       supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*))').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
     ])
-    setProdutos(pR.data || [])
+    setProdutos((pR.data || []).filter(isSupplierProduct))
     setPedidos(pedR.data || [])
     setLoading(false)
   }
@@ -614,7 +614,10 @@ function OrdersTab({ bar }) {
 
       {showForm && (
         <div className="card" style={{ marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>New order for JBM Drinks</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>New order for JBM Drinks</div>
+          <div style={{ fontSize:12, color:'var(--text2)', marginBottom:16 }}>
+            Supplier price list — 税込 (10% tax included). Menu/POS drinks are not shown here.
+          </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
             <div>
               <label className="form-label">Requested delivery date</label>

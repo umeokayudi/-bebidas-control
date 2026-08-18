@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
-import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, SectionTitle, DelBtn, MetricCard } from './utils'
+import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, SectionTitle, DelBtn, MetricCard, isSupplierProduct } from './utils'
 
 export default function VendasTab() {
   const { user } = useAuth()
@@ -24,7 +24,7 @@ export default function VendasTab() {
       supabase.from('bars').select('*').order('nome')
     ])
     setVendas(v || [])
-    setProdutos(p || [])
+    setProdutos((p || []).filter(isSupplierProduct))
     setBars(b || [])
     if (b?.length && !form.bar_id) setForm(f => ({ ...f, bar_id: b[0].id }))
     setLoading(false)
