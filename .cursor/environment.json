@@ -1,0 +1,15 @@
+{
+  "name": "JBM Bebidas Control",
+  "install": "npm install --silent && npm run build",
+  "start": "export VITE_SUPABASE_URL=\"${VITE_SUPABASE_URL:-https://ojirgkqtqvugqktyuhem.supabase.co}\"",
+  "terminals": [
+    {
+      "name": "vite",
+      "command": "npm run dev -- --host 0.0.0.0 --port 5173",
+      "description": "Frontend dev server (Vite)"
+    }
+  ],
+  "ports": [
+    { "name": "vite", "port": 5173 }
+  ]
+}
