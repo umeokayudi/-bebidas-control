@@ -1,28 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
 import { fmtYen, Spinner } from './utils'
-
-const ANTH_KEY = 'placeholder' // handled by proxy
-
-const GROQ_KEY = import.meta.env.VITE_GROQ_KEY
-
-async function callClaude(messages, system) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_KEY },
-    body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
-      max_tokens: 1000,
-      messages: [
-        ...(system ? [{ role: 'system', content: system }] : []),
-        ...messages
-      ]
-    })
-  })
-  const data = await res.json()
-  if (data.error) return 'Error: ' + data.error.message
-  return data.choices?.[0]?.message?.content || 'No response'
-}
 
 export default function AIAssistant() {
   const [tab, setTab] = useState('chat')
@@ -76,7 +55,7 @@ Recent sales: ${JSON.stringify(vendas)}
 Answer in the same language the user writes in. Be concise and helpful.
 `
     const history = messages.filter(m=>m.role!=='assistant'||messages.indexOf(m)>0).map(m=>({role:m.role,content:m.content}))
-    const reply = await callClaude([...history, userMsg], context)
+    const reply = await callGeminiChat({ messages: [...history, userMsg], system: context })
     setMessages(m => [...m, { role:'assistant', content: reply }])
     setLoading(false)
   }
@@ -166,8 +145,10 @@ Provide:
 
 Be specific with quantities and prices in yen.`
 
-    const reply = await callClaude([{role:'user',content:prompt}],
-      'You are a procurement advisor for JBM Drinks Japan. Be concise, practical and specific.')
+    const reply = await callGeminiChat({
+      messages: [{ role: 'user', content: prompt }],
+      system: 'You are a procurement advisor for JBM Drinks Japan. Be concise, practical and specific.',
+    })
     setAdvice(reply)
     setLoading(false)
   }
@@ -204,10 +185,8 @@ function ReceiptScanner() {
     setLoading(true)
     setResult(null)
 
-    const base64 = image.split(',')[1]
-    const mediaType = image.split(';')[0].split(':')[1]
-
-    const prompt = `Extract purchase information from this receipt image (base64: ${base64.slice(0,50)}...). Return ONLY valid JSON:
+    const imageParts = imageDataUrlToParts(image)
+    const prompt = `Extract purchase information from this receipt image. Return ONLY valid JSON:
 {
   "supplier": "store name",
   "date": "YYYY-MM-DD",
@@ -216,16 +195,15 @@ function ReceiptScanner() {
   "total": 0,
   "points": 0
 }`
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role:'user', content: prompt }] })
+
+    const text = await callGeminiChat({
+      messages: [{ role: 'user', content: prompt }],
+      image: imageParts,
+      temperature: 0.2,
+      maxOutputTokens: 1024,
     })
-    const data = await res.json()
-    const text = data.text || '{}'
     try {
-      const clean = text.replace(/```json|```/g,'').trim()
-      setResult(JSON.parse(clean))
+      setResult(parseJsonFromAI(text))
     } catch(e) {
       setResult({ error: text })
     }

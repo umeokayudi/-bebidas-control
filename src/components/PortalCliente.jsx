@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
+import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
+import { LogoSidebar } from './Logo'
 import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas } from './utils'
 
 const STATUS_PEDIDO = {
@@ -1745,23 +1747,26 @@ function FaturasTab({ bar }) {
   }
 
   async function scanReceipt(imageData) {
+    if (!imageData) return
     setScanning(true)
+    setScannedData(null)
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + import.meta.env.VITE_GROQ_KEY },
-        body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
-          max_tokens: 200,
-          messages: [{ role:"user", content:"Payment receipt. Extract: amount in yen, date, method. Reply ONLY JSON: {valor:number,data:YYYY-MM-DD,metodo:string}" }]
-        })
+      const image = imageDataUrlToParts(imageData)
+      const text = await callGeminiChat({
+        messages: [{
+          role: 'user',
+          content: 'Payment receipt. Extract: amount in yen, date, method. Reply ONLY JSON: {valor:number,data:"YYYY-MM-DD",metodo:string}',
+        }],
+        image,
+        temperature: 0.2,
+        maxOutputTokens: 256,
       })
-      const data = await res.json()
-      const text = data.choices?.[0]?.message?.content || "{}"
-      const parsed = JSON.parse(text.replace(/```json|```/g,"").trim())
+      const parsed = parseJsonFromAI(text)
       setScannedData(parsed)
-      if (parsed.valor) setPayForm(f => ({...f, valor:parsed.valor, metodo:parsed.metodo||f.metodo}))
-    } catch(e) { console.error(e) }
+      if (parsed.valor) setPayForm(f => ({ ...f, valor: parsed.valor, metodo: parsed.metodo || f.metodo }))
+    } catch (e) {
+      console.error(e)
+    }
     setScanning(false)
   }
 
@@ -1967,7 +1972,11 @@ function FaturasTab({ bar }) {
                   onChange={e=>{
                     const file = e.target.files[0]; if (!file) return
                     const reader = new FileReader()
-                    reader.onload = ev => { setImage(ev.target.result) }
+                    reader.onload = ev => {
+                      const dataUrl = ev.target.result
+                      setImage(dataUrl)
+                      scanReceipt(dataUrl)
+                    }
                     reader.readAsDataURL(file)
                   }}
                 />
@@ -1975,6 +1984,12 @@ function FaturasTab({ bar }) {
             </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Amount (¥)</div>
+              {scanning && <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>🤖 Gemini extracting amount...</div>}
+              {scannedData?.valor && !scanning && (
+                <div style={{ fontSize:12, color:"var(--green)", marginBottom:8, fontWeight:600 }}>
+                  ✅ Detected: {fmtYen(scannedData.valor)}{scannedData.metodo ? ` · ${scannedData.metodo}` : ''}
+                </div>
+              )}
               <input type="number" value={payForm.valor} onChange={e=>setPayForm({...payForm,valor:e.target.value})} style={{ width:"100%", padding:"12px 14px", fontSize:18, borderRadius:12, fontWeight:700 }} />
             </div>
             <div style={{ marginBottom:12 }}>
@@ -2153,8 +2168,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
     <div style={{ display:'flex', minHeight:'100vh', background:'var(--bg)' }}>
       <aside className="sidebar">
         <div style={{padding:'24px 20px 20px',borderBottom:'1px solid rgba(193,156,86,0.15)'}}>
-          <div style={{fontSize:18,fontWeight:800,color:'white',letterSpacing:2}}>JBM</div>
-          <div style={{fontSize:9,color:'var(--gold)',letterSpacing:'0.15em',textTransform:'uppercase',marginTop:2}}>Drinks</div>
+          <LogoSidebar />
         </div>
         <div style={{padding:'12px 0',flex:1}}>
           {NAV.map(n => (
