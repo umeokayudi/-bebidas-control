@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
-import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas } from './utils'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pending',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -48,9 +48,9 @@ function HomeTab({ bar, onTab }) {
       supabase.from('pedidos').select('*').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
       supabase.from('vendas_itens').select('*, produtos(nome,preco_venda,preco_bar), vendas(data,bar_id)').eq('vendas.bar_id', bar.id),
     ])
-    setVendas(vR.data || [])
+    setVendas(filterSupplierVendas(vR.data || []))
     setPedidos(pR.data || [])
-    setItens(iR.data?.filter(i => i.vendas) || [])
+    setItens((iR.data || []).filter(i => i.vendas && filterSupplierVendas([i.vendas]).length))
     setLoading(false)
   }
 
@@ -370,7 +370,7 @@ function DeliveriesTab({ bar }) {
 
   async function load() {
     const { data } = await supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').eq('bar_id', bar.id).order('data', { ascending:false })
-    setVendas(data || [])
+    setVendas(filterSupplierVendas(data || []))
     setLoading(false)
   }
 
@@ -1739,7 +1739,7 @@ function FaturasTab({ bar }) {
       supabase.from("fatura_pagamentos").select("*").order("criado_em", { ascending:false }),
     ])
     setFaturas(fR.data||[])
-    setVendas(vR.data||[])
+    setVendas(filterSupplierVendas(vR.data||[]))
     setPagamentos(pR.data||[])
     setLoading(false)
   }

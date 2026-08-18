@@ -26,7 +26,7 @@ import Cashflow from './components/Cashflow'
 import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, monthLabel } from './components/utils'
+import { fmtYen, monthLabel, filterSupplierVendas } from './components/utils'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -83,13 +83,14 @@ function Dashboard({ onNav }) {
     try {
     const now = new Date()
     const mesAtual = now.toISOString().slice(0,7)
-    const [{ data:purchases },{ data:sales },{ data:products },{ data:bars },{ data:pedidos }] = await Promise.all([
+    const [{ data:purchases },{ data:salesRaw },{ data:products },{ data:bars },{ data:pedidos }] = await Promise.all([
       supabase.from('compras').select('*').order('data'),
       supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').order('data'),
       supabase.from('produtos').select('*').eq('ativo',true),
       supabase.from('bars').select('*'),
       supabase.from('pedidos').select('*').eq('status','pendente'),
     ])
+    const sales = filterSupplierVendas(salesRaw)
     const meses=[]
     for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push(d.toISOString().slice(0,7))}
     const receitaPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(sales||[]).filter(v=>v.data?.startsWith(m)).reduce((a,v)=>a+(+v.total||0),0)}))

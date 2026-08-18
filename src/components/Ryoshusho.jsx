@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, fmtDate, Spinner, Empty, SectionTitle } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
 
 const TAX_RATE = 0.10
 
@@ -35,7 +35,7 @@ export default function RyoshushoTab() {
       const v = vRes.data || []
       const h = hRes.data || []
       setBars(b)
-      setVendas(v)
+      setVendas(filterSupplierVendas(v))
       setHistory(h)
       if (b.length > 0 && !barId) setBarId(b[0].id)
       const y = new Date().getFullYear()

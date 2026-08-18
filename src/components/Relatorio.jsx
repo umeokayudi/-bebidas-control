@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle } from './utils'
+import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
 
 function MetricCard({ label, value, sub, color='var(--navy)', accent }) {
   return (
@@ -73,7 +73,7 @@ export default function RelatorioTab() {
     ])
     setBars(bR.data || [])
     setCompras(cR.data || [])
-    setVendas(vR.data || [])
+    setVendas(filterSupplierVendas(vR.data || []))
     setProdutos(pR.data || [])
     setRyoshusho(rR.data || [])
     setPedidos(pedR.data || [])

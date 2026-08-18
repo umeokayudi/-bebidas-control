@@ -9,4 +9,5 @@ export VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://ojirgkqtqvugqktyuhem.supa
 [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && { echo "❌ Falta SUPABASE_SERVICE_ROLE_KEY"; exit 1; }
 node scripts/sync-atomic-prices.mjs
 node scripts/setup-usuarios.mjs "${ATOMIC_EMAIL:-}"
+node scripts/limpar-pos-vendas.mjs 2>/dev/null || true
 echo "✅ https://bebidas-control.vercel.app"
