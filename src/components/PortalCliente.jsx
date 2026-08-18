@@ -11,6 +11,7 @@ import {
   monthlySpendSeries,
   projectItemRevenue,
 } from '../lib/clientAnalytics'
+import ClientAnalyticsTab from './ClientAnalyticsTab'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pending',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -50,6 +51,7 @@ function HomeTab({ bar, onTab }) {
   const [faturas,     setFaturas]     = useState([])
   const [loading,     setLoading]     = useState(true)
   const [periodo,     setPeriodo]     = useState('30')
+  const [chartMonth,  setChartMonth]   = useState(null)
 
   useEffect(() => { load() }, [bar])
 
@@ -92,7 +94,9 @@ function HomeTab({ bar, onTab }) {
   const totalPrev  = vendasPrev.reduce((a,v) => a+(+v.total||0), 0)
   const growth     = totalPrev > 0 ? Math.round((totalPeriod-totalPrev)/totalPrev*100) : null
 
-  const { labels: monthLabels, values: monthlyData } = monthlySpendSeries(vendas, 6)
+  const { labels: monthLabels, values: monthlyData, keys: monthKeys } = monthlySpendSeries(vendas, 6)
+  const chartMonthKey = chartMonth !== null ? monthKeys[chartMonth] : mes
+  const chartMonthStats = analyzePurchases(itens, pricingMap, { monthKey: chartMonthKey })
 
   // Top products by revenue
   const prodMap = {}
@@ -110,7 +114,6 @@ function HomeTab({ bar, onTab }) {
   const topMargin = periodProjection.products.slice(0, 6)
 
   const ativos  = pedidos.filter(p=>p.status==='pendente'||p.status==='confirmado')
-  const totalMes = account.contaMes
 
   const maxMonth = Math.max(...monthlyData, 1)
 
@@ -233,35 +236,53 @@ function HomeTab({ bar, onTab }) {
         ))}
       </div>
 
-      {/* Spend chart */}
+      {/* Spend chart — clickable */}
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700 }}>Monthly spend</div>
-          <div style={{ fontSize:13, fontWeight:800, color:'var(--navy)' }}>{fmtYen(totalMes)} this month</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:8 }}>
+          <div>
+            <div style={{ fontSize:14, fontWeight:700 }}>Monthly spend</div>
+            <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>Clique no mês · {chartMonthKey}</div>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'var(--navy)' }}>{fmtYen(chartMonthStats.jbmTotal)}</div>
+            <button type="button" onClick={()=>onTab('analytics')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
+              Analytics →
+            </button>
+          </div>
         </div>
-        {/* Bar chart */}
         <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:100 }}>
           {monthlyData.map((v,i) => {
             const pct = Math.max(v/maxMonth*100, v>0?4:0)
-            const isCurrent = i===5
+            const isSelected = chartMonth === i || (chartMonth === null && i === 5)
             return (
-              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+              <button key={i} type="button" onClick={()=>setChartMonth(i)} style={{
+                flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+                background:'transparent', border:'none', cursor:'pointer', padding:0,
+                opacity: chartMonth === null || chartMonth === i ? 1 : 0.5,
+              }}>
                 <div style={{ fontSize:10, color:'var(--text2)', fontWeight:600 }}>
                   {v>0 ? (v>=10000 ? Math.round(v/1000)+'k' : fmtYen(v)) : ''}
                 </div>
                 <div style={{
                   width:'100%', height:pct+'%', minHeight:v>0?4:0,
-                  background:isCurrent?'var(--navy)':'var(--border)',
-                  borderRadius:'6px 6px 0 0', transition:'height 0.3s',
+                  background:isSelected?'var(--navy)':'var(--border)',
+                  borderRadius:'6px 6px 0 0', transition:'height 0.3s, background 0.2s',
                   position:'relative'
                 }}>
-                  {isCurrent && v>0 && <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg,rgba(255,255,255,0.15) 0%,transparent 100%)', borderRadius:'6px 6px 0 0' }}/>}
+                  {isSelected && v>0 && <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg,rgba(255,255,255,0.15) 0%,transparent 100%)', borderRadius:'6px 6px 0 0' }}/>}
                 </div>
-                <div style={{ fontSize:10, color:isCurrent?'var(--navy)':'var(--text3)', fontWeight:isCurrent?700:400 }}>{monthLabels[i]}</div>
-              </div>
+                <div style={{ fontSize:10, color:isSelected?'var(--navy)':'var(--text3)', fontWeight:isSelected?700:400 }}>{monthLabels[i]}</div>
+              </button>
             )
           })}
         </div>
+        {chartMonthStats.jbmTotal > 0 && (
+          <div style={{ marginTop:16, padding:'12px 14px', background:'var(--bg3)', borderRadius:12, display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, fontSize:12 }}>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>Projeção POS</span><strong style={{ color:'var(--navy)' }}>{fmtYen(chartMonthStats.posTotal)}</strong></div>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>Lucro proj.</span><strong style={{ color:'var(--green)' }}>{fmtYen(chartMonthStats.margin)}</strong></div>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>ROI</span><strong>{chartMonthStats.roiPct}%</strong></div>
+          </div>
+        )}
       </div>
 
       {/* Top products */}
@@ -2246,6 +2267,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
 
   const NAV = [
     { id:'home',       label:'Home',       icon:'🏠' },
+    { id:'analytics',  label:'Analytics',  icon:'📈' },
     { id:'orders',     label:'Orders',     icon:'🛒' },
     { id:'deliveries', label:'Deliveries', icon:'📦' },
     { id:'inventory',  label:'Inventory',  icon:'📊' },
@@ -2287,6 +2309,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
       </aside>
       <main style={{flex:1,padding:'28px 32px',overflowY:'auto',maxWidth:1100}}>
         {tab==='home'       && <HomeTab bar={bar} onTab={setTab} />}
+        {tab==='analytics'  && <ClientAnalyticsTab bar={bar} onTab={setTab} />}
         {tab==='orders'     && <OrdersTab bar={bar} />}
         {tab==='deliveries' && <DeliveriesTab bar={bar} />}
         {tab==='inventory'  && <InventoryTab bar={bar} onOrder={()=>setTab('orders')} />}

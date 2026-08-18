@@ -34,7 +34,6 @@ export function projectItemRevenue(item, pricingMap) {
     }
   }
 
-  // Fallback: bottle/chaser estimate (~2.8× JBM cost as conservative POS bottle price)
   const bottlePos = Math.round(jbmUnit * 2.8)
   const posTotal = bottlePos * qtd
   return {
@@ -49,10 +48,11 @@ export function projectItemRevenue(item, pricingMap) {
   }
 }
 
-export function analyzePurchases(itens, pricingMap, { monthKey } = {}) {
+export function analyzePurchases(itens, pricingMap, { monthKey, cutoffStr } = {}) {
   const filtered = (itens || []).filter(it => {
     if (!it.vendas) return false
     if (monthKey && !it.vendas.data?.startsWith(monthKey)) return false
+    if (cutoffStr && it.vendas.data < cutoffStr) return false
     return true
   })
 
@@ -74,6 +74,7 @@ export function analyzePurchases(itens, pricingMap, { monthKey } = {}) {
       byProduct[nome] = {
         nome,
         produto_id: it.produto_id,
+        categoria: it.produtos?.categoria || 'Outros',
         qtd: 0,
         jbmTotal: 0,
         posTotal: 0,
@@ -94,6 +95,8 @@ export function analyzePurchases(itens, pricingMap, { monthKey } = {}) {
       ...p,
       marginPct: p.posTotal > 0 ? Math.round(p.margin / p.posTotal * 100) : 0,
       roiPct: p.jbmTotal > 0 ? Math.round(p.margin / p.jbmTotal * 100) : 0,
+      jbmPerUnit: p.qtd > 0 ? Math.round(p.jbmTotal / p.qtd) : 0,
+      posPerUnit: p.qtd > 0 ? Math.round(p.posTotal / p.qtd) : 0,
     }))
     .sort((a, b) => b.margin - a.margin)
 
@@ -153,12 +156,166 @@ export function monthlySpendSeries(vendas, months = 6) {
   const supplier = filterSupplierVendas(vendas || [])
   const labels = []
   const values = []
+  const keys = []
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date()
+    d.setDate(1)
     d.setMonth(d.getMonth() - i)
     const mk = d.toISOString().slice(0, 7)
+    keys.push(mk)
     labels.push(mk.slice(5))
     values.push(supplier.filter(v => v.data?.startsWith(mk)).reduce((a, v) => a + (+v.total || 0), 0))
   }
-  return { labels, values }
+  return { labels, values, keys }
+}
+
+export function getAvailableMonths(vendas) {
+  const set = new Set()
+  for (const v of filterSupplierVendas(vendas || [])) {
+    if (v.data?.length >= 7) set.add(v.data.slice(0, 7))
+  }
+  return [...set].sort().reverse()
+}
+
+/** JBM spend + POS projection per calendar month (for interactive charts). */
+export function monthlyProjectionSeries(vendas, itens, pricingMap, months = 12) {
+  const labels = []
+  const keys = []
+  const jbm = []
+  const pos = []
+  const margin = []
+  const deliveries = []
+  const roi = []
+
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(1)
+    d.setMonth(d.getMonth() - i)
+    const mk = d.toISOString().slice(0, 7)
+    keys.push(mk)
+    labels.push(mk.slice(2).replace('-', '/'))
+    const account = monthlyAccountSummary(vendas, [], mk)
+    const proj = analyzePurchases(itens, pricingMap, { monthKey: mk })
+    jbm.push(account.contaMes)
+    pos.push(proj.posTotal)
+    margin.push(proj.margin)
+    deliveries.push(account.deliveries)
+    roi.push(proj.roiPct)
+  }
+
+  return { labels, keys, jbm, pos, margin, deliveries, roi }
+}
+
+export function categoryAnalysis(itens, pricingMap, { monthKey, cutoffStr } = {}) {
+  const filtered = (itens || []).filter(it => {
+    if (!it.vendas) return false
+    if (monthKey && !it.vendas.data?.startsWith(monthKey)) return false
+    if (cutoffStr && it.vendas.data < cutoffStr) return false
+    return true
+  })
+
+  const byCat = {}
+  for (const it of filtered) {
+    const cat = it.produtos?.categoria || 'Outros'
+    if (!byCat[cat]) {
+      byCat[cat] = { categoria: cat, qtd: 0, jbmTotal: 0, posTotal: 0, margin: 0, skuCount: 0, _names: new Set() }
+    }
+    const r = projectItemRevenue(it, pricingMap)
+    const c = byCat[cat]
+    c.qtd += +it.qtd || 0
+    c.jbmTotal += r.jbmTotal
+    c.posTotal += r.posTotal
+    c.margin += r.margin
+    c._names.add(it.produtos?.nome)
+  }
+
+  const rows = Object.values(byCat)
+    .map(c => ({
+      categoria: c.categoria,
+      qtd: c.qtd,
+      jbmTotal: c.jbmTotal,
+      posTotal: c.posTotal,
+      margin: c.margin,
+      skuCount: c._names.size,
+      marginPct: c.posTotal > 0 ? Math.round(c.margin / c.posTotal * 100) : 0,
+      roiPct: c.jbmTotal > 0 ? Math.round(c.margin / c.jbmTotal * 100) : 0,
+    }))
+    .sort((a, b) => b.jbmTotal - a.jbmTotal)
+
+  const totalJbm = rows.reduce((a, r) => a + r.jbmTotal, 0)
+  return rows.map(r => ({
+    ...r,
+    sharePct: totalJbm > 0 ? Math.round(r.jbmTotal / totalJbm * 100) : 0,
+  }))
+}
+
+export function weeklySpendSeries(vendas, weeks = 8) {
+  const supplier = filterSupplierVendas(vendas || [])
+  const labels = []
+  const values = []
+  const keys = []
+
+  for (let i = weeks - 1; i >= 0; i--) {
+    const end = new Date()
+    end.setDate(end.getDate() - i * 7)
+    const start = new Date(end)
+    start.setDate(start.getDate() - 6)
+    const startStr = start.toISOString().slice(0, 10)
+    const endStr = end.toISOString().slice(0, 10)
+    keys.push(`${startStr}_${endStr}`)
+    labels.push(`${start.getDate()}/${start.getMonth() + 1}`)
+    values.push(
+      supplier
+        .filter(v => v.data >= startStr && v.data <= endStr)
+        .reduce((a, v) => a + (+v.total || 0), 0)
+    )
+  }
+
+  return { labels, values, keys }
+}
+
+export function findMissingPricing(itens, pricingMap) {
+  const seen = new Map()
+  for (const it of itens || []) {
+    if (!it.produto_id || pricingMap[it.produto_id]?.preco_drink > 0) continue
+    const nome = it.produtos?.nome || '?'
+    if (!seen.has(it.produto_id)) {
+      seen.set(it.produto_id, { produto_id: it.produto_id, nome, categoria: it.produtos?.categoria, qtd: 0, jbmTotal: 0 })
+    }
+    const row = seen.get(it.produto_id)
+    row.qtd += +it.qtd || 0
+    row.jbmTotal += (+it.preco_unitario || 0) * (+it.qtd || 0)
+  }
+  return [...seen.values()].sort((a, b) => b.jbmTotal - a.jbmTotal)
+}
+
+export function simulatePurchase(pricingMap, { produto_id, preco_unitario, qtd = 1, produtos }) {
+  return projectItemRevenue(
+    { produto_id, qtd, preco_unitario, produtos },
+    pricingMap
+  )
+}
+
+export function monthOverMonthDelta(series, index) {
+  if (index <= 0) return null
+  const prev = series[index - 1]
+  const curr = series[index]
+  if (prev <= 0) return curr > 0 ? 100 : null
+  return Math.round((curr - prev) / prev * 100)
+}
+
+export function downloadCsv(filename, columns, rows) {
+  const escape = v => {
+    const s = String(v ?? '')
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const header = columns.map(c => escape(c.label)).join(',')
+  const body = rows.map(r => columns.map(c => escape(typeof c.get === 'function' ? c.get(r) : r[c.key])).join(',')).join('\n')
+  const blob = new Blob(['\ufeff' + header + '\n' + body], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
