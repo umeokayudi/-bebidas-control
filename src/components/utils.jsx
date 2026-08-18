@@ -36,6 +36,13 @@ export function filterSupplierVendas(list) {
   return (list || []).filter(isSupplierVenda)
 }
 
+export function roleLabel(role) {
+  if (role === 'admin') return 'Administrator'
+  if (role === 'cliente') return 'Client'
+  if (role === 'funcionario') return 'Staff'
+  return 'Staff'
+}
+
 // ── Metric Card ───────────────────────────────────────────────────────────────
 export function MetricCard({ label, value, sub, color = 'blue', icon }) {
   return (

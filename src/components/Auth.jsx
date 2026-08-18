@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
         id: uid,
         nome: user?.user?.user_metadata?.nome || user?.user?.email?.split('@')[0] || 'Usuário',
         email: user?.user?.email || null,
-        role: 'funcionario'
+        role: 'staff'
       })
       const { data: newPerfil } = await supabase.from('perfis').select('*').eq('id', uid).single()
       data = newPerfil

@@ -10,4 +10,5 @@ export VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://ojirgkqtqvugqktyuhem.supa
 node scripts/sync-atomic-prices.mjs
 node scripts/setup-usuarios.mjs "${ATOMIC_EMAIL:-}"
 node scripts/limpar-pos-vendas.mjs 2>/dev/null || true
+node scripts/check-env.mjs 2>/dev/null || echo "⚠️  Configure GEMINI_API_KEY no Vercel para IA funcionar"
 echo "✅ https://bebidas-control.vercel.app"
