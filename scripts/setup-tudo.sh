@@ -44,16 +44,29 @@ node scripts/setup-usuarios.mjs "$ATOMIC_EMAIL"
 echo ""
 echo "── Vercel (opcional — precisa: npm i -g vercel && vercel login) ──"
 if command -v vercel >/dev/null 2>&1; then
-  echo "Quer gravar SUPABASE_SERVICE_ROLE_KEY no Vercel? (s/N)"
+  echo "Quer gravar secrets no Vercel? (s/N)"
   read -r DO_VERCEL
   if [ "$DO_VERCEL" = "s" ] || [ "$DO_VERCEL" = "S" ]; then
-    printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" | vercel env add SUPABASE_SERVICE_ROLE_KEY production --force 2>/dev/null || \
-    echo "⚠️  vercel env falhou — cola manual: https://vercel.com/umeokayudi/bebidas-control/settings/environment-variables"
+    printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" | vercel env add SUPABASE_SERVICE_ROLE_KEY production preview development --force 2>/dev/null || \
+    echo "⚠️  SUPABASE_SERVICE_ROLE_KEY — cola manual no painel Vercel"
+    if [ -n "$GEMINI_API_KEY" ]; then
+      printf '%s' "$GEMINI_API_KEY" | vercel env add GEMINI_API_KEY production preview development --force 2>/dev/null || \
+      echo "⚠️  GEMINI_API_KEY — cola manual no painel Vercel"
+    else
+      echo "Cole GEMINI_API_KEY (Google AI Studio, mesma do Kuripuro) e Enter:"
+      read -rs GEMINI_API_KEY
+      echo ""
+      if [ -n "$GEMINI_API_KEY" ]; then
+        printf '%s' "$GEMINI_API_KEY" | vercel env add GEMINI_API_KEY production preview development --force 2>/dev/null || \
+        echo "⚠️  GEMINI_API_KEY — cola manual no painel Vercel"
+      fi
+    fi
     vercel --prod 2>/dev/null || echo "⚠️  deploy: faz redeploy no painel Vercel"
   fi
 else
-  echo "⚠️  vercel CLI não instalado. Cola a key aqui:"
-  echo "   https://vercel.com/umeokayudi/bebidas-control/settings/environment-variables"
+  echo "⚠️  vercel CLI não instalado. Cola no painel:"
+  echo "   https://vercel.com/umeokayudis-projects/bebidas-control/settings/environment-variables"
+  echo "   Variáveis: SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY"
 fi
 
 echo ""
