@@ -75,12 +75,13 @@ async function main() {
   }
 
   const targetMonth = targetDate.slice(0, 7)
+  const monthEnd = targetMonth === '2026-06' ? `${targetMonth}-30` : `${targetMonth}-31`
   const { data: checkV } = await admin
     .from('vendas')
     .select('total,data')
     .eq('bar_id', barId)
     .gte('data', `${targetMonth}-01`)
-    .lte('data', `${targetMonth}-31`)
+    .lte('data', monthEnd)
 
   const { data: checkJul } = await admin
     .from('vendas')
