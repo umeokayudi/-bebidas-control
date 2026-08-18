@@ -26,7 +26,7 @@ import Cashflow from './components/Cashflow'
 import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, monthLabel, filterSupplierVendas } from './components/utils'
+import { fmtYen, monthLabel, filterSupplierVendas, roleLabel } from './components/utils'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -300,7 +300,7 @@ function Shell() {
             </div>
             <div style={{minWidth:0}}>
               <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.85)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{perfil?.nome||user.email}</div>
-              <div style={{fontSize:10,color:'rgba(193,156,86,0.7)'}}>{perfil?.role==='admin'?'Administrator':'Staff'}</div>
+              <div style={{fontSize:10,color:'rgba(193,156,86,0.7)'}}>{roleLabel(perfil?.role)}</div>
             </div>
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>

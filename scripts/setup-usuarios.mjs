@@ -86,6 +86,13 @@ async function main() {
   }
   console.log('✅ Perfis sincronizados:', (authData.users || []).length)
 
+  const { data: legacyStaff } = await admin.from('perfis').select('id').eq('role', 'funcionario')
+  if (legacyStaff?.length) {
+    const { error } = await admin.from('perfis').update({ role: 'staff' }).eq('role', 'funcionario')
+    if (error) console.log('⚠️  normalize roles:', error.message)
+    else console.log('✅ Roles normalizados: funcionario → staff (' + legacyStaff.length + ')')
+  }
+
   // Link email to Atomic
   if (linkEmail) {
     const user = authData.users.find(u => u.email?.toLowerCase() === linkEmail)
