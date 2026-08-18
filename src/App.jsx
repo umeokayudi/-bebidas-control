@@ -256,6 +256,18 @@ function Shell() {
 
   // PORTAL DO CLIENTE
   if (perfil?.role === 'cliente') {
+    if (!perfil.bar_id) {
+      return (
+        <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--navy)', color:'white', flexDirection:'column', gap:16, padding:24, textAlign:'center' }}>
+          <LogoSidebar />
+          <div style={{ fontSize:16, fontWeight:700 }}>Account not linked to a bar</div>
+          <div style={{ fontSize:13, color:'rgba(255,255,255,0.55)', maxWidth:360, lineHeight:1.6 }}>
+            Ask JBM admin to open <strong>Users</strong>, edit your account, set role <strong>Client</strong> and select your bar (e.g. Atomic Bar).
+          </div>
+          <button onClick={signOut} style={{ marginTop:8, padding:'10px 20px', borderRadius:8, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', color:'white', cursor:'pointer' }}>Sign out</button>
+        </div>
+      )
+    }
     if (!bar) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--navy)',color:'white',flexDirection:'column',gap:16}}><LogoSidebar /><div style={{color:'rgba(255,255,255,0.5)',fontSize:13}}>Loading portal...</div></div>
     return <PortalCliente bar={bar} signOut={signOut} notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll}/>
   }

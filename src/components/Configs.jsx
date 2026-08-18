@@ -186,100 +186,158 @@ export function UsuariosTab() {
   const [saving, setSaving] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState({ nome:'', email:'', role:'cliente', bar_id:'' })
+  const [editPw, setEditPw] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [newPw, setNewPw] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [creating, setCreating] = useState(false)
   const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
 
   useEffect(() => { load() }, [])
 
+  async function loadUsers() {
+    const res = await fetch('/api/admin-user')
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error || 'Failed to load users')
+    return json.users || []
+  }
+
   async function load() {
-    const [{ data: u }, { data: b }] = await Promise.all([
-      supabase.from('perfis').select('*').order('nome'),
-      supabase.from('bars').select('id,nome').order('nome'),
-    ])
-    setUsers(u || [])
-    setBars(b || [])
+    setLoading(true)
+    setErr('')
+    try {
+      const [{ data: b }, u] = await Promise.all([
+        supabase.from('bars').select('id,nome').order('nome'),
+        loadUsers().catch(async () => {
+          const { data: fallback } = await supabase.from('perfis').select('*').order('nome')
+          return fallback || []
+        }),
+      ])
+      setBars(b || [])
+      setUsers(u || [])
+    } catch (e) {
+      setErr(e.message)
+    }
     setLoading(false)
   }
 
   async function saveEdit(id) {
+    if (form.role === 'cliente' && !form.bar_id) {
+      setErr('Select a bar for client accounts')
+      return
+    }
     setSaving(true)
-    await supabase.from('perfis').update({
-      nome: form.nome,
-      role: form.role,
-      bar_id: form.bar_id || null,
-    }).eq('id', id)
+    setErr('')
+    try {
+      const res = await fetch('/api/admin-user', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          nome: form.nome,
+          email: form.email,
+          role: form.role,
+          bar_id: form.role === 'cliente' ? form.bar_id : null,
+          password: editPw || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Update failed')
+      setMsg('User updated')
+      setEditId(null)
+      setEditPw('')
+      load()
+      setTimeout(() => setMsg(''), 4000)
+    } catch (e) {
+      setErr(e.message)
+    }
     setSaving(false)
-    setEditId(null)
-    load()
   }
 
   async function deleteUser(id) {
-    if (!confirm('Delete this user?')) return
+    if (!confirm('Delete profile only? Login remains in Supabase Auth — disable there if needed.')) return
     await supabase.from('perfis').delete().eq('id', id)
     load()
   }
 
   function startEdit(u) {
     setEditId(u.id)
-    setForm({ nome: u.nome||'', email: u.email||'', role: u.role||'cliente', bar_id: u.bar_id||'' })
+    setEditPw('')
+    setForm({
+      nome: u.nome || '',
+      email: u.email || '',
+      role: u.role === 'funcionario' ? 'staff' : (u.role || 'cliente'),
+      bar_id: u.bar_id || '',
+    })
   }
 
-  const roleColor = { admin:'var(--gold)', staff:'var(--navy)', cliente:'var(--green)' }
+  const roleColor = { admin:'var(--gold)', staff:'var(--navy)', funcionario:'var(--navy)', cliente:'var(--green)' }
+  const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Client' }[r] || r)
 
   if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>Loading...</div>
 
   return (
     <div className="fade-in">
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-        <div style={{fontSize:18,fontWeight:800,color:'var(--navy)'}}>Users <span style={{fontSize:13,fontWeight:400,color:'var(--text3)'}}>({users.length})</span></div>
-        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>setShowNew(v=>!v)}>+ New user</button>
+        <div>
+          <div style={{fontSize:18,fontWeight:800,color:'var(--navy)'}}>Users <span style={{fontSize:13,fontWeight:400,color:'var(--text3)'}}>({users.length})</span></div>
+          <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>Create bar logins, change email, reset password, link bar</div>
+        </div>
+        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>{ setShowNew(v=>!v); setErr('') }}>+ New user</button>
       </div>
 
-      {msg && <div style={{background:'var(--green)',color:'white',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:13}}>{msg}</div>}
+      {err && <div style={{background:'#fef2f2',color:'#b91c1c',border:'1px solid #fecaca',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:13}}>{err}</div>}
+      {msg && <div style={{background:'var(--green-bg)',color:'var(--green)',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:13}}>{msg}</div>}
+
+      {bars.length === 0 && (
+        <div style={{background:'#FDF3E0',border:'1px solid #f0d080',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#8A5A00'}}>
+          No bars registered yet. Go to <strong>Bars</strong> and add Atomic Bar before creating client logins.
+        </div>
+      )}
 
       {showNew && (
         <div className="card" style={{marginBottom:20,background:'var(--bg2)',border:'1px solid rgba(193,156,86,0.2)'}}>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:'var(--navy)'}}>Create new user</div>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:'var(--navy)'}}>Create portal login</div>
+          <div style={{fontSize:11,color:'var(--text2)',marginBottom:12}}>For Atomic or any bar — role Client + select the bar</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
             <input className="input" placeholder="Full name" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/>
-            <input className="input" placeholder="Email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
-            <input className="input" placeholder="Password" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
+            <input className="input" placeholder="Email" type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
+            <input className="input" placeholder="Password (min 6)" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
             <select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
-              <option value="cliente">Cliente</option>
+              <option value="cliente">Client (bar portal)</option>
             </select>
-            {form.role==='cliente' && (
-              <select className="input" value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})}>
-                <option value="">— Select bar —</option>
+            {form.role === 'cliente' && (
+              <select className="input" value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} style={{ gridColumn:'span 2' }}>
+                <option value="">— Select bar (required) —</option>
                 {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
               </select>
             )}
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} disabled={creating||!newEmail||!newPw||!form.nome}
+            <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} disabled={creating||!newEmail||!newPw||!form.nome||(form.role==='cliente'&&!form.bar_id)}
               onClick={async()=>{
                 setCreating(true)
+                setErr('')
                 try {
-                  const res = await fetch('/api/create-user', {
+                  const res = await fetch('/api/admin-user', {
                     method: 'POST',
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ email: newEmail, password: newPw, nome: form.nome, role: form.role, bar_id: form.bar_id||null })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: newEmail, password: newPw, nome: form.nome, role: form.role, bar_id: form.bar_id || null })
                   })
                   const json = await res.json()
-                  if (!res.ok) { setMsg('Error: '+(json.error||'unknown')); setCreating(false); return }
-                  setMsg('User created: '+newEmail)
+                  if (!res.ok) throw new Error(json.error || 'Create failed')
+                  setMsg('User created: ' + newEmail)
                   setShowNew(false); setNewEmail(''); setNewPw('')
-                  setForm({nome:'',email:'',role:'cliente',bar_id:''})
+                  setForm({ nome:'', email:'', role:'cliente', bar_id:'' })
                   load()
                   setTimeout(()=>setMsg(''),4000)
-                } catch(e) { setMsg('Error: '+e.message) }
+                } catch(e) { setErr(e.message) }
                 setCreating(false)
               }}>
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? 'Creating...' : 'Create login'}
             </button>
             <button onClick={()=>setShowNew(false)} style={{fontSize:12,padding:'8px 16px',background:'var(--bg3)',border:'none',borderRadius:8,cursor:'pointer',color:'var(--text2)'}}>Cancel</button>
           </div>
@@ -290,7 +348,7 @@ export function UsuariosTab() {
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead>
             <tr style={{background:'var(--bg2)',borderBottom:'1px solid var(--border)'}}>
-              {['Name','Email','Role','Bar','Actions'].map(h=>(
+              {['Name','Email','Role','Bar','Status','Actions'].map(h=>(
                 <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.05em'}}>{h}</th>
               ))}
             </tr>
@@ -301,24 +359,27 @@ export function UsuariosTab() {
                 {editId===u.id ? (
                   <>
                     <td style={{padding:'8px 14px'}}><input className="input" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/></td>
-                    <td style={{padding:'8px 14px',fontSize:12,color:'var(--text3)'}}>{u.email}</td>
+                    <td style={{padding:'8px 14px'}}><input className="input" type="email" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="Change login email"/></td>
                     <td style={{padding:'8px 14px'}}>
                       <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
                         <option value="admin">Admin</option>
                         <option value="staff">Staff</option>
-                        <option value="cliente">Cliente</option>
+                        <option value="cliente">Client</option>
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>
-                      <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})}>
+                      <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} disabled={form.role !== 'cliente'}>
                         <option value="">—</option>
                         {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>
+                      <input className="input" type="password" style={{padding:'4px 8px',fontSize:11,width:'100%'}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="New password (optional)"/>
+                    </td>
+                    <td style={{padding:'8px 14px'}}>
                       <div style={{display:'flex',gap:6}}>
                         <button className="btn-primary" style={{fontSize:11,padding:'4px 10px'}} disabled={saving} onClick={()=>saveEdit(u.id)}>{saving?'...':'Save'}</button>
-                        <button onClick={()=>setEditId(null)} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>Cancel</button>
+                        <button onClick={()=>{setEditId(null);setEditPw('')}} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>Cancel</button>
                       </div>
                     </td>
                   </>
@@ -327,9 +388,14 @@ export function UsuariosTab() {
                     <td style={{padding:'10px 14px',fontSize:13,fontWeight:600}}>{u.nome||'—'}</td>
                     <td style={{padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>{u.email||'—'}</td>
                     <td style={{padding:'10px 14px'}}>
-                      <span style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:20,background:`${roleColor[u.role]||'#ccc'}20`,color:roleColor[u.role]||'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>{u.role||'—'}</span>
+                      <span style={{fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:20,background:`${roleColor[u.role]||'#ccc'}20`,color:roleColor[u.role]||'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>{roleLabel(u.role)}</span>
                     </td>
                     <td style={{padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>{bars.find(b=>b.id===u.bar_id)?.nome||'—'}</td>
+                    <td style={{padding:'10px 14px',fontSize:11}}>
+                      {u.role === 'cliente' && !u.bar_id
+                        ? <span style={{color:'var(--red)',fontWeight:600}}>No bar linked</span>
+                        : <span style={{color:'var(--green)'}}>OK</span>}
+                    </td>
                     <td style={{padding:'10px 14px'}}>
                       <div style={{display:'flex',gap:6}}>
                         <button onClick={()=>startEdit(u)} style={{fontSize:11,padding:'4px 10px',background:'var(--navy)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Edit</button>
@@ -343,6 +409,11 @@ export function UsuariosTab() {
           </tbody>
         </table>
         {users.length===0 && <div style={{padding:32,textAlign:'center',color:'var(--text3)',fontSize:13}}>No users found</div>}
+      </div>
+
+      <div style={{marginTop:16,fontSize:12,color:'var(--text2)',lineHeight:1.6}}>
+        <strong>Setup:</strong> add <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel env vars (Supabase → Settings → API → service_role).
+        Run <code>USUARIOS_SQL.sql</code> once in Supabase if email column is missing.
       </div>
     </div>
   )
