@@ -4,6 +4,13 @@ import { useAuth } from './Auth'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
 import { LogoSidebar } from './Logo'
 import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas } from './utils'
+import {
+  analyzePurchases,
+  buildPricingMap,
+  monthlyAccountSummary,
+  monthlySpendSeries,
+  projectItemRevenue,
+} from '../lib/clientAnalytics'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pending',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -36,50 +43,56 @@ function SparkLine({ data, color='var(--navy)', height=40 }) {
 }
 
 function HomeTab({ bar, onTab }) {
-  const [vendas,    setVendas]    = useState([])
-  const [pedidos,   setPedidos]   = useState([])
-  const [itens,     setItens]     = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [periodo,   setPeriodo]   = useState('30')  // days: 7, 30, 90, 365
+  const [vendas,      setVendas]      = useState([])
+  const [pedidos,     setPedidos]     = useState([])
+  const [itens,       setItens]       = useState([])
+  const [barPricing,  setBarPricing]  = useState([])
+  const [faturas,     setFaturas]     = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [periodo,     setPeriodo]     = useState('30')
 
   useEffect(() => { load() }, [bar])
 
   async function load() {
-    const [vR, pR, iR] = await Promise.all([
+    const [vR, pR, iR, bpR, fR] = await Promise.all([
       supabase.from('vendas').select('*').eq('bar_id', bar.id).order('data', { ascending:true }),
       supabase.from('pedidos').select('*').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
-      supabase.from('vendas_itens').select('*, produtos(nome,preco_venda,preco_bar), vendas(data,bar_id)').eq('vendas.bar_id', bar.id),
+      supabase.from('vendas_itens').select('*, produtos(nome,categoria,preco_venda,volume_ml), vendas(data,bar_id,obs)').eq('vendas.bar_id', bar.id),
+      supabase.from('bar_pricing').select('produto_id,drinks_por_garrafa,preco_drink').eq('bar_id', bar.id),
+      supabase.from('faturas').select('*').eq('bar_id', bar.id).order('data_vencimento', { ascending:false }),
     ])
     setVendas(filterSupplierVendas(vR.data || []))
     setPedidos(pR.data || [])
     setItens((iR.data || []).filter(i => i.vendas && filterSupplierVendas([i.vendas]).length))
+    setBarPricing(bpR.data || [])
+    setFaturas(fR.data || [])
     setLoading(false)
   }
+
+  const pricingMap = buildPricingMap(barPricing)
+  const mes = new Date().toISOString().slice(0, 7)
+  const account = monthlyAccountSummary(vendas, faturas, mes)
+  const monthProjection = analyzePurchases(itens, pricingMap, { monthKey: mes })
 
   const days = +periodo
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = cutoff.toISOString().slice(0,10)
+  const periodProjection = analyzePurchases(
+    itens.filter(it => it.vendas?.data >= cutoffStr),
+    pricingMap
+  )
 
   const vendasPeriod = vendas.filter(v => v.data >= cutoffStr)
   const totalPeriod  = vendasPeriod.reduce((a,v) => a+(+v.total||0), 0)
   const avgOrder     = vendasPeriod.length > 0 ? Math.round(totalPeriod / vendasPeriod.length) : 0
 
-  // Previous period comparison
   const prev = new Date(cutoff); prev.setDate(prev.getDate() - days)
   const prevStr = prev.toISOString().slice(0,10)
   const vendasPrev = vendas.filter(v => v.data >= prevStr && v.data < cutoffStr)
   const totalPrev  = vendasPrev.reduce((a,v) => a+(+v.total||0), 0)
   const growth     = totalPrev > 0 ? Math.round((totalPeriod-totalPrev)/totalPrev*100) : null
 
-  // Monthly spend chart (last 6 months)
-  const monthlyData = []
-  const monthLabels = []
-  for (let i=5; i>=0; i--) {
-    const d = new Date(); d.setMonth(d.getMonth()-i)
-    const mk = d.toISOString().slice(0,7)
-    monthLabels.push(mk.slice(5))
-    monthlyData.push(vendas.filter(v=>v.data?.startsWith(mk)).reduce((a,v)=>a+(+v.total||0),0))
-  }
+  const { labels: monthLabels, values: monthlyData } = monthlySpendSeries(vendas, 6)
 
   // Top products by revenue
   const prodMap = {}
@@ -93,32 +106,23 @@ function HomeTab({ bar, onTab }) {
   const topRevenue = Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,5)
   const topVolume  = Object.entries(prodVol).sort((a,b)=>b[1]-a[1]).slice(0,5)
 
-  // Top by bar margin (preco_bar - preco_venda) * qty
-  const margMap = {}
-  itens.filter(it => it.vendas?.data >= cutoffStr).forEach(it => {
-    const nome = it.produtos?.nome || '?'
-    const barPrice = it.produtos?.preco_bar || 0
-    const jbmPrice = it.preco_unitario || it.produtos?.preco_venda || 0
-    const margin = (barPrice - jbmPrice) * it.qtd
-    if (barPrice > 0) margMap[nome] = (margMap[nome]||0) + margin
-  })
-  const topMargin = Object.entries(margMap).sort((a,b)=>b[1]-a[1]).slice(0,5)
+  // Top by projected margin (bar POS prices via bar_pricing)
+  const topMargin = periodProjection.products.slice(0, 6)
 
   const ativos  = pedidos.filter(p=>p.status==='pendente'||p.status==='confirmado')
-  const mes     = new Date().toISOString().slice(0,7)
-  const totalMes = vendas.filter(v=>v.data?.startsWith(mes)).reduce((a,v)=>a+(+v.total||0),0)
+  const totalMes = account.contaMes
 
   const maxMonth = Math.max(...monthlyData, 1)
 
   if (loading) return <Spinner text="Loading dashboard..." />
 
   return (
-    <div className="fade-in" style={{ maxWidth:900 }}>
+    <div className="fade-in" style={{ maxWidth:1000 }}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
         <div>
           <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Dashboard · JBM Drinks</div>
+          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Client dashboard · JBM Drinks</div>
         </div>
         <div style={{ display:'flex', gap:6 }}>
           {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
@@ -130,6 +134,85 @@ function HomeTab({ bar, onTab }) {
           ))}
         </div>
       </div>
+
+      {/* ── Monthly account + POS projection hero ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:20 }}>
+        <div style={{
+          background:'linear-gradient(135deg, var(--navy) 0%, #002855 100%)',
+          borderRadius:20, padding:'22px 24px', color:'white',
+          boxShadow:'0 12px 40px rgba(0,16,40,0.25)'
+        }}>
+          <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', opacity:0.65, marginBottom:10, fontWeight:700 }}>
+            Conta JBM · {mes}
+          </div>
+          <div style={{ fontSize:32, fontWeight:900, lineHeight:1, letterSpacing:-1 }}>{fmtYen(account.contaMes)}</div>
+          <div style={{ fontSize:12, opacity:0.75, marginTop:10 }}>
+            {account.deliveries} entrega{account.deliveries !== 1 ? 's' : ''} este mês
+            {account.growth !== null && (
+              <span style={{ marginLeft:8, color: account.growth >= 0 ? '#6ee7b7' : '#fca5a5', fontWeight:700 }}>
+                {account.growth >= 0 ? '↑' : '↓'} {Math.abs(account.growth)}% vs mês anterior
+              </span>
+            )}
+          </div>
+          {account.faturaPendente > 0 && (
+            <div style={{ marginTop:14, padding:'10px 12px', background:'rgba(255,59,48,0.15)', borderRadius:10, fontSize:12, border:'1px solid rgba(255,59,48,0.3)' }}>
+              ⏳ Fatura pendente: <strong>{fmtYen(account.faturaPendente)}</strong>
+            </div>
+          )}
+          {account.faturasCount === 0 && account.contaMes > 0 && (
+            <div style={{ marginTop:14, fontSize:11, opacity:0.55 }}>Valor das compras JBM registradas no mês</div>
+          )}
+        </div>
+
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:20, padding:'22px 24px' }}>
+          <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
+            Faturamento projetado (POS)
+          </div>
+          <div style={{ fontSize:30, fontWeight:900, color:'var(--navy)', lineHeight:1, letterSpacing:-0.5 }}>
+            {fmtYen(monthProjection.posTotal)}
+          </div>
+          <div style={{ fontSize:12, color:'var(--text2)', marginTop:10, lineHeight:1.5 }}>
+            Se vender tudo pelo preço do bar ({monthProjection.posCoveragePct}% com preços POS cadastrados)
+          </div>
+          <div style={{ marginTop:12, display:'flex', gap:8, flexWrap:'wrap' }}>
+            <span style={{ fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'#EAF0FA', color:'var(--navy)' }}>
+              ROI {monthProjection.roiPct}%
+            </span>
+            {monthProjection.estimatedSharePct > 0 && (
+              <span style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:20, background:'#fffbeb', color:'var(--amber)' }}>
+                ~{monthProjection.estimatedSharePct}% estimado
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ background:'var(--bg2)', border:'1px solid rgba(52,199,89,0.25)', borderRadius:20, padding:'22px 24px' }}>
+          <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
+            Lucro projetado (margem)
+          </div>
+          <div style={{ fontSize:30, fontWeight:900, color:'var(--green)', lineHeight:1, letterSpacing:-0.5 }}>
+            {fmtYen(monthProjection.margin)}
+          </div>
+          <div style={{ fontSize:12, color:'var(--text2)', marginTop:10 }}>
+            Margem {monthProjection.marginPct}% sobre faturamento POS
+          </div>
+          <div style={{ marginTop:14, height:6, background:'var(--bg3)', borderRadius:3, overflow:'hidden' }}>
+            <div style={{ height:'100%', width:Math.min(monthProjection.marginPct,100)+'%', background:'var(--green)', borderRadius:3 }}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Period projection strip */}
+      {periodo !== '30' || monthProjection.jbmTotal !== periodProjection.jbmTotal ? (
+        <div style={{ background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:14, padding:'12px 16px', marginBottom:16, fontSize:12, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+          <span>
+            <strong>Últimos {periodo} dias:</strong> compras {fmtYen(periodProjection.jbmTotal)} → projeção POS {fmtYen(periodProjection.posTotal)} (lucro {fmtYen(periodProjection.margin)})
+          </span>
+          <button onClick={()=>onTab('pricing')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
+            Ajustar preços POS →
+          </button>
+        </div>
+      ) : null}
 
       {/* KPI row */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
@@ -234,66 +317,75 @@ function HomeTab({ bar, onTab }) {
         </div>
       </div>
 
-      {/* Top margin */}
+      {/* Top margin — projected from POS pricing */}
       {topMargin.length > 0 && (
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Top margin products 🏆</div>
-          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>Your most profitable products · Last {periodo} days</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
-            {topMargin.map(([nome,margin],i) => (
-              <div key={nome} style={{
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🏆 Bebidas com mais margem (projeção POS)</div>
+              <div style={{ fontSize:11, color:'var(--text2)' }}>Compras JBM × preços do bar · Últimos {periodo} dias</div>
+            </div>
+            <button onClick={()=>onTab('pricing')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
+              Editar preços
+            </button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:10 }}>
+            {topMargin.map((p,i) => (
+              <div key={p.nome} style={{
                 background:i===0?'linear-gradient(135deg,var(--navy),#2563eb)':'var(--bg3)',
                 borderRadius:12, padding:'14px',
                 border:i===0?'none':'1px solid var(--border)'
               }}>
                 <div style={{ fontSize:11, marginBottom:4 }}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '}</div>
-                <div style={{ fontSize:12, fontWeight:600, color:i===0?'white':'var(--text)', marginBottom:6, lineHeight:1.3 }}>{nome}</div>
-                <div style={{ fontSize:18, fontWeight:800, color:i===0?'#34c759':'var(--green)' }}>{fmtYen(margin)}</div>
-                <div style={{ fontSize:10, color:i===0?'rgba(255,255,255,0.6)':'var(--text2)', marginTop:2 }}>margin</div>
+                <div style={{ fontSize:11, fontWeight:600, color:i===0?'white':'var(--text)', marginBottom:6, lineHeight:1.3, minHeight:28 }}>
+                  {p.nome.length > 22 ? p.nome.slice(0,20)+'…' : p.nome}
+                </div>
+                <div style={{ fontSize:17, fontWeight:800, color:i===0?'#34c759':'var(--green)' }}>{fmtYen(p.margin)}</div>
+                <div style={{ fontSize:10, color:i===0?'rgba(255,255,255,0.6)':'var(--text2)', marginTop:4 }}>
+                  {p.marginPct}% · ROI {p.roiPct}{p.source === 'estimate' ? ' · ~' : ''}
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Drink Economics */}
+      {/* Drink Economics — POS prices from bar_pricing */}
       {(() => {
-        const drinkProds = itens
-          .filter(it => it.vendas?.data >= cutoffStr && it.produtos?.drinks_por_garrafa > 0)
-          .reduce((acc, it) => {
-            const p = it.produtos
-            const nome = p.nome
-            if (!acc[nome]) acc[nome] = {
-              nome, qtd:0,
-              custo_unit: p.preco_venda || 0,
-              drinks_por_garrafa: p.drinks_por_garrafa || 1,
-              preco_drink: p.preco_drink || 0,
-              preco_bar: p.preco_bar || 0
-            }
-            acc[nome].qtd += it.qtd
-            return acc
-          }, {})
-        const rows = Object.values(drinkProds).map(p => {
-          const totalGarrafas = p.qtd
-          const totalDrinks   = totalGarrafas * p.drinks_por_garrafa
-          const custoTotal    = totalGarrafas * p.custo_unit
-          const revenueTotal  = totalDrinks * p.preco_drink
-          const costPerDrink  = p.drinks_por_garrafa > 0 ? Math.round(p.custo_unit / p.drinks_por_garrafa) : 0
-          const marginPerDrink = p.preco_drink - costPerDrink
-          const marginPct     = p.preco_drink > 0 ? Math.round(marginPerDrink/p.preco_drink*100) : 0
-          return {...p, totalDrinks, custoTotal, revenueTotal, costPerDrink, marginPerDrink, marginPct}
-        }).filter(p => p.preco_drink > 0).sort((a,b) => b.revenueTotal - a.revenueTotal)
+        const byName = {}
+        itens.filter(it => it.vendas?.data >= cutoffStr).forEach(it => {
+          const nome = it.produtos?.nome || '?'
+          if (!byName[nome]) byName[nome] = { nome, qtd: 0, jbmTotal: 0, posTotal: 0, margin: 0, source: 'pos' }
+          const r = projectItemRevenue(it, pricingMap)
+          byName[nome].qtd += +it.qtd || 0
+          byName[nome].jbmTotal += r.jbmTotal
+          byName[nome].posTotal += r.posTotal
+          byName[nome].margin += r.margin
+          if (r.source === 'estimate') byName[nome].source = 'estimate'
+        })
+        const rows = Object.values(byName)
+          .map(p => ({
+            ...p,
+            marginPct: p.posTotal > 0 ? Math.round(p.margin / p.posTotal * 100) : 0,
+            costPerUnit: p.qtd > 0 ? Math.round(p.jbmTotal / p.qtd) : 0,
+            posPerUnit: p.qtd > 0 ? Math.round(p.posTotal / p.qtd) : 0,
+          }))
+          .filter(p => p.posTotal > 0)
+          .sort((a, b) => b.margin - a.margin)
+          .slice(0, 12)
 
         if (rows.length === 0) return null
         return (
           <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🍹 Drink economics</div>
-            <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>Cost per drink · margin · revenue estimate · Last {periodo} days</div>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>📊 Detalhe: compra JBM → projeção POS</div>
+            <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>
+              Preços do bar (Pricing tab) · Últimos {periodo} dias · itens estimados marcados ~
+            </div>
             <div style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr style={{ borderBottom:'2px solid var(--border)' }}>
-                    {['Product','Bottles','Drinks','Cost/drink','Price/drink','Margin','Est. Revenue','Margin %'].map(h => (
+                    {['Produto','Qtd','Custo JBM','Proj. POS/un','Margem total','Margem %',''].map(h => (
                       <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -301,13 +393,11 @@ function HomeTab({ bar, onTab }) {
                 <tbody>
                   {rows.map((r,i) => (
                     <tr key={r.nome} style={{ borderBottom:'1px solid var(--border)', background:i===0?'rgba(193,156,86,0.04)':'transparent' }}>
-                      <td style={{ padding:'10px', fontWeight:i===0?700:500 }}>{i===0?'🥇 ':''}{r.nome}</td>
+                      <td style={{ padding:'10px', fontWeight:i===0?700:500 }}>{r.source==='estimate'?'~ ':''}{r.nome}</td>
                       <td style={{ padding:'10px', textAlign:'right' }}>{r.qtd}</td>
-                      <td style={{ padding:'10px', textAlign:'right', fontWeight:600 }}>{r.totalDrinks}</td>
-                      <td style={{ padding:'10px', textAlign:'right', color:'var(--red)' }}>{fmtYen(r.costPerDrink)}</td>
-                      <td style={{ padding:'10px', textAlign:'right' }}>{fmtYen(r.preco_drink)}</td>
-                      <td style={{ padding:'10px', textAlign:'right', color:'var(--green)', fontWeight:600 }}>{fmtYen(r.marginPerDrink)}</td>
-                      <td style={{ padding:'10px', textAlign:'right', fontWeight:700, color:'var(--navy)' }}>{fmtYen(r.revenueTotal)}</td>
+                      <td style={{ padding:'10px', textAlign:'right', color:'var(--red)' }}>{fmtYen(r.jbmTotal)}</td>
+                      <td style={{ padding:'10px', textAlign:'right' }}>{fmtYen(r.posPerUnit)}</td>
+                      <td style={{ padding:'10px', textAlign:'right', fontWeight:700, color:'var(--green)' }}>{fmtYen(r.margin)}</td>
                       <td style={{ padding:'10px', textAlign:'right' }}>
                         <span style={{
                           padding:'3px 8px', borderRadius:20, fontSize:11, fontWeight:700,
@@ -315,6 +405,7 @@ function HomeTab({ bar, onTab }) {
                           color: r.marginPct>60?'var(--green)':r.marginPct>40?'var(--amber)':'var(--red)'
                         }}>{r.marginPct}%</span>
                       </td>
+                      <td style={{ padding:'10px', textAlign:'right', fontSize:11, color:'var(--navy)', fontWeight:700 }}>{fmtYen(r.posTotal)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2194,7 +2285,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <button onClick={signOut} style={{width:'100%',padding:'7px',fontSize:11,color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,background:'transparent',textTransform:'uppercase',letterSpacing:'0.04em'}}>Sign out</button>
         </div>
       </aside>
-      <main style={{flex:1,padding:'28px 32px',overflowY:'auto',maxWidth:900}}>
+      <main style={{flex:1,padding:'28px 32px',overflowY:'auto',maxWidth:1100}}>
         {tab==='home'       && <HomeTab bar={bar} onTab={setTab} />}
         {tab==='orders'     && <OrdersTab bar={bar} />}
         {tab==='deliveries' && <DeliveriesTab bar={bar} />}
