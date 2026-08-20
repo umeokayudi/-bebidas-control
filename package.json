@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:holding && vite build",
+    "build:holding": "cd jbm-master-app && npm ci --silent && npm run build:holding && cd .. && rm -rf public/holding && cp -r jbm-master-app/dist public/holding",
     "preview": "vite preview"
   },
   "dependencies": {

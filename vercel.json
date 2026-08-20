@@ -5,11 +5,10 @@
       "schedule": "*/15 * * * *"
     }
   ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/holding", "dest": "/holding/index.html" },
-    { "src": "/holding/(.*)", "dest": "/holding/index.html" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
