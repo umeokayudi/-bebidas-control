@@ -5,22 +5,11 @@
       "schedule": "*/15 * * * *"
     }
   ],
-  "rewrites": [
-    {
-      "source": "/holding",
-      "destination": "/holding/index.html"
-    },
-    {
-      "source": "/holding/",
-      "destination": "/holding/index.html"
-    },
-    {
-      "source": "/holding/:path((?!assets/).*)",
-      "destination": "/holding/index.html"
-    },
-    {
-      "source": "/((?!api/|holding).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/holding", "dest": "/holding/index.html" },
+    { "src": "/holding/(.*)", "dest": "/holding/index.html" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
