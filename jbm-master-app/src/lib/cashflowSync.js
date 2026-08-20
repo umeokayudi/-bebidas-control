@@ -5,42 +5,49 @@ const STORAGE_FILE = 'cashflow_snapshot.json'
 let cache = null
 let cacheAt = 0
 
-export async function fetchDrinksCashflow(holdingClient) {
+export async function fetchHoldingSnapshot(holdingClient) {
   const now = Date.now()
   if (cache && now - cacheAt < 60_000) return cache
+
+  let raw = null
 
   try {
     const res = await fetch(API_URL, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
-      if (!data.error) {
-        cache = normalizeCashflow(data)
-        cacheAt = now
-        return cache
-      }
+      if (!data.error) raw = data
     }
-  } catch { /* fallback storage */ }
+  } catch { /* */ }
 
   if (holdingClient) {
     try {
       const { data, error } = await holdingClient.storage.from(STORAGE_BUCKET).download(STORAGE_FILE)
       if (!error && data) {
-        const parsed = normalizeCashflow(JSON.parse(await data.text()))
-        cache = parsed
-        cacheAt = now
-        return parsed
+        const stored = JSON.parse(await data.text())
+        const storedNewer = stored.geradoEm && (!raw?.geradoEm || stored.geradoEm > raw.geradoEm)
+        if (storedNewer || !raw) raw = stored
       }
     } catch { /* */ }
   }
 
-  return emptyCashflow()
+  cache = normalizeSnapshot(raw || {})
+  cacheAt = now
+  return cache
 }
 
-function normalizeCashflow(raw) {
+/** @deprecated use fetchHoldingSnapshot */
+export async function fetchDrinksCashflow(holdingClient) {
+  const s = await fetchHoldingSnapshot(holdingClient)
+  return s.drinks
+}
+
+function normalizeSnapshot(raw) {
   const f = raw.financeiro || {}
-  return {
-    geradoEm: raw.geradoEm || new Date().toISOString(),
-    fonte: raw.fonte || 'sync',
+  const k = raw.kuripuro || {}
+
+  const drinks = {
+    geradoEm: raw.geradoEm,
+    fonte: raw.fonte,
     receitaMes: f.receitaMes ?? 0,
     custoMes: f.custoMes ?? 0,
     lucroMes: f.lucroMes ?? ((f.receitaMes ?? 0) - (f.custoMes ?? 0)),
@@ -53,15 +60,29 @@ function normalizeCashflow(raw) {
     saidas30d: f.saidas30d ?? 0,
     recentes: raw.recentes || {},
   }
-}
 
-function emptyCashflow() {
+  const kuripuro = {
+    receitaMes: k.receitaMes ?? 0,
+    custoMes: k.custoMes ?? 0,
+    lucroMes: k.lucroMes ?? 0,
+    clientesAtivos: k.clientesAtivos ?? 0,
+    funcionariosAtivos: k.funcionariosAtivos ?? 0,
+    lancamentosReceita: k.lancamentosReceita ?? 0,
+    lancamentosDespesa: k.lancamentosDespesa ?? 0,
+    saldoLancamentos: k.saldoLancamentos ?? 0,
+    contasPendentes: k.contasPendentes ?? 0,
+    clientes: k.clientes || [],
+    lancamentos: k.lancamentos || [],
+  }
+
   return {
-    geradoEm: null,
-    fonte: 'empty',
-    receitaMes: 0, custoMes: 0, lucroMes: 0,
-    caixaLiquido: 0, projetado30d: 0, aReceber: 0, aPagar: 0,
-    faturasVencidas: 0, entradas30d: 0, saidas30d: 0,
-    recentes: {},
+    geradoEm: raw.geradoEm,
+    fonte: raw.fonte,
+    drinks,
+    kuripuro,
+    holding: {
+      receitaTotal: drinks.receitaMes + kuripuro.receitaMes,
+      lucroTotal: drinks.lucroMes + kuripuro.lucroMes,
+    },
   }
 }

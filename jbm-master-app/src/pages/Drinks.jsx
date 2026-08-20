@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { holdingSb } from '../lib/supabase'
-import { fetchDrinksCashflow } from '../lib/cashflowSync'
+import { fetchHoldingSnapshot } from '../lib/cashflowSync'
 import { fmtYen, fmtPct } from '../lib/format'
 import CashflowPanel from '../components/CashflowPanel'
 
 export default function Drinks() {
-  const [cf, setCf] = useState(null)
+  const [snap, setSnap] = useState(null)
   const [tab, setTab] = useState('overview')
 
   useEffect(() => {
@@ -15,9 +15,10 @@ export default function Drinks() {
   }, [])
 
   async function load() {
-    setCf(await fetchDrinksCashflow(holdingSb))
+    setSnap(await fetchHoldingSnapshot(holdingSb))
   }
 
+  const cf = snap?.drinks
   const receita = cf?.receitaMes ?? 0
   const custo = cf?.custoMes ?? 0
   const lucro = cf?.lucroMes ?? 0
