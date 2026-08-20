@@ -68,7 +68,7 @@ export default function Dashboard() {
         <KuriPuroFinancePanel kp={k} />
       </div>
 
-      <div style={{ background: 'linear-gradient(135deg,rgba(193,156,86,0.15),rgba(193,156,86,0.03))', border: '1px solid rgba(193,156,86,0.2)', borderRadius: 20, padding: '24px 28px', marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 20 }}>
+      <div className="hero-banner" style={{ background: 'linear-gradient(135deg,rgba(193,156,86,0.15),rgba(193,156,86,0.03))', border: '1px solid rgba(193,156,86,0.2)', borderRadius: 20, padding: '24px 28px', marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 20 }}>
         {[['Receita grupo', totalRevenue, '#c19c56'], ['A receber total', totalReceivable, '#4ade80'], ['Lucro estimado', totalProfit, '#60a5fa'], ['ROI investido', fmtPct(inv.returned, inv.invested), '#34d399']].map(([label, val, color]) => (
           <div key={label} style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
