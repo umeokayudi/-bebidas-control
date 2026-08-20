@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider, useTheme, THEMES } from './lib/theme'
 import Dashboard from './pages/Dashboard'
@@ -123,11 +123,15 @@ function Shell() {
 
 export default function App() {
   const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined
+  const isHoldingMirror = basename === '/holding'
+  const Router = isHoldingMirror ? HashRouter : BrowserRouter
+  const routerProps = isHoldingMirror ? {} : { basename }
+
   return (
     <ThemeProvider>
-      <BrowserRouter basename={basename}>
+      <Router {...routerProps}>
         <Shell />
-      </BrowserRouter>
+      </Router>
     </ThemeProvider>
   )
 }
