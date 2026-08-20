@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { ThemeProvider, useTheme, THEMES } from './lib/theme'
 import Dashboard from './pages/Dashboard'
 import Drinks from './pages/Drinks'
 import KuriPuro from './pages/KuriPuro'
@@ -26,10 +27,24 @@ const NAV = [
   { to: '/saques', label: 'Saques', icon: '💸' },
 ]
 
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  return (
+    <button type="button" className="theme-toggle" onClick={() => setTheme(theme === THEMES.modern ? THEMES.classic : THEMES.modern)}>
+      <span className="theme-toggle-label">Design</span>
+      <span className="theme-pill">
+        <span className={theme === THEMES.classic ? 'on' : ''}>Clássico</span>
+        <span className={theme === THEMES.modern ? 'on' : ''}>Moderno</span>
+      </span>
+    </button>
+  )
+}
+
 function Shell() {
   const [authed, setAuthed] = useState(localStorage.getItem(AUTH_KEY) === 'true')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
+  const { theme } = useTheme()
 
   function login() {
     if (!PASSWORD) {
@@ -45,15 +60,20 @@ function Shell() {
     }
   }
 
+  const toastStyle = theme === THEMES.modern
+    ? { background: '#fff', color: '#1d1d1f', border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }
+    : { background: '#0d1f35', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }
+
   if (!authed) {
     return (
       <div className="login-wrap">
         <div className="login-card">
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#c19c56', marginBottom: 4 }}>JBM</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 28 }}>Master Dashboard</div>
+          <div className="sidebar-brand-title" style={{ marginBottom: 4 }}>JBM</div>
+          <div className="sidebar-brand-sub" style={{ marginBottom: 28 }}>Master Dashboard</div>
           <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} placeholder="Senha" />
-          {err && <div style={{ color: '#f87171', fontSize: 12, marginBottom: 8 }}>{err}</div>}
+          {err && <div style={{ color: 'var(--red)', fontSize: 12, marginBottom: 8 }}>{err}</div>}
           <button type="button" onClick={login}>Entrar</button>
+          <div style={{ marginTop: 16 }}><ThemeToggle /></div>
         </div>
       </div>
     )
@@ -61,34 +81,40 @@ function Shell() {
 
   return (
     <>
-      <Toaster position="top-right" toastOptions={{ style: { background: '#0d1f35', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } }} />
+      <Toaster position="top-right" toastOptions={{ style: toastStyle }} />
       <div style={{ display: 'flex', minHeight: '100vh' }}>
         <aside className="sidebar">
           <div className="sidebar-brand">
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#c19c56' }}>JBM</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', letterSpacing: 2, textTransform: 'uppercase' }}>Holding Master</div>
+            <div className="sidebar-brand-title">JBM</div>
+            <div className="sidebar-brand-sub">Holding Master</div>
           </div>
           {NAV.map(n => n.section ? (
-            <div key={n.section} style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', letterSpacing: 2, textTransform: 'uppercase', padding: '12px 14px 4px', marginTop: 8 }}>{n.section}</div>
+            <div key={n.section} className="nav-section">{n.section}</div>
           ) : (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              <span>{n.icon}</span> {n.label}
+              <span>{n.icon}</span>
+              <span className="nav-label">{n.label}</span>
             </NavLink>
           ))}
-          <button type="button" className="logout-btn" onClick={() => { localStorage.removeItem(AUTH_KEY); setAuthed(false) }}>Logout</button>
+          <div className="sidebar-footer">
+            <ThemeToggle />
+            <button type="button" className="logout-btn" onClick={() => { localStorage.removeItem(AUTH_KEY); setAuthed(false) }}>Logout</button>
+          </div>
         </aside>
         <main className="main">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/kuripuro" element={<KuriPuro />} />
-            <Route path="/drinks" element={<Drinks />} />
-            <Route path="/hr" element={<HR />} />
-            <Route path="/logistica" element={<Logistica />} />
-            <Route path="/investimentos" element={<Investimentos />} />
-            <Route path="/financeiro" element={<Financeiro />} />
-            <Route path="/saques" element={<Saques />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <div className="main-inner">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/kuripuro" element={<KuriPuro />} />
+              <Route path="/drinks" element={<Drinks />} />
+              <Route path="/hr" element={<HR />} />
+              <Route path="/logistica" element={<Logistica />} />
+              <Route path="/investimentos" element={<Investimentos />} />
+              <Route path="/financeiro" element={<Financeiro />} />
+              <Route path="/saques" element={<Saques />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </>
@@ -97,8 +123,10 @@ function Shell() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Shell />
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Shell />
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
