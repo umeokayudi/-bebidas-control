@@ -3,13 +3,12 @@
   "crons": [
     {
       "path": "/api/sync-cashflow-cron",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 3 * * *"
     }
   ],
   "rewrites": [
     {
-      "source": "/((?!api/|holding/).*)",
-      "missing": [{ "type": "filesystem" }],
+      "source": "/((?!api/|holding/|assets/|logo).*)",
       "destination": "/index.html"
     }
   ]
