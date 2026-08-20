@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty } from './utils'
+import JbmHoldingPanel from './JbmHoldingPanel'
 
 export default function Cashflow() {
   const [tab, setTab] = useState('overview')
@@ -9,7 +10,7 @@ export default function Cashflow() {
       <div style={{ fontSize:20, fontWeight:800, marginBottom:4 }}>Cash Flow</div>
       <div style={{ fontSize:13, color:'var(--text2)', marginBottom:16 }}>Track money in (bar payments) and money out (supplier purchases)</div>
       <div style={{ display:'flex', gap:8, marginBottom:24 }}>
-        {[['overview','📊 Overview'],['in','💚 Money In'],['out','🔴 Money Out'],['purchases','🛒 Purchases'],['caixa','💵 Caixa'],['calendario','📅 Calendar']].map(([id,label]) => (
+        {[['overview','📊 Visão geral'],['in','💚 Entradas'],['out','🔴 Saídas'],['purchases','🛒 Compras'],['holding','🏛 JBM Holding'],['caixa','💵 Caixa'],['calendario','📅 Calendário']].map(([id,label]) => (
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'8px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', background:tab===id?'var(--navy)':'var(--bg3)', color:tab===id?'white':'var(--text2)', border:'none' }}>{label}</button>
         ))}
       </div>
@@ -17,7 +18,8 @@ export default function Cashflow() {
       {tab==='in'        && <MoneyIn />}
       {tab==='out'       && <MoneyOut />}
       {tab==='purchases' && <PurchasePayments />}
-      {tab==='caixa' && <Caixa />}
+      {tab==='holding'   && <JbmHoldingPanel />}
+      {tab==='caixa'     && <Caixa />}
       {tab==='calendario' && <Calendario />}
     </div>
   )

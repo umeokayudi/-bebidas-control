@@ -1,43 +1,37 @@
 /**
- * Purchase cash-flow advisor — pay now vs pay on terms, tied to JBM resale & bar collections.
+ * Advisor de fluxo de caixa — pagar à vista vs a prazo, com JBM Holding e custo de oportunidade.
  */
 
+import {
+  describeForsakenAlternatives,
+  resolveOpportunityCostPct,
+  opportunityCostPayNow,
+} from './jbmHolding'
+
 export const DEFAULTS = {
-  costOfCapitalPct: 12,      // annual % — credit card / opportunity cost
-  cashDiscountPct: 2,        // typical cash discount at supplier
-  cardFeePct: 1.8,           // card processing
-  pointsValuePct: 1,         // effective value of loyalty points
-  daysToSell: 21,            // avg days to sell stock through bars
-  daysToCollectBar: 25,      // JBM invoice → bar payment (after delivery month)
-  minCashBuffer: 500000,     // ¥ safety buffer for sustainable ops
+  costOfCapitalPct: 28,
+  cashDiscountPct: 2,
+  cardFeePct: 1.8,
+  pointsValuePct: 1,
+  daysToSell: 21,
+  daysToCollectBar: 25,
+  minCashBuffer: 500000,
 }
 
 const CATEGORY_DAYS = {
-  Champagne: 14,
-  Beer: 7,
-  Juice: 10,
-  Soda: 10,
-  Water: 7,
-  'Energy Drink': 10,
-  Whisky: 28,
-  'Japanese Whisky': 35,
-  Vodka: 21,
-  Gin: 21,
-  Tequila: 21,
-  Spirits: 21,
-  Shochu: 21,
-  Wine: 21,
-  Others: 21,
+  Champagne: 14, Beer: 7, Juice: 10, Soda: 10, Water: 7,
+  'Energy Drink': 10, Whisky: 28, 'Japanese Whisky': 35,
+  Vodka: 21, Gin: 21, Tequila: 21, Spirits: 21, Shochu: 21, Wine: 21, Others: 21,
 }
 
 export function parsePaymentTerms(pagamento = '') {
   const p = String(pagamento).toLowerCase()
-  if (/60/.test(p)) return { mode: 'deferred', days: 60, label: 'Invoice 60 days' }
-  if (/30|invoice/.test(p)) return { mode: 'deferred', days: 30, label: 'Invoice 30 days' }
-  if (/transfer|bank/.test(p)) return { mode: 'deferred', days: 7, label: 'Bank transfer (~7d)' }
-  if (/card|credit|debit/.test(p)) return { mode: 'immediate', days: 0, label: 'Card (immediate)' }
-  if (/cash|dinheiro|à vista|avista/.test(p)) return { mode: 'immediate', days: 0, label: 'Cash (immediate)' }
-  return { mode: 'immediate', days: 0, label: pagamento || 'Immediate' }
+  if (/60/.test(p)) return { mode: 'deferred', days: 60, label: 'Fatura 60 dias' }
+  if (/30|invoice|fatura/.test(p)) return { mode: 'deferred', days: 30, label: 'Fatura 30 dias' }
+  if (/transfer|bank|transferência/.test(p)) return { mode: 'deferred', days: 7, label: 'Transferência (~7d)' }
+  if (/card|cartão|credit|debit/.test(p)) return { mode: 'immediate', days: 0, label: 'Cartão (imediato)' }
+  if (/cash|dinheiro|à vista|avista/.test(p)) return { mode: 'immediate', days: 0, label: 'À vista' }
+  return { mode: 'immediate', days: 0, label: pagamento || 'Imediato' }
 }
 
 export function daysToSellForCategory(categoria) {
@@ -53,69 +47,77 @@ function pointsBenefit(amount, pointsPct, pointsValuePct) {
   return Math.round(amount * (pointsPct / 100) * (pointsValuePct / 100))
 }
 
-/**
- * Build pay-now vs pay-later scenarios for one purchase amount.
- */
 export function buildPaymentScenarios({
   amount,
   supplierPayment = 'Cash',
   pointsPct = 0,
   settings = {},
+  opportunityCostPct = 28,
+  daysCapitalLocked = 0,
 }) {
   const s = { ...DEFAULTS, ...settings }
+  const oppPct = opportunityCostPct || s.costOfCapitalPct
   const base = +amount || 0
   if (!base) return []
 
   const terms = parsePaymentTerms(supplierPayment)
   const deferredDays = terms.mode === 'deferred' ? terms.days : 30
+  const oppCostNow = opportunityCostPayNow(base, daysCapitalLocked, oppPct)
 
   const scenarios = [
     {
       id: 'cash_now',
-      label: 'Pay now — cash',
+      label: 'Pagar à vista — dinheiro',
       paymentDay: 0,
       grossOut: base,
-      effectiveCost: Math.round(base * (1 - s.cashDiscountPct / 100)),
-      discountOrFee: -Math.round(base * s.cashDiscountPct / 100),
+      cashDiscount: Math.round(base * s.cashDiscountPct / 100),
+      opportunityCost: oppCostNow,
+      effectiveCost: Math.round(base * (1 - s.cashDiscountPct / 100) + oppCostNow),
       pointsValue: 0,
       financingCost: 0,
-      notes: `${s.cashDiscountPct}% cash discount assumed`,
+      notes: `Desconto ${s.cashDiscountPct}% + custo oportunidade ${oppPct}% (${daysCapitalLocked}d capital preso)`,
     },
     {
       id: 'card_now',
-      label: 'Pay now — card',
+      label: 'Pagar à vista — cartão',
       paymentDay: 0,
       grossOut: base,
-      effectiveCost: Math.round(base * (1 + s.cardFeePct / 100) - pointsBenefit(base, pointsPct, s.pointsValuePct)),
-      discountOrFee: Math.round(base * s.cardFeePct / 100),
+      cashDiscount: 0,
+      opportunityCost: oppCostNow,
+      effectiveCost: Math.round(
+        base * (1 + s.cardFeePct / 100)
+        - pointsBenefit(base, pointsPct, s.pointsValuePct)
+        + oppCostNow * 0.5
+      ),
       pointsValue: pointsBenefit(base, pointsPct, s.pointsValuePct),
-      financingCost: 0,
-      notes: `Card fee ${s.cardFeePct}%${pointsPct ? `, ${pointsPct}% points` : ''}`,
+      financingCost: Math.round(base * s.cardFeePct / 100),
+      notes: `Taxa cartão ${s.cardFeePct}% + metade do custo de oportunidade`,
     },
     {
       id: 'terms',
-      label: `Pay on terms — ${terms.label}`,
+      label: `Pagar a prazo — ${terms.label}`,
       paymentDay: deferredDays,
       grossOut: base,
-      effectiveCost: base + financingCost(base, deferredDays, s.costOfCapitalPct),
-      discountOrFee: 0,
+      cashDiscount: 0,
+      opportunityCost: 0,
+      effectiveCost: base + financingCost(base, deferredDays, oppPct) - pointsBenefit(base, pointsPct, s.pointsValuePct),
       pointsValue: pointsBenefit(base, pointsPct, s.pointsValuePct),
-      financingCost: financingCost(base, deferredDays, s.costOfCapitalPct),
-      notes: `Money cost ${s.costOfCapitalPct}%/yr × ${deferredDays}d`,
+      financingCost: financingCost(base, deferredDays, oppPct),
+      notes: `Custo do dinheiro ${oppPct}%/ano × ${deferredDays}d — libera caixa agora`,
     },
   ]
 
   if (terms.mode === 'deferred') {
     scenarios.push({
       id: 'supplier_default',
-      label: `Supplier default — ${supplierPayment}`,
+      label: `Padrão do fornecedor — ${supplierPayment}`,
       paymentDay: terms.days,
       grossOut: base,
-      effectiveCost: base + financingCost(base, terms.days, s.costOfCapitalPct) - pointsBenefit(base, pointsPct, s.pointsValuePct),
-      discountOrFee: 0,
+      opportunityCost: 0,
+      effectiveCost: base + financingCost(base, terms.days, oppPct) - pointsBenefit(base, pointsPct, s.pointsValuePct),
       pointsValue: pointsBenefit(base, pointsPct, s.pointsValuePct),
-      financingCost: financingCost(base, terms.days, s.costOfCapitalPct),
-      notes: 'Configured supplier payment terms',
+      financingCost: financingCost(base, terms.days, oppPct),
+      notes: 'Condição cadastrada no fornecedor',
       isSupplierDefault: true,
     })
   }
@@ -123,13 +125,10 @@ export function buildPaymentScenarios({
   return scenarios.map(sc => ({
     ...sc,
     savingsVsWorst: 0,
-    cashPressure: sc.paymentDay === 0 ? 'high' : sc.paymentDay <= 7 ? 'medium' : 'low',
+    cashPressure: sc.paymentDay === 0 ? 'alta' : sc.paymentDay <= 7 ? 'média' : 'baixa',
   }))
 }
 
-/**
- * Full analysis: payment timing + resale margin + collection cycle + cash position.
- */
 export function analyzePurchaseCashflow({
   purchaseAmount,
   supplierPayment = 'Cash',
@@ -141,6 +140,7 @@ export function analyzePurchaseCashflow({
   categoria = 'Others',
   cashflow = {},
   settings = {},
+  holding = null,
 }) {
   const s = { ...DEFAULTS, ...settings }
   const amount = +purchaseAmount || 0
@@ -153,24 +153,30 @@ export function analyzePurchaseCashflow({
   const revenueDay = deliveryDay + sellDays
   const collectDay = revenueDay + s.daysToCollectBar
 
-  const scenarios = buildPaymentScenarios({ amount, supplierPayment, pointsPct, settings: s })
-  const worst = Math.max(...scenarios.map(x => x.effectiveCost))
-  scenarios.forEach(sc => { sc.savingsVsWorst = worst - sc.effectiveCost })
-
   const netCash = cashflow.netCash ?? 0
   const pendingOut30 = cashflow.pendingOut30 ?? 0
   const pendingIn30 = cashflow.pendingIn30 ?? 0
   const projectedCash = netCash + pendingIn30 - pendingOut30
+  const capitalTight = projectedCash < s.minCashBuffer
 
-  const ranked = [...scenarios].sort((a, b) => {
-    const scoreA = a.effectiveCost - (a.paymentDay > 0 ? 500 : 0) + (projectedCash < s.minCashBuffer && a.paymentDay === 0 ? 50000 : 0)
-    const scoreB = b.effectiveCost - (b.paymentDay > 0 ? 500 : 0) + (projectedCash < s.minCashBuffer && b.paymentDay === 0 ? 50000 : 0)
-    return scoreA - scoreB
+  const opportunityCostPct = resolveOpportunityCostPct(holding, { capitalTight })
+  const forsaken = describeForsakenAlternatives(holding, amount)
+
+  const scenarios = buildPaymentScenarios({
+    amount,
+    supplierPayment,
+    pointsPct,
+    settings: s,
+    opportunityCostPct,
+    daysCapitalLocked: collectDay,
   })
 
-  const best = ranked[0]
+  const worst = Math.max(...scenarios.map(x => x.effectiveCost), 1)
+  scenarios.forEach(sc => { sc.savingsVsWorst = worst - sc.effectiveCost })
+
   const payNow = scenarios.find(x => x.id === 'cash_now')
   const payTerms = scenarios.find(x => x.id === 'terms' || x.id === 'supplier_default') || scenarios.find(x => x.paymentDay > 0)
+  const best = [...scenarios].sort((a, b) => a.effectiveCost - b.effectiveCost)[0]
 
   const cashNowAffordable = projectedCash - (payNow?.effectiveCost || amount) >= -s.minCashBuffer
   const recoverBeforePay = payTerms ? collectDay <= payTerms.paymentDay : false
@@ -178,46 +184,69 @@ export function analyzePurchaseCashflow({
 
   let verdict = 'neutral'
   let headline = ''
-  let reasons = []
+  const reasons = []
 
   if (!amount) {
-    return { verdict: 'incomplete', headline: 'Enter purchase amount to analyze', scenarios: [], reasons: [] }
+    return {
+      verdict: 'incomplete',
+      headline: 'Informe o valor da compra para analisar',
+      scenarios: [],
+      reasons: [],
+      opportunityCostPct,
+      forsaken,
+      holding,
+    }
+  }
+
+  reasons.push(`Custo de oportunidade JBM Holding: ${opportunityCostPct}%/ano (não é só 12% — inclui outros negócios)`)
+
+  if (payNow?.opportunityCost > 0) {
+    reasons.push(
+      `Pagar à vista prende ¥${Math.round(amount).toLocaleString('ja-JP')} por ~${collectDay} dias até cobrar o bar → custo oportunidade +${fmt(payNow.opportunityCost)}`
+    )
+  }
+
+  forsaken.slice(0, 2).forEach(f => reasons.push(f.mensagem))
+
+  if (holding?.regraCapital) {
+    reasons.push(holding.regraCapital)
   }
 
   if (payNow && payTerms) {
     const savingNow = payTerms.effectiveCost - payNow.effectiveCost
-    if (savingNow > 500 && cashNowAffordable) {
-      verdict = 'pay_now'
-      headline = `Pay now saves ${fmt(savingNow)} vs waiting`
-      reasons.push(`Cash discount / lower effective cost beats financing ${payTerms.paymentDay}d`)
+    if (payNow.opportunityCost > savingNow + 500 && payTerms.paymentDay > 0) {
+      verdict = 'pay_later'
+      headline = `A prazo — custo de oportunidade maior que o desconto à vista`
+      reasons.push(`À vista economiza ${fmt(savingNow)} no preço, mas oportunidade custa ${fmt(payNow.opportunityCost)}`)
     } else if (!cashNowAffordable && payTerms.paymentDay > 0) {
       verdict = 'pay_later'
-      headline = `Pay on terms — protects cash buffer`
-      reasons.push(`Projected cash ¥${Math.round(projectedCash).toLocaleString()} — paying now risks tight cashflow`)
+      headline = `A prazo — protege o caixa da holding`
+      reasons.push(`Caixa projetado 30d: ${fmt(projectedCash)} — pagar agora aperta a operação`)
     } else if (recoverBeforePay && margin > 0) {
       verdict = 'pay_later'
-      headline = `Terms OK — you collect before paying`
-      reasons.push(`Bar payment ~day ${collectDay} vs supplier due day ${payTerms.paymentDay}`)
+      headline = `A prazo — você cobra o bar antes de pagar o fornecedor`
+      reasons.push(`Cobrança do bar ~dia ${collectDay} vs vencimento fornecedor dia ${payTerms.paymentDay}`)
     } else if (workingCapitalGap > 0) {
       verdict = 'caution'
-      headline = `Gap of ${workingCapitalGap} days — you pay before collecting`
-      reasons.push(`Need ¥${fmt(amount)} working capital for ${workingCapitalGap} days`)
+      headline = `Atenção: ${workingCapitalGap} dias pagando antes de receber`
+      reasons.push(`Precisa de capital de giro de ${fmt(amount)} por ${workingCapitalGap} dias`)
+    } else if (savingNow > 1000 && cashNowAffordable && payNow.opportunityCost < savingNow) {
+      verdict = 'pay_now'
+      headline = `À vista — desconto supera custo de oportunidade`
     } else if (savingNow <= 0) {
       verdict = 'pay_later'
-      headline = `Defer payment — no benefit paying early`
-      reasons.push(`Financing cost of paying early exceeds cash discount`)
+      headline = `A prazo — sem vantagem em pagar cedo`
     } else {
-      verdict = 'pay_now'
-      headline = `Pay now — lowest effective cost`
-      reasons.push(`Best effective cost: ${best.label}`)
+      verdict = capitalTight ? 'pay_later' : 'pay_now'
+      headline = capitalTight ? `A prazo — holding com capital apertado` : `À vista — menor custo efetivo`
     }
   }
 
   if (marginPct !== null && marginPct < 30) {
-    reasons.push(`Low resale margin ${marginPct}% — prioritize cash preservation`)
+    reasons.push(`Margem de revenda baixa (${marginPct}%) — preserve caixa para a holding`)
   }
   if (revenue > 0) {
-    reasons.push(`Projected resale ¥${Math.round(revenue).toLocaleString()} → margin ¥${Math.round(margin).toLocaleString()}`)
+    reasons.push(`Revenda projetada ${fmt(revenue)} → margem ${fmt(margin)}`)
   }
 
   return {
@@ -226,21 +255,13 @@ export function analyzePurchaseCashflow({
     reasons,
     bestScenario: best,
     scenarios: scenarios.sort((a, b) => a.effectiveCost - b.effectiveCost),
-    timeline: {
-      deliveryDay,
-      revenueDay,
-      collectDay,
-      recoverBeforePay,
-      workingCapitalGap,
-    },
-    cashflow: {
-      netCash,
-      projectedCash,
-      cashNowAffordable,
-      minBuffer: s.minCashBuffer,
-    },
+    timeline: { deliveryDay, revenueDay, collectDay, recoverBeforePay, workingCapitalGap },
+    cashflow: { netCash, projectedCash, cashNowAffordable, minBuffer: s.minCashBuffer, capitalTight },
     margin: { revenue, margin, marginPct },
     settings: s,
+    opportunityCostPct,
+    forsaken,
+    holding,
   }
 }
 
@@ -249,37 +270,54 @@ function fmt(n) {
 }
 
 export function buildAIAdvisorPrompt(analysis, context = {}) {
+  const holding = context.holding || {}
+  const negocios = (holding.negocios || [])
+    .map(n => `- ${n.nome} (${n.tipo}): custo oportunidade ${n.custoOportunidadePct}%/ano, prioridade ${n.prioridade}. ${n.notas || ''}`)
+    .join('\n')
+
   return {
-    system: `You are JBM Drinks' purchase & cash-flow advisor for a beverage supplier in Japan.
-Explain in clear Portuguese (Brazil) whether to pay immediately or on supplier terms.
-Focus on: cost of money, time to sell to bars, time to collect from bars (faturas), and sustainable cash buffer.
-Be direct: 2-3 short paragraphs + bullet recommendation. No markdown headers.`,
+    system: `Você é o advisor financeiro da JBM Holding (grupo que inclui JBM Drinks e outros negócios).
+Responda SEMPRE em português do Brasil, direto e sem enrolação — o usuário está cansado de texto em inglês.
+Explique se vale pagar à vista ou a prazo considerando:
+- Custo de oportunidade REAL (muito acima de 12% quando capital poderia ir para contratar gente em outro negócio)
+- Fluxo de caixa sustentável da holding
+- Prazo para vender no bar e cobrar o Atomic
+- Regra de alocação de capital entre negócios
+2-3 parágrafos + recomendação final em bullet. Sem headers markdown.`,
     messages: [{
       role: 'user',
-      content: `Analyze this purchase decision:
+      content: `Decisão de compra JBM Drinks (dentro da JBM Holding):
 
-Supplier: ${context.supplierName || '?'}
-Product: ${context.productName || '?'} (${context.categoria || '?'})
-Purchase amount: ¥${context.purchaseAmount || 0}
-Supplier payment terms: ${context.supplierPayment || '?'}
-Delivery days: ${context.deliveryDays ?? 1}
-Points %: ${context.pointsPct ?? 0}
+FORNECEDOR: ${context.supplierName || '?'}
+PRODUTO: ${context.productName || '?'} (${context.categoria || '?'})
+VALOR: ¥${context.purchaseAmount || 0}
+PAGAMENTO FORNECEDOR: ${context.supplierPayment || '?'}
+ENTREGA: ${context.deliveryDays ?? 1} dias | Pontos: ${context.pointsPct ?? 0}%
 
-Resale to bar: ¥${analysis.margin?.revenue || 0} (margin ${analysis.margin?.marginPct ?? '?'}%)
-Timeline: deliver day ${analysis.timeline.deliveryDay}, revenue day ${analysis.timeline.revenueDay}, collect from bar day ${analysis.timeline.collectDay}
+JBM HOLDING — perfil sincronizado:
+Nome: ${holding.nome || 'JBM Holding'}
+Custo oportunidade efetivo: ${analysis.opportunityCostPct}%/ano
+Regra de capital: ${holding.regraCapital || '—'}
+Negócios:
+${negocios || '—'}
 
-Cash position: net ¥${analysis.cashflow.netCash}, projected 30d ¥${analysis.cashflow.projectedCash}
-Can afford pay-now: ${analysis.cashflow.cashNowAffordable}
-Recover before supplier due: ${analysis.timeline.recoverBeforePay}
-Working capital gap: ${analysis.timeline.workingCapitalGap} days
+O que deixa de fazer se pagar à vista em bebidas:
+${(analysis.forsaken || []).map(f => f.mensagem).join('\n') || '—'}
 
-Scenarios (effective cost):
-${analysis.scenarios.map(s => `- ${s.label}: ¥${s.effectiveCost} (pay day ${s.paymentDay})`).join('\n')}
+REVENDA AO BAR: ¥${analysis.margin?.revenue || 0} (margem ${analysis.margin?.marginPct ?? '?'}%)
+LINHA DO TEMPO: entrega dia ${analysis.timeline.deliveryDay}, venda dia ${analysis.timeline.revenueDay}, cobrança bar dia ${analysis.timeline.collectDay}
 
-System verdict: ${analysis.verdict} — ${analysis.headline}
-Reasons: ${analysis.reasons.join('; ')}
+CAIXA: líquido ¥${analysis.cashflow.netCash}, projetado 30d ¥${analysis.cashflow.projectedCash}
+Capital apertado: ${analysis.cashflow.capitalTight ? 'SIM' : 'NÃO'}
+Cobre antes de pagar fornecedor: ${analysis.timeline.recoverBeforePay ? 'SIM' : 'NÃO'}
+Gap capital de giro: ${analysis.timeline.workingCapitalGap} dias
 
-Should JBM pay now or on terms for a SUSTAINABLE operation?`,
+CENÁRIOS (custo efetivo):
+${analysis.scenarios.map(s => `- ${s.label}: ${fmt(s.effectiveCost)} (paga dia ${s.paymentDay})${s.opportunityCost ? ` [oportunidade +${fmt(s.opportunityCost)}]` : ''}`).join('\n')}
+
+Veredito sistema: ${analysis.verdict} — ${analysis.headline}
+
+Pagar à vista ou a prazo para operação SUSTENTÁVEL da holding?`,
     }],
   }
 }
@@ -314,11 +352,5 @@ export async function loadCashflowSnapshot(supabase) {
     })
     .reduce((a, c) => a + (+c.total_pago || +c.total_real || 0), 0)
 
-  return {
-    netCash: paidIn - paidOut,
-    pendingIn30,
-    pendingOut30,
-    paidIn,
-    paidOut,
-  }
+  return { netCash: paidIn - paidOut, pendingIn30, pendingOut30, paidIn, paidOut }
 }

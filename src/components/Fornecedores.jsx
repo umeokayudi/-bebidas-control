@@ -278,7 +278,7 @@ function SmartPurchase() {
                       </div>
                       <button type="button" onClick={()=>setAdvisorOffer({ product: p, offer: pr })}
                         style={{ padding:'8px 14px', borderRadius:10, background:advisorOffer?.offer?.id===pr.id?'var(--gold)':'var(--bg3)', color:advisorOffer?.offer?.id===pr.id?'var(--navy)':'var(--text)', border:'1px solid var(--border)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
-                        💰 Cash flow
+                        💰 Fluxo de caixa
                       </button>
                       {pr.url_compra && <a href={pr.url_compra} target="_blank" rel="noreferrer"
                         style={{ padding:'8px 14px', borderRadius:10, background:'var(--navy)', color:'white', textDecoration:'none', fontSize:12, fontWeight:700, whiteSpace:'nowrap' }}>🛒 Buy</a>}
