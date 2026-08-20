@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
+import { fetchHoldingSystemSnapshot, buildHoldingChatSystem } from '../lib/holdingDataSync'
+import { syncHoldingFromCloud } from '../lib/jbmHolding'
 import { fmtYen, Spinner } from './utils'
+import JbmHoldingPanel from './JbmHoldingPanel'
 
 export default function AIAssistant() {
-  const [tab, setTab] = useState('chat')
+  const [tab, setTab] = useState('holding')
   return (
     <div>
-      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
-        {[['chat','🤖 AI Chat'],['purchase','🛒 Purchase Advisor'],['scan','📷 Scan Receipt']].map(([id,label]) => (
+      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+        {[['holding','🏛 JBM Holding'],['chat','🤖 Chat'],['purchase','🛒 Compras'],['scan','📷 Recibo']].map(([id,label]) => (
           <button key={id} onClick={()=>setTab(id)} style={{
             padding:'8px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer',
             background: tab===id ? 'var(--navy)' : 'var(--bg3)',
@@ -16,6 +19,7 @@ export default function AIAssistant() {
           }}>{label}</button>
         ))}
       </div>
+      {tab==='holding'  && <JbmHoldingPanel />}
       {tab==='chat'     && <AIChat />}
       {tab==='purchase' && <PurchaseAdvisor />}
       {tab==='scan'     && <ReceiptScanner />}
@@ -25,7 +29,7 @@ export default function AIAssistant() {
 
 function AIChat() {
   const [messages, setMessages] = useState([
-    { role:'assistant', content:'Hi! I am your JBM drinks assistant. Ask me anything about your business, stock, orders, or products.' }
+    { role:'assistant', content:'Olá! Sou o assistente JBM Drinks, ligado aos dados reais do sistema. Pergunte sobre estoque, pedidos, caixa ou compras.' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -40,22 +44,16 @@ function AIChat() {
     setInput('')
     setLoading(true)
 
-    // Fetch context from DB
-    const [{ data: produtos }, { data: pedidos }, { data: vendas }] = await Promise.all([
-      supabase.from('produtos').select('nome,categoria,custo,preco_venda,volume_ml').eq('ativo',true),
-      supabase.from('pedidos').select('status,total_estimado,criado_em').order('criado_em',{ascending:false}).limit(10),
-      supabase.from('vendas').select('total,data').order('data',{ascending:false}).limit(20),
-    ])
+    const holding = await syncHoldingFromCloud().catch(() => null)
+    const snapshot = await fetchHoldingSystemSnapshot(supabase, holding)
+    const system = buildHoldingChatSystem(snapshot) + `
 
-    const context = `
-You are an AI assistant for JBM Drinks, a beverage supplier in Japan serving bars like Atomic and Bar do Mario.
-Current products: ${JSON.stringify(produtos?.slice(0,20))}
-Recent orders: ${JSON.stringify(pedidos)}
-Recent sales: ${JSON.stringify(vendas)}
-Answer in the same language the user writes in. Be concise and helpful.
-`
+Produtos recentes: ${JSON.stringify((await supabase.from('produtos').select('nome,categoria,custo,preco_venda').eq('ativo',true).limit(15)).data)}
+Pedidos recentes: ${JSON.stringify((await supabase.from('pedidos').select('status,total_estimado,criado_em').order('criado_em',{ascending:false}).limit(8)).data)}
+Responda em português do Brasil, de forma concisa e prática.`
+
     const history = messages.filter(m=>m.role!=='assistant'||messages.indexOf(m)>0).map(m=>({role:m.role,content:m.content}))
-    const reply = await callGeminiChat({ messages: [...history, userMsg], system: context })
+    const reply = await callGeminiChat({ messages: [...history, userMsg], system })
     setMessages(m => [...m, { role:'assistant', content: reply }])
     setLoading(false)
   }
