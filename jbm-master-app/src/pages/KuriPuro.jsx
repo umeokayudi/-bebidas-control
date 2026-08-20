@@ -17,7 +17,7 @@ export default function KuriPuro() {
   async function load() {
     const s = await fetchHoldingSnapshot(holdingSb)
     setSnap(s)
-    const { data } = await holdingSb.from('clients').select('*').eq('is_active', true).order('name')
+    const { data } = await holdingSb.from('clients').select('*').eq('is_active', true).order('company_name')
     setClients(data || [])
   }
 
@@ -46,7 +46,7 @@ export default function KuriPuro() {
           {clients.map(c => (
             <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{c.company_name || c.contact_name}</div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>custo {fmtYen(c.monthly_cost)}/mês</div>
               </div>
               <div style={{ fontWeight: 600, color: '#c19c56' }}>{fmtYen(c.monthly_revenue)}</div>

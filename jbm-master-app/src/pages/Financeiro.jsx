@@ -16,16 +16,16 @@ export default function Financeiro() {
 
   async function load() {
     setSnap(await fetchHoldingSnapshot(holdingSb))
-    const { data } = await holdingSb.from('financial_entries').select('*').order('date', { ascending: false }).limit(50)
+    const { data } = await holdingSb.from('salary_payments').select('*').order('payment_date', { ascending: false }).limit(50)
     setEntries(data || [])
   }
 
   const d = snap?.drinks || {}
   const k = snap?.kuripuro || {}
-  const kuriEntries = entries.filter(e => e.unit === 'KuriPuro')
-  const holdingEntries = entries.filter(e => e.unit !== 'KuriPuro')
+  const kuriEntries = entries
+  const holdingEntries = snap?.kuripuro?.lancamentos || []
 
-  const sum = (list, type) => list.filter(e => e.type === type).reduce((a, e) => a + Number(e.amount || 0), 0)
+  const sum = (list, type) => list.filter(e => (e.type || 'expense') === type).reduce((a, e) => a + Number(e.amount || 0), 0)
 
   return (
     <div>
@@ -51,19 +51,34 @@ export default function Financeiro() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>🧹 KuriPuro — lançamentos</div>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>🧹 KuriPuro — pagamentos folha</div>
         {kuriEntries.length === 0 && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Nenhum</div>}
         {kuriEntries.slice(0, 12).map(e => (
-          <EntryRow key={e.id} e={e} />
+          <PaymentRow key={e.id} e={e} />
         ))}
       </div>
 
       <div className="card">
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>🏛 Holding — outros lançamentos</div>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>🏛 Snapshot — lançamentos recentes</div>
         {holdingEntries.length === 0 && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Nenhum</div>}
-        {holdingEntries.slice(0, 15).map(e => (
-          <EntryRow key={e.id} e={e} />
+        {holdingEntries.slice(0, 15).map((e, i) => (
+          <EntryRow key={i} e={e} />
         ))}
+      </div>
+    </div>
+  )
+}
+
+function PaymentRow({ e }) {
+  const isIncome = e.is_deduction
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div>
+        <div style={{ fontSize: 12 }}>{e.employee_name} — {e.description || e.payment_type}</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{e.payment_date} · {e.status} · {e.payment_type}</div>
+      </div>
+      <div style={{ fontWeight: 600, color: isIncome ? '#4ade80' : '#f87171' }}>
+        {isIncome ? '+' : '-'}{fmtYen(e.amount)}
       </div>
     </div>
   )
@@ -74,7 +89,7 @@ function EntryRow({ e }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
       <div>
         <div style={{ fontSize: 12 }}>{e.description}</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{e.unit} · {e.date} · {e.category}</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{e.date} · {e.category}</div>
       </div>
       <div style={{ fontWeight: 600, color: e.type === 'income' ? '#4ade80' : '#f87171' }}>
         {e.type === 'income' ? '+' : '-'}{fmtYen(e.amount)}
