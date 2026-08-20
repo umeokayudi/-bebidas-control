@@ -7,7 +7,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|holding).*)",
       "destination": "/index.html"
     }
   ]
