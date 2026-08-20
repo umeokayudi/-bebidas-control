@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { fixAtomicJuneDebt } from './_atomicJuneFix.js'
+import { fixAtomicReceivables } from './_atomicJuneFix.js'
 
 const BUCKET = 'system-private'
 const FILE = 'cashflow_snapshot.json'
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
 
     if (req.query.fixAtomicJune === '1' && req.query.confirm === 'atomic-june-465000') {
       const debt = Number(req.query.debt || 465000)
-      const fix = await fixAtomicJuneDebt(sb, debt)
+      const fix = await fixAtomicReceivables(sb)
       const { data: faturas } = await sb.from('faturas').select('valor,total,pago,status').eq('bar_id', 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9').neq('status', 'pago')
       const aReceber = (faturas || []).reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
       return res.status(200).json({ ok: true, fix, aReceber })

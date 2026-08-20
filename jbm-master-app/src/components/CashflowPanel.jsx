@@ -30,18 +30,20 @@ export default function CashflowPanel({ cf, title = '💸 Cashflow', color = '#c
 
 export function KuriPuroFinancePanel({ kp }) {
   if (!kp) return null
+  const items = [
+    ['Receita/mês', kp.receitaMes, '#c19c56'],
+    ['A receber', kp.aReceber || kp.aReceberAtomic, '#4ade80'],
+    ['Lucro ajust. ago', kp.lucroAjustadoAgosto ?? kp.lucroMes, '#60a5fa'],
+    ['Desc. OTP ago', kp.descontoOnThePlanetAgosto || 0, '#fbbf24'],
+  ]
   return (
-    <CashflowPanel
-      title="🧹 KuriPuro — Financeiro"
-      color="#60a5fa"
-      cf={{
-        items: [
-          ['Receita/mês', kp.receitaMes, '#c19c56'],
-          ['Custo/mês', kp.custoMes, '#f87171'],
-          ['Lucro', kp.lucroMes, '#4ade80'],
-          ['Pendências', kp.contasPendentes, '#fbbf24'],
-        ],
-      }}
-    />
+    <div style={{ marginBottom: 20 }}>
+      <CashflowPanel title="🧹 KuriPuro — Financeiro" color="#60a5fa" cf={{ items }} />
+      {(kp.atomicFaturas || []).length > 0 && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 8 }}>
+          Atomic: {(kp.atomicFaturas || []).map(f => `${f.mes?.slice(5) || '?'} ¥${Math.round(f.valor || 0).toLocaleString('ja-JP')}`).join(' · ')}
+        </div>
+      )}
+    </div>
   )
 }

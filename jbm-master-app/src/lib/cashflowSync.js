@@ -63,9 +63,15 @@ function normalizeSnapshot(raw) {
 
   const kuripuro = {
     receitaMes: k.receitaMes ?? 0,
+    receitaAjustadaAgosto: k.receitaAjustadaAgosto ?? k.receitaMes ?? 0,
     custoMes: k.custoMes ?? 0,
     custoFolha: k.custoFolha ?? 0,
     lucroMes: k.lucroMes ?? 0,
+    lucroAjustadoAgosto: k.lucroAjustadoAgosto ?? k.lucroMes ?? 0,
+    descontoOnThePlanetAgosto: k.descontoOnThePlanetAgosto ?? 0,
+    aReceber: k.aReceber ?? 0,
+    aReceberAtomic: k.aReceberAtomic ?? 0,
+    atomicFaturas: k.atomicFaturas || [],
     clientesAtivos: k.clientesAtivos ?? 0,
     funcionariosAtivos: k.funcionariosAtivos ?? 0,
     lancamentosReceita: k.lancamentosReceita ?? 0,

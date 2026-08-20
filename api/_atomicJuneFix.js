@@ -1,7 +1,38 @@
 export const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 
-export async function fixAtomicJuneDebt(sb, debt = 465000) {
-  const report = { debt, deletedVendas: 0, movedPedidos: 0, faturaId: null, oldVendasTotal: 0 }
+/** Faturas Atomic: maio ¥165k + jun ¥150k + jul ¥150k = ¥465k */
+export const ATOMIC_FATURAS = [
+  {
+    valor: 165000,
+    total: 165000,
+    data_emissao: '2026-05-31',
+    data_vencimento: '2026-06-30',
+    periodo_inicio: '2026-05-01',
+    periodo_fim: '2026-05-31',
+    obs: 'Maio/2026 — fornecimento ¥150.000 + equipamentos limpeza ¥15.000',
+  },
+  {
+    valor: 150000,
+    total: 150000,
+    data_emissao: '2026-06-30',
+    data_vencimento: '2026-07-31',
+    periodo_inicio: '2026-06-01',
+    periodo_fim: '2026-06-30',
+    obs: 'Junho/2026 — fornecimento Atomic',
+  },
+  {
+    valor: 150000,
+    total: 150000,
+    data_emissao: '2026-07-31',
+    data_vencimento: '2026-08-31',
+    periodo_inicio: '2026-07-01',
+    periodo_fim: '2026-07-31',
+    obs: 'Julho/2026 — fornecimento Atomic',
+  },
+]
+
+export async function fixAtomicReceivables(sb) {
+  const report = { deletedVendas: 0, movedPedidos: 0, faturaIds: [], oldVendasTotal: 0 }
 
   const { data: vendas, error: vErr } = await sb
     .from('vendas')
@@ -37,35 +68,24 @@ export async function fixAtomicJuneDebt(sb, debt = 465000) {
     report.movedPedidos++
   }
 
-  const { data: faturas } = await sb
-    .from('faturas')
-    .select('id')
-    .eq('bar_id', ATOMIC_BAR_ID)
-    .eq('status', 'pendente')
+  await sb.from('faturas').delete().eq('bar_id', ATOMIC_BAR_ID).eq('status', 'pendente')
 
-  const faturaPatch = {
-    bar_id: ATOMIC_BAR_ID,
-    valor: debt,
-    total: debt,
-    pago: 0,
-    status: 'pendente',
-    data_emissao: '2026-06-30',
-    data_vencimento: '2026-07-31',
-    periodo_inicio: '2026-06-01',
-    periodo_fim: '2026-06-30',
-    obs: 'Fatura jun/2026 — dívida consolidada Atomic (¥465.000)',
+  for (const f of ATOMIC_FATURAS) {
+    const { data, error } = await sb.from('faturas').insert({
+      bar_id: ATOMIC_BAR_ID,
+      pago: 0,
+      status: 'pendente',
+      ...f,
+    }).select('id').single()
+    if (error) throw new Error(error.message)
+    report.faturaIds.push(data.id)
   }
 
-  if (faturas?.length) {
-    const { data } = await sb.from('faturas').update(faturaPatch).eq('id', faturas[0].id).select('id').single()
-    report.faturaId = data?.id
-    if (faturas.length > 1) {
-      await sb.from('faturas').delete().in('id', faturas.slice(1).map(f => f.id))
-    }
-  } else {
-    const { data } = await sb.from('faturas').insert(faturaPatch).select('id').single()
-    report.faturaId = data?.id
-  }
-
+  report.debt = ATOMIC_FATURAS.reduce((a, f) => a + f.valor, 0)
   return report
+}
+
+/** @deprecated */
+export async function fixAtomicJuneDebt(sb, debt = 465000) {
+  return fixAtomicReceivables(sb)
 }
