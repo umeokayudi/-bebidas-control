@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/sync-cashflow-cron",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
