@@ -6,6 +6,7 @@ import {
   MetricCard, Badge, Spinner, Empty, SectionTitle, DelBtn,
   PAGAMENTOS, analyzeReceipt
 } from './utils'
+import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
 
 export default function ComprasTab() {
   const { user } = useAuth()
@@ -31,9 +32,12 @@ export default function ComprasTab() {
 
   useEffect(() => { load(); loadFornecedores() }, [])
   async function loadFornecedores() {
-    const { data } = await supabase.from('fornecedores').select('id,nome').order('nome')
+    const { data } = await supabase.from('fornecedores').select('id,nome,pagamento,prazo_entrega_dias,pontos_pct').order('nome')
     setFornecedores(data||[])
   }
+
+  const selectedSupplier = fornecedores.find(f => f.nome === form.fornecedor)
+  const purchaseTotal = (+form.total_pago || +form.subtotal || 0) - (+form.desconto_pontos || 0)
 
   async function load() {
     setLoading(true)
@@ -263,10 +267,20 @@ export default function ComprasTab() {
           ))}
         </div>
 
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <PurchaseCashflowAdvisor
+          purchaseAmount={purchaseTotal}
+          supplierName={form.fornecedor}
+          supplierPayment={selectedSupplier?.pagamento || form.pagamento}
+          deliveryDays={selectedSupplier?.prazo_entrega_dias || 1}
+          pointsPct={selectedSupplier?.pontos_pct || 0}
+          productName={form.itens?.[0]?.nome || ''}
+          qtd={form.itens?.reduce((a, it) => a + (+it.qtd || 0), 0) || 1}
+        />
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16 }}>
           <div style={{ fontSize:14 }}>
             Real cost: <strong style={{ color:'var(--blue)' }}>
-              {fmtYen((+form.total_pago || +form.subtotal) - (+form.desconto_pontos || 0))}
+              {fmtYen(purchaseTotal)}
             </strong>
           </div>
           <button className="btn-primary" onClick={saveCompra} disabled={saving}>

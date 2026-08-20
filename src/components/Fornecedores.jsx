@@ -1,6 +1,7 @@
 import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, Spinner, Empty } from './utils'
+import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -216,10 +217,11 @@ function SmartPurchase() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [advisorOffer, setAdvisorOffer] = useState(null)
   useEffect(() => { load() }, [])
   async function load() {
     const [pR, prR] = await Promise.all([
-      supabase.from('produtos').select('id,nome,categoria,custo,volume_ml').order('categoria').order('nome'),
+      supabase.from('produtos').select('id,nome,categoria,custo,preco_venda,volume_ml').order('categoria').order('nome'),
       supabase.from('fornecedor_precos').select('*, fornecedores(nome,prazo_entrega_dias,pagamento,pontos_pct,website)'),
     ])
     setProdutos(pR.data||[]); setPrecos(prR.data||[]); setLoading(false)
@@ -242,7 +244,7 @@ function SmartPurchase() {
           const best = prices[0]
           return (
             <div key={p.id} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, overflow:'hidden' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', cursor:'pointer' }} onClick={()=>setSelected(selected===p.id?null:p.id)}>
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', cursor:'pointer' }} onClick={()=>{ setSelected(selected===p.id?null:p.id); setAdvisorOffer(null) }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:13, fontWeight:600 }}>{p.nome}</div>
                   <div style={{ fontSize:11, color:'var(--text2)' }}>{p.categoria} · JBM: {fmtYen(p.custo)}</div>
@@ -274,10 +276,30 @@ function SmartPurchase() {
                           {pr.preco<p.custo?'↓ cheaper':pr.preco>p.custo?'↑ more expensive':'= same as JBM'}
                         </div>}
                       </div>
+                      <button type="button" onClick={()=>setAdvisorOffer({ product: p, offer: pr })}
+                        style={{ padding:'8px 14px', borderRadius:10, background:advisorOffer?.offer?.id===pr.id?'var(--gold)':'var(--bg3)', color:advisorOffer?.offer?.id===pr.id?'var(--navy)':'var(--text)', border:'1px solid var(--border)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
+                        💰 Cash flow
+                      </button>
                       {pr.url_compra && <a href={pr.url_compra} target="_blank" rel="noreferrer"
                         style={{ padding:'8px 14px', borderRadius:10, background:'var(--navy)', color:'white', textDecoration:'none', fontSize:12, fontWeight:700, whiteSpace:'nowrap' }}>🛒 Buy</a>}
                     </div>
                   ))}
+                  {advisorOffer?.product?.id === p.id && (
+                    <div style={{ marginTop: 12 }}>
+                      <PurchaseCashflowAdvisor
+                        compact
+                        purchaseAmount={advisorOffer.offer.preco}
+                        supplierName={advisorOffer.offer.fornecedores?.nome}
+                        supplierPayment={advisorOffer.offer.fornecedores?.pagamento || 'Cash'}
+                        deliveryDays={advisorOffer.offer.fornecedores?.prazo_entrega_dias || 1}
+                        pointsPct={advisorOffer.offer.fornecedores?.pontos_pct || 0}
+                        productName={p.nome}
+                        categoria={p.categoria}
+                        qtd={1}
+                        jbmSellPrice={p.preco_venda || p.custo || 0}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
