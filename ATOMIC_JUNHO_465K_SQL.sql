@@ -20,16 +20,10 @@ delete from vendas
 where bar_id = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
   and data >= '2026-06-01' and data <= '2026-06-30';
 
--- 2) Pedidos de junho → julho (pendente, para relançar)
-update pedidos set
-  data_pedido = '2026-07-01',
-  data_entrega_prevista = '2026-07-01',
-  status = 'pendente',
-  obs = coalesce(obs, '') || ' [movido de jun→jul 2026]'
-where bar_id = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
-  and data_pedido >= '2026-06-01' and data_pedido <= '2026-06-30';
+-- 2) Pedidos de junho permanecem em junho (NÃO mover para julho)
+-- Se algum pedido foi movido por engano, use REVERT_ATOMIC_PEDIDOS_JUNE.sql
 
--- 3) Fatura jun/2026 consolidada
+-- 3) Faturas maio/jun/jul = ¥465.000 total
 delete from faturas
 where bar_id = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
   and status = 'pendente';

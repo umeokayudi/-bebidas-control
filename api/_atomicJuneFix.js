@@ -1,5 +1,7 @@
 export const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 
+const MOVIDO_TAG = /\[movido de jun→jul 2026\]/gi
+
 /** Faturas Atomic: maio ¥165k + jun ¥150k + jul ¥150k = ¥465k */
 export const ATOMIC_FATURAS = [
   {
@@ -31,8 +33,57 @@ export const ATOMIC_FATURAS = [
   },
 ]
 
+function stripMovidoTag(obs) {
+  return (obs || '').replace(MOVIDO_TAG, '').trim() || null
+}
+
+/** Converte timestamp jul→jun se necessário; preserva jun original */
+function toJuneTimestamp(iso) {
+  if (!iso) return null
+  if (iso.startsWith('2026-06')) return iso
+  if (iso.startsWith('2026-07')) return iso.replace('2026-07-', '2026-06-')
+  return iso
+}
+
+function toJuneDate(iso) {
+  const ts = toJuneTimestamp(iso)
+  return ts ? ts.slice(0, 10) : '2026-06-15'
+}
+
+/** Reverte pedidos Atomic movidos erroneamente de junho para julho */
+export async function revertAtomicPedidosToJune(sb) {
+  const { data: pedidos, error } = await sb
+    .from('pedidos')
+    .select('id,criado_em,data_pedido,data_entrega_prevista,obs,total_estimado')
+    .eq('bar_id', ATOMIC_BAR_ID)
+    .ilike('obs', '%movido de jun%jul%')
+
+  if (error) throw new Error(error.message)
+
+  const report = { reverted: 0, totalEstimado: 0, ids: [] }
+
+  for (const p of pedidos || []) {
+    const juneDate = toJuneDate(p.criado_em || p.data_pedido)
+    const juneTs = toJuneTimestamp(p.criado_em) || `${juneDate}T12:00:00+00:00`
+
+    const { error: uErr } = await sb.from('pedidos').update({
+      data_pedido: juneDate,
+      data_entrega_prevista: juneDate,
+      criado_em: juneTs,
+      obs: stripMovidoTag(p.obs),
+    }).eq('id', p.id)
+
+    if (uErr) throw new Error(`pedido ${p.id}: ${uErr.message}`)
+    report.reverted++
+    report.totalEstimado += Number(p.total_estimado || 0)
+    report.ids.push(p.id)
+  }
+
+  return report
+}
+
 export async function fixAtomicReceivables(sb) {
-  const report = { deletedVendas: 0, movedPedidos: 0, faturaIds: [], oldVendasTotal: 0 }
+  const report = { deletedVendas: 0, faturaIds: [], oldVendasTotal: 0 }
 
   const { data: vendas, error: vErr } = await sb
     .from('vendas')
@@ -51,22 +102,7 @@ export async function fixAtomicReceivables(sb) {
     report.deletedVendas = vendaIds.length
   }
 
-  const { data: pedidos } = await sb
-    .from('pedidos')
-    .select('id,obs')
-    .eq('bar_id', ATOMIC_BAR_ID)
-    .gte('data_pedido', '2026-06-01')
-    .lte('data_pedido', '2026-06-30')
-
-  for (const p of pedidos || []) {
-    await sb.from('pedidos').update({
-      data_pedido: '2026-07-01',
-      data_entrega_prevista: '2026-07-01',
-      status: 'pendente',
-      obs: ((p.obs || '') + ' [movido de jun→jul 2026]').trim(),
-    }).eq('id', p.id)
-    report.movedPedidos++
-  }
+  // Pedidos de junho permanecem em junho — não mover para julho
 
   await sb.from('faturas').delete().eq('bar_id', ATOMIC_BAR_ID).eq('status', 'pendente')
 

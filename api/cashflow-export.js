@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { fixAtomicReceivables } from './_atomicJuneFix.js'
+import { fixAtomicReceivables, revertAtomicPedidosToJune } from './_atomicJuneFix.js'
 import { isSupplierVenda } from './_supplierVenda.js'
 
 const BUCKET = 'system-private'
@@ -107,6 +107,11 @@ export default async function handler(req, res) {
 
   try {
     const sb = adminClient()
+
+    if (req.query.revertPedidosJune === '1' && req.query.confirm === 'atomic-june-465000') {
+      const revert = await revertAtomicPedidosToJune(sb)
+      return res.status(200).json({ ok: true, revert })
+    }
 
     if (req.query.fixAtomicJune === '1' && req.query.confirm === 'atomic-june-465000') {
       const debt = Number(req.query.debt || 465000)
