@@ -1,6 +1,6 @@
 {
   "name": "JBM Bebidas Control",
-  "install": "npm install --silent && npm run build",
+  "install": "npm install --silent && cd jbm-master-app && npm ci --silent && cd .. && npm run build",
   "start": "export VITE_SUPABASE_URL=\"${VITE_SUPABASE_URL:-https://ojirgkqtqvugqktyuhem.supabase.co}\"",
   "terminals": [
     {

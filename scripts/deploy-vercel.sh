@@ -34,7 +34,8 @@ fi
 
 VC="npx vercel --token \"$VERCEL_TOKEN\""
 TEAM_ARGS=()
-if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
+# Só usa --scope para teams reais (team_xxx). Conta pessoal não aceita scope.
+if [[ -n "${VERCEL_ORG_ID:-}" && "${VERCEL_ORG_ID}" == team_* ]]; then
   TEAM_ARGS=(--scope "$VERCEL_ORG_ID")
 elif [[ -n "${VERCEL_TEAM:-}" ]]; then
   TEAM_ARGS=(--scope "$VERCEL_TEAM")
