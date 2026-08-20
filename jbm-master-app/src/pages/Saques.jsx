@@ -6,7 +6,7 @@ export default function Saques() {
   const [rows, setRows] = useState([])
 
   useEffect(() => {
-    holdingSb.from('withdrawals').select('*').order('date', { ascending: false }).limit(30).then(({ data }) => setRows(data || []))
+    holdingSb.from('jbm_saques').select('*').order('date', { ascending: false }).limit(30).then(({ data }) => setRows(data || []))
   }, [])
 
   const total = rows.reduce((a, r) => a + Number(r.amount || 0), 0)

@@ -4,6 +4,7 @@
  * Uso: SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/fix-all-atomic.mjs
  */
 import { createClient } from '@supabase/supabase-js'
+import { isSupplierVenda } from './lib/supplierVenda.mjs'
 
 const URL = process.env.VITE_SUPABASE_URL || 'https://ojirgkqtqvugqktyuhem.supabase.co'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -31,14 +32,6 @@ const EXPLICIT = {
   'd5720654-a82b-4305-9c5e-777793790abd': { drinks_por_garrafa: 60, preco_drink: 2000 }, // Wilkson 1800ml
   'f3bf40f6-a5f9-4e75-a643-782f3297d871': { drinks_por_garrafa: 20, preco_drink: 1000 }, // Jasmin Tea
   '77ddb712-1cbc-4b3a-8520-cea447d54c71': { drinks_por_garrafa: 14, preco_drink: 2000 }, // Grey Goose Bottle
-}
-
-function isSupplierVenda(v) {
-  if (!v) return false
-  const obs = (v.obs || '').toLowerCase()
-  if (obs.includes('balcão') || obs.includes('balcao') || obs.includes('square') || obs.includes('pos')) return false
-  if (v.cast_id) return false
-  return true
 }
 
 async function fixPricing() {

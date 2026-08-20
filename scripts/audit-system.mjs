@@ -4,6 +4,7 @@
  * Uso: SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/audit-system.mjs
  */
 import { createClient } from '@supabase/supabase-js'
+import { isSupplierVenda } from './lib/supplierVenda.mjs'
 
 const URL = process.env.VITE_SUPABASE_URL || 'https://ojirgkqtqvugqktyuhem.supabase.co'
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -13,14 +14,6 @@ if (!KEY) {
 }
 
 const sb = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSession: false } })
-
-function isSupplierVenda(v) {
-  if (!v) return false
-  const obs = (v.obs || '').toLowerCase()
-  if (obs.includes('balcão') || obs.includes('balcao') || obs.includes('square') || obs.includes('pos')) return false
-  if (v.cast_id) return false
-  return true
-}
 
 async function main() {
   console.log('\n📋 JBM Drinks — System audit\n')

@@ -2301,6 +2301,12 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         <div style={{padding:'16px 20px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Client portal</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
+          <a href="https://jbm-master.vercel.app/drinks" target="_blank" rel="noreferrer" style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.55)',marginBottom:10,textDecoration:'none',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(193,156,86,0.25)',background:'rgba(193,156,86,0.08)'}}>
+            ↗ JBM Holding — visão consolidada
+          </a>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>
+            Estoque, preços POS e faturas sincronizados com o painel admin JBM.
+          </div>
           <div style={{marginBottom:8}}>
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={setTab}/>
           </div>
