@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run build:holding",
   "crons": [
     {
       "path": "/api/sync-cashflow-cron",
@@ -7,7 +8,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|holding/).*)",
       "missing": [{ "type": "filesystem" }],
       "destination": "/index.html"
     }

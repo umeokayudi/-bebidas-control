@@ -18,11 +18,19 @@ VITE_HOLDING_SUPABASE_ANON_KEY=<anon key>
 VITE_CASHFLOW_API=https://bebidas-control.vercel.app/api/cashflow-export
 ```
 
-## URL alternativa (mirror)
+## URL alternativa (mirror) — recomendada até redeploy
 
 **https://bebidas-control.vercel.app/holding/#/hr**
 
 Usa HashRouter — rotas com `#` (ex: `#/logistica`, `#/investimentos`).
+
+> Após push no repo `-bebidas-control`, faça **Redeploy** do projeto bebidas-control para o mirror `/holding/` servir arquivos estáticos (ver `vercel.json`).
+
+## Auditoria live
+
+```bash
+node scripts/audit-live.mjs
+```
 
 ## Design — Clássico vs Moderno
 

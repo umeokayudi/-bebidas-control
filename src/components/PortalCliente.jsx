@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
+import { HOLDING_DRINKS } from '../lib/holdingLinks'
 import { LogoSidebar } from './Logo'
 import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas } from './utils'
 import {
@@ -2301,7 +2302,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         <div style={{padding:'16px 20px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Client portal</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
-          <a href="https://jbm-master.vercel.app/drinks" target="_blank" rel="noreferrer" style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.55)',marginBottom:10,textDecoration:'none',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(193,156,86,0.25)',background:'rgba(193,156,86,0.08)'}}>
+          <a href={HOLDING_DRINKS} target="_blank" rel="noreferrer" style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.55)',marginBottom:10,textDecoration:'none',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(193,156,86,0.25)',background:'rgba(193,156,86,0.08)'}}>
             ↗ JBM Holding — visão consolidada
           </a>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>

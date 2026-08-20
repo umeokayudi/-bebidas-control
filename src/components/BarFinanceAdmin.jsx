@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { HOLDING_DRINKS } from '../lib/holdingLinks'
 import { filterSupplierVendas, fmtYen, fmtDate } from './utils'
 
 const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
@@ -106,7 +107,7 @@ export default function BarFinanceAdmin() {
           <a href={PORTAL_URL} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ textDecoration: 'none', fontSize: 13 }}>
             Abrir portal (como admin preview)
           </a>
-          <a href="https://jbm-master.vercel.app/drinks" target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none', fontSize: 13, background: 'var(--navy2)', color: 'var(--gold)' }}>
+          <a href={HOLDING_DRINKS} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none', fontSize: 13, background: 'var(--navy2)', color: 'var(--gold)' }}>
             ↗ JBM Holding — Drinks
           </a>
         </div>
