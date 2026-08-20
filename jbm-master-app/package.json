@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:holding": "vite build --mode holding",
     "preview": "vite preview"
   },
   "dependencies": {

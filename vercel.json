@@ -7,7 +7,15 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/holding/assets/:path*",
+      "destination": "/holding/assets/:path*"
+    },
+    {
+      "source": "/holding/:path*",
+      "destination": "/holding/index.html"
+    },
+    {
+      "source": "/((?!api/|holding/).*)",
       "destination": "/index.html"
     }
   ]
