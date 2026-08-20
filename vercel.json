@@ -7,15 +7,19 @@
   ],
   "rewrites": [
     {
-      "source": "/holding/assets/:path*",
-      "destination": "/holding/assets/:path*"
-    },
-    {
-      "source": "/holding/:path*",
+      "source": "/holding",
       "destination": "/holding/index.html"
     },
     {
-      "source": "/((?!api/|holding/).*)",
+      "source": "/holding/",
+      "destination": "/holding/index.html"
+    },
+    {
+      "source": "/holding/:path((?!assets/).*)",
+      "destination": "/holding/index.html"
+    },
+    {
+      "source": "/((?!api/|holding).*)",
       "destination": "/index.html"
     }
   ]
