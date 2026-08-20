@@ -2,6 +2,41 @@ import { createClient } from '@supabase/supabase-js'
 
 const BUCKET = 'system-private'
 const HOLDING_FILE = 'jbm_holding.json'
+const HOLDING_KEY_FILE = 'holding_service_role_key.txt'
+const CASHFLOW_FILE = 'cashflow_snapshot.json'
+const HOLDING_URL = process.env.HOLDING_SUPABASE_URL || 'https://fxsakrshmldmkdmbevna.supabase.co'
+
+async function resolveHoldingKey(sb) {
+  if (process.env.HOLDING_SERVICE_ROLE_KEY) return process.env.HOLDING_SERVICE_ROLE_KEY
+  try {
+    const { data } = await sb.storage.from(BUCKET).download(HOLDING_KEY_FILE)
+    if (data) return (await data.text()).trim()
+  } catch { /* */ }
+  return null
+}
+
+async function pushToJbmMaster(sb, payload) {
+  const holdingKey = await resolveHoldingKey(sb)
+  if (!holdingKey) return { pushed: false, reason: 'holding key not registered' }
+
+  const holdingSb = createClient(HOLDING_URL, holdingKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  const { data: buckets } = await holdingSb.storage.listBuckets()
+  if (!buckets?.some(b => b.name === BUCKET)) {
+    await holdingSb.storage.createBucket(BUCKET, { public: false })
+  }
+  const snapshot = {
+    ...payload,
+    geradoEm: new Date().toISOString(),
+    fonte: 'bebidas-control-holding-audit',
+    destino: 'jbm-master',
+  }
+  const { error } = await holdingSb.storage.from(BUCKET).upload(CASHFLOW_FILE, JSON.stringify(snapshot, null, 2), {
+    upsert: true,
+    contentType: 'application/json',
+  })
+  if (error) throw error
+  return { pushed: true, financeiro: snapshot.financeiro }
+}
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -19,6 +54,34 @@ function isSupplierVenda(v) {
 }
 
 export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    try {
+      const sb = adminClient()
+      const holdingKey = req.body?.holdingKey?.trim()
+      if (!holdingKey) return res.status(400).json({ error: 'holdingKey required' })
+
+      const holdingSb = createClient(HOLDING_URL, holdingKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      const { data: buckets } = await holdingSb.storage.listBuckets()
+      if (!buckets?.some(b => b.name === BUCKET)) {
+        await holdingSb.storage.createBucket(BUCKET, { public: false })
+      }
+      const ping = JSON.stringify({ ok: true, at: new Date().toISOString() })
+      const { error: pingErr } = await holdingSb.storage.from(BUCKET).upload('sync_ping.json', ping, { upsert: true, contentType: 'application/json' })
+      if (pingErr) return res.status(400).json({ error: 'Chave inválida: ' + pingErr.message })
+
+      const { data: dbuckets } = await sb.storage.listBuckets()
+      if (!dbuckets?.some(b => b.name === BUCKET)) {
+        await sb.storage.createBucket(BUCKET, { public: false })
+      }
+      const { error } = await sb.storage.from(BUCKET).upload(HOLDING_KEY_FILE, holdingKey, { upsert: true, contentType: 'text/plain' })
+      if (error) throw error
+
+      return res.status(200).json({ ok: true, message: 'Chave registrada. Use GET ?pushHolding=1 para sincronizar.' })
+    } catch (e) {
+      return res.status(500).json({ error: e.message })
+    }
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -66,7 +129,7 @@ export default async function handler(req, res) {
       { ok: paidIn - paidOut > -500000, label: 'Caixa', detail: `¥${paidIn - paidOut}` },
     ]
 
-    return res.status(200).json({
+    const payload = {
       geradoEm: new Date().toISOString(),
       holding,
       financeiro: { receitaMes, custoMes, caixaLiquido: paidIn - paidOut, aReceber, faturasVencidas },
@@ -79,7 +142,14 @@ export default async function handler(req, res) {
       checksOk: checks.filter(c => c.ok).length,
       checksTotal: checks.length,
       geminiReady: true,
-    })
+    }
+
+    if (req.query.pushHolding === '1' || req.query.sync === '1') {
+      const push = await pushToJbmMaster(sb, payload)
+      return res.status(200).json({ ...payload, jbmMaster: push })
+    }
+
+    return res.status(200).json(payload)
   } catch (e) {
     return res.status(500).json({ error: e.message })
   }
