@@ -10,8 +10,9 @@ export function PageHeader({ icon, title, color, children }) {
 }
 
 export function StatGrid({ items }) {
+  const cols = items.length >= 4 ? 'grid-4' : items.length === 2 ? 'grid-2' : 'grid-3'
   return (
-    <div className="grid-3" style={{ marginBottom: 20 }}>
+    <div className={cols} style={{ marginBottom: 20 }}>
       {items.map(([label, value, color, fmt]) => (
         <div key={label} className="card" style={{ textAlign: 'center' }}>
           <div className="stat-value" style={{ color: color || 'var(--text)' }}>{fmt === 'yen' ? fmtYen(value) : value}</div>
@@ -75,11 +76,11 @@ export const inputStyle = {
   transition: 'border-color 0.2s, box-shadow 0.2s',
 }
 
-export function Modal({ open, title, onClose, children }) {
+export function Modal({ open, title, onClose, children, wide = false }) {
   if (!open) return null
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div className="card" style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="card modal-card" style={{ maxWidth: wide ? 640 : 480 }} onClick={e => e.stopPropagation()}>
         <div style={{ fontWeight: 700, marginBottom: 16, fontSize: 16 }}>{title}</div>
         {children}
       </div>

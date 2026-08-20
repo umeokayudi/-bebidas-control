@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, HashRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider, useTheme, THEMES } from './lib/theme'
+import { holdingSb } from './lib/supabase'
+import { fetchHoldingSnapshot } from './lib/cashflowSync'
+import { loadHoldingModules } from './lib/holdingModules'
+import { shouldShowDailyReport } from './lib/investmentAdvisor'
+import { DailyReportModal } from './components/DailyReport'
 import Dashboard from './pages/Dashboard'
 import Drinks from './pages/Drinks'
 import KuriPuro from './pages/KuriPuro'
@@ -44,7 +49,19 @@ function Shell() {
   const [authed, setAuthed] = useState(localStorage.getItem(AUTH_KEY) === 'true')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
+  const [dailyOpen, setDailyOpen] = useState(false)
+  const [snap, setSnap] = useState(null)
+  const [mods, setMods] = useState(null)
   const { theme } = useTheme()
+
+  useEffect(() => {
+    if (!authed) return
+    Promise.all([fetchHoldingSnapshot(holdingSb), loadHoldingModules()]).then(([s, m]) => {
+      setSnap(s)
+      setMods(m)
+      if (shouldShowDailyReport()) setDailyOpen(true)
+    })
+  }, [authed])
 
   function login() {
     if (!PASSWORD) {
@@ -82,6 +99,7 @@ function Shell() {
   return (
     <>
       <Toaster position="top-right" toastOptions={{ style: toastStyle }} />
+      <DailyReportModal open={dailyOpen} onClose={() => setDailyOpen(false)} snap={snap} mods={mods} />
       <div style={{ display: 'flex', minHeight: '100vh' }}>
         <aside className="sidebar">
           <div className="sidebar-brand">
@@ -104,7 +122,7 @@ function Shell() {
         <main className="main">
           <div className="main-inner">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Dashboard onOpenDailyReport={() => setDailyOpen(true)} />} />
               <Route path="/kuripuro" element={<KuriPuro />} />
               <Route path="/drinks" element={<Drinks />} />
               <Route path="/hr" element={<HR />} />
