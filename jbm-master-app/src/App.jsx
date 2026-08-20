@@ -122,9 +122,10 @@ function Shell() {
 }
 
 export default function App() {
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <Shell />
       </BrowserRouter>
     </ThemeProvider>
