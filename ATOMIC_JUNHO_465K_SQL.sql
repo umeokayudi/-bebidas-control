@@ -32,7 +32,7 @@ where bar_id = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 -- 3) Fatura jun/2026 consolidada
 delete from faturas
 where bar_id = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
-  and periodo_inicio >= '2026-06-01' and periodo_fim <= '2026-06-30';
+  and status = 'pendente';
 
 insert into faturas (
   bar_id, valor, total, pago, status,

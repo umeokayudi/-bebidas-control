@@ -7,10 +7,8 @@ echo "  Atomic — ajustando dívida jun/2026"
 echo "══════════════════════════════════════════"
 echo ""
 
-RES=$(curl -fsSL 'https://bebidas-control.vercel.app/api/holding-audit?fixAtomicJune=1&confirm=atomic-june-465000&debt=465000') || {
-  RES=$(curl -fsSL -X POST 'https://bebidas-control.vercel.app/api/fix-atomic-june' \
-    -H 'Content-Type: application/json' \
-    -d '{"confirm":"atomic-june-465000","debt":465000}') || {
+RES=$(curl -fsSL 'https://bebidas-control.vercel.app/api/cashflow-export?fixAtomicJune=1&confirm=atomic-june-465000&debt=465000') || {
+  RES=$(curl -fsSL 'https://bebidas-control.vercel.app/api/holding-audit?fixAtomicJune=1&confirm=atomic-june-465000&debt=465000') || {
   echo "❌ API ainda não disponível. Aguarde 1–2 min após deploy e tente de novo."
   echo "   Ou rode o SQL: ATOMIC_JUNHO_465K_SQL.sql no Supabase"
   exit 1
