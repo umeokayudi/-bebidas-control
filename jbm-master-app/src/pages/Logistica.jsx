@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { holdingSb } from '../lib/supabase'
 import { fmtYen } from '../lib/format'
+import { loadLogisticsJobs, saveLogisticsJob, markLogisticsCommPaid } from '../lib/holdingStorage'
 import { PageHeader, StatGrid, StatusBadge, Empty, Btn, Field, inputStyle, Modal } from '../lib/sharedUi'
 
 export default function Logistica() {
@@ -12,8 +12,7 @@ export default function Logistica() {
   useEffect(() => { load(); const iv = setInterval(load, 30_000); return () => clearInterval(iv) }, [])
 
   async function load() {
-    const { data } = await holdingSb.from('logistics_jobs').select('*').order('job_date', { ascending: false })
-    setRows(data || [])
+    setRows(await loadLogisticsJobs())
   }
 
   const commPending = rows.filter(r => r.commission_status === 'pendente').reduce((a, r) => a + Number(r.commission || 0), 0)
@@ -30,23 +29,17 @@ export default function Logistica() {
 
   async function save() {
     try {
-      const { error } = await holdingSb.from('logistics_jobs').insert({
-        ...form,
-        revenue: Number(form.revenue) || 0,
-        cost: Number(form.cost) || 0,
-        commission: Number(form.commission) || 0,
-      })
-      if (error) throw error
+      await saveLogisticsJob(form)
       toast.success('Trabalho registrado')
       setModal(false)
       load()
     } catch (e) {
-      toast.error(e.message?.includes('does not exist') ? 'Rode JBM_HOLDING_MODULES_SQL.sql no Supabase' : e.message)
+      toast.error(e.message)
     }
   }
 
-  async function markCommPaid(id) {
-    await holdingSb.from('logistics_jobs').update({ commission_status: 'pago' }).eq('id', id)
+  async function onMarkCommPaid(id) {
+    await markLogisticsCommPaid(id)
     toast.success('Comissão paga')
     load()
   }
@@ -66,7 +59,7 @@ export default function Logistica() {
         ['Comissões pendentes', commPending, '#fbbf24', 'yen'],
       ]} />
 
-      {rows.length === 0 ? <Empty text="Nenhum trabalho de logística" /> :
+      {rows.length === 0 ? <Empty text="Nenhum trabalho de logística — registre fretes e entregas" /> :
         rows.map(r => (
           <div key={r.id} className="card" style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -83,7 +76,7 @@ export default function Logistica() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize: 12 }}>Comissão: <strong style={{ color: '#fbbf24' }}>{fmtYen(r.commission)}</strong> <StatusBadge status={r.commission_status} /></div>
-              {r.commission_status === 'pendente' && <Btn variant="ghost" onClick={() => markCommPaid(r.id)}>Pagar comissão</Btn>}
+              {r.commission_status === 'pendente' && <Btn variant="ghost" onClick={() => onMarkCommPaid(r.id)}>Pagar comissão</Btn>}
             </div>
           </div>
         ))}

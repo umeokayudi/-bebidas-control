@@ -1,21 +1,7 @@
-import { holdingSb } from './supabase'
+import { loadAllModules } from './holdingStorage'
 
 export async function loadHoldingModules() {
-  const [hrPlacements, hrPresentations, hrCommissions, logistics, investments, returns] = await Promise.all([
-    holdingSb.from('hr_placements').select('*').order('placement_date', { ascending: false }),
-    safeSelect('hr_presentations', '*', 'presentation_date', false),
-    safeSelect('hr_commissions', '*', 'due_date', false),
-    safeSelect('logistics_jobs', '*', 'job_date', false),
-    safeSelect('jbm_investments', '*', 'invested_at', false),
-    safeSelect('investment_returns', '*', 'return_date', false),
-  ])
-
-  const placements = hrPlacements.data || []
-  const presentations = hrPresentations.data || []
-  const commissions = hrCommissions.data || []
-  const jobs = logistics.data || []
-  const inv = investments.data || []
-  const ret = returns.data || []
+  const { presentations, placements, commissions, jobs, inv, ret } = await loadAllModules()
 
   const hrCommPending = commissions.filter(c => c.status === 'pendente' || c.status === 'parcial')
     .reduce((a, c) => a + Number(c.amount || 0), 0)
@@ -35,7 +21,7 @@ export async function loadHoldingModules() {
   }
   for (const r of ret) {
     const invRow = inv.find(i => i.id === r.investment_id)
-    const key = invRow?.person_name || '—'
+    const key = invRow?.person_name || r.jbm_investments?.person_name || '—'
     if (!roiByPerson[key]) roiByPerson[key] = { invested: 0, returned: 0, unit: invRow?.unit }
     roiByPerson[key].returned += Number(r.amount || 0)
   }
@@ -45,10 +31,4 @@ export async function loadHoldingModules() {
     logistics: { jobs, commPending: logCommPending, revenue: jobs.reduce((a, j) => a + Number(j.revenue || 0), 0) },
     investments: { inv, ret, invested, returned, roi: Object.entries(roiByPerson).map(([name, v]) => ({ name, ...v, saldo: v.returned - v.invested })) },
   }
-}
-
-async function safeSelect(table, select, orderCol, asc = true) {
-  const { data, error } = await holdingSb.from(table).select(select).order(orderCol, { ascending: asc })
-  if (error) return { data: [], error }
-  return { data: data || [], error: null }
 }
