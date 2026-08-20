@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { holdingSb } from '../lib/supabase'
 import { fmtYen, fmtPct } from '../lib/format'
+import { loadInvestments, saveInvestment, saveInvestmentReturn } from '../lib/holdingStorage'
 import { PageHeader, StatGrid, TabBar, StatusBadge, Empty, Btn, Field, inputStyle, Modal } from '../lib/sharedUi'
 
 const UNITS = ['HR', 'KuriPuro', 'Logistica', 'Drinks', 'Holding']
@@ -18,12 +18,9 @@ export default function Investimentos() {
   useEffect(() => { load(); const iv = setInterval(load, 30_000); return () => clearInterval(iv) }, [])
 
   async function load() {
-    const [iR, rR] = await Promise.all([
-      holdingSb.from('jbm_investments').select('*').order('invested_at', { ascending: false }),
-      holdingSb.from('investment_returns').select('*, jbm_investments(person_name, unit)').order('return_date', { ascending: false }),
-    ])
-    setInv(iR.data || [])
-    setReturns(rR.data || [])
+    const { inv: i, ret: r } = await loadInvestments()
+    setInv(i)
+    setReturns(r)
   }
 
   const invested = inv.filter(i => !['quitado', 'perda'].includes(i.status)).reduce((a, i) => a + Number(i.amount_invested || 0), 0)
@@ -35,7 +32,8 @@ export default function Investimentos() {
     roiMap[i.person_name].invested += Number(i.amount_invested || 0)
   }
   for (const r of returns) {
-    const name = r.jbm_investments?.person_name || inv.find(i => i.id === r.investment_id)?.person_name
+    const invRow = inv.find(i => i.id === r.investment_id)
+    const name = invRow?.person_name || r.jbm_investments?.person_name
     if (!name) continue
     if (!roiMap[name]) roiMap[name] = { name, invested: 0, returned: 0 }
     roiMap[name].returned += Number(r.amount || 0)
@@ -48,29 +46,27 @@ export default function Investimentos() {
   }
 
   function openReturn(investmentId) {
+    const row = inv.find(i => i.id === investmentId)
     setRetForm({ investment_id: investmentId, amount: '', return_date: new Date().toISOString().slice(0, 10), source: 'trabalho', notes: '' })
+    setRetForm(f => ({ ...f, _person: row }))
     setModal('return')
   }
 
-  async function saveInvest() {
+  async function onSaveInvest() {
     try {
-      const { error } = await holdingSb.from('jbm_investments').insert({
-        ...form, amount_invested: Number(form.amount_invested) || 0,
-        expected_return_amount: Number(form.expected_return_amount) || 0,
-      })
-      if (error) throw error
+      await saveInvestment(form)
       toast.success('Investimento registrado')
       setModal(null)
       load()
     } catch (e) {
-      toast.error(e.message?.includes('does not exist') ? 'Rode JBM_HOLDING_MODULES_SQL.sql no Supabase' : e.message)
+      toast.error(e.message)
     }
   }
 
-  async function saveReturn() {
+  async function onSaveReturn() {
     try {
-      const { error } = await holdingSb.from('investment_returns').insert({ ...retForm, amount: Number(retForm.amount) || 0 })
-      if (error) throw error
+      const personMeta = retForm._person || {}
+      await saveInvestmentReturn(retForm, { person_name: personMeta.person_name, unit: personMeta.unit })
       toast.success('Retorno registrado')
       setModal(null)
       load()
@@ -118,7 +114,7 @@ export default function Investimentos() {
       )}
 
       {tab === 'roi' && (
-        roiList.length === 0 ? <Empty /> :
+        roiList.length === 0 ? <Empty text="Registre investimentos e retornos para ver ROI" /> :
         roiList.sort((a, b) => b.returned - a.returned).map(r => (
           <div key={r.name} className="card" style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -156,7 +152,7 @@ export default function Investimentos() {
         <Field label="Data"><input type="date" style={inputStyle} value={form.invested_at} onChange={e => set('invested_at', e.target.value)} /></Field>
         <Field label="Retorno esperado (¥)"><input type="number" style={inputStyle} value={form.expected_return_amount} onChange={e => set('expected_return_amount', e.target.value)} /></Field>
         <Field label="Notas"><input style={inputStyle} value={form.notes} onChange={e => set('notes', e.target.value)} /></Field>
-        <Btn onClick={saveInvest}>Salvar</Btn>
+        <Btn onClick={onSaveInvest}>Salvar</Btn>
       </Modal>
 
       <Modal open={modal === 'return'} title="Registrar retorno" onClose={() => setModal(null)}>
@@ -165,7 +161,7 @@ export default function Investimentos() {
         <Field label="Fonte"><select style={inputStyle} value={retForm.source} onChange={e => setR('source', e.target.value)}>
           {['trabalho', 'comissao', 'salario', 'bonus', 'outro'].map(s => <option key={s}>{s}</option>)}
         </select></Field>
-        <Btn onClick={saveReturn}>Salvar retorno</Btn>
+        <Btn onClick={onSaveReturn}>Salvar retorno</Btn>
       </Modal>
     </div>
   )

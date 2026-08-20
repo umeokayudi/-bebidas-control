@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { holdingSb } from '../lib/supabase'
 import { fmtYen } from '../lib/format'
+import {
+  loadPresentations, loadPlacements, loadCommissions,
+  savePresentation, savePlacement, saveCommission, markCommissionPaid,
+} from '../lib/holdingStorage'
 import { PageHeader, StatGrid, TabBar, StatusBadge, Empty, Btn, Field, inputStyle, Modal } from '../lib/sharedUi'
 
 const TABS = [
@@ -28,14 +31,10 @@ export default function HR() {
   useEffect(() => { load(); const iv = setInterval(load, 30_000); return () => clearInterval(iv) }, [])
 
   async function load() {
-    const [pR, plR, cR] = await Promise.all([
-      holdingSb.from('hr_presentations').select('*').order('presentation_date', { ascending: false }),
-      holdingSb.from('hr_placements').select('*').order('placement_date', { ascending: false }),
-      holdingSb.from('hr_commissions').select('*').order('due_date', { ascending: false }),
-    ])
-    setPresentations(pR.data || [])
-    setPlacements(plR.data || [])
-    setCommissions(cR.data || [])
+    const [p, pl, c] = await Promise.all([loadPresentations(), loadPlacements(), loadCommissions()])
+    setPresentations(p)
+    setPlacements(pl)
+    setCommissions(c)
   }
 
   const commPending = commissions.filter(c => c.status === 'pendente' || c.status === 'parcial')
@@ -52,31 +51,19 @@ export default function HR() {
 
   async function save() {
     try {
-      if (modal === 'apresentacao') {
-        const { error } = await holdingSb.from('hr_presentations').insert({ ...form, expected_fee: Number(form.expected_fee) || 0 })
-        if (error) throw error
-      }
-      if (modal === 'placement') {
-        const { error } = await holdingSb.from('hr_placements').insert({
-          ...form, fee: Number(form.fee) || 0, daily_rate: Number(form.daily_rate) || 0,
-          work_days_per_month: Number(form.work_days_per_month) || 22,
-        })
-        if (error) throw error
-      }
-      if (modal === 'comissao') {
-        const { error } = await holdingSb.from('hr_commissions').insert({ ...form, amount: Number(form.amount) || 0 })
-        if (error) throw error
-      }
+      if (modal === 'apresentacao') await savePresentation(form)
+      if (modal === 'placement') await savePlacement(form)
+      if (modal === 'comissao') await saveCommission(form)
       toast.success('Salvo!')
       setModal(null)
       load()
     } catch (e) {
-      toast.error(e.message?.includes('does not exist') ? 'Rode JBM_HOLDING_MODULES_SQL.sql no Supabase' : e.message)
+      toast.error(e.message)
     }
   }
 
-  async function markPaid(id) {
-    await holdingSb.from('hr_commissions').update({ status: 'pago', paid_date: new Date().toISOString().slice(0, 10) }).eq('id', id)
+  async function onMarkPaid(id) {
+    await markCommissionPaid(id)
     toast.success('Comissão paga')
     load()
   }
@@ -115,7 +102,7 @@ export default function HR() {
       )}
 
       {tab === 'placements' && (
-        placements.length === 0 ? <Empty /> :
+        placements.length === 0 ? <Empty text="Nenhuma colocação — apresente candidatos às empresas" /> :
         placements.map(r => (
           <div key={r.id} className="card" style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -147,7 +134,7 @@ export default function HR() {
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontWeight: 700, color: r.status === 'pago' ? '#4ade80' : '#fbbf24' }}>{fmtYen(r.amount)}</div>
               <StatusBadge status={r.status} />
-              {r.status === 'pendente' && <Btn variant="ghost" onClick={() => markPaid(r.id)}>Marcar pago</Btn>}
+              {r.status === 'pendente' && <Btn variant="ghost" onClick={() => onMarkPaid(r.id)}>Marcar pago</Btn>}
             </div>
           </div>
         ))

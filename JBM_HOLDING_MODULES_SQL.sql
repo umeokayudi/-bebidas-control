@@ -1,4 +1,6 @@
--- JBM Holding — HR, Logística, Investimentos
+-- JBM Holding — HR, Logística, Investimentos (OPCIONAL)
+-- Os módulos já funcionam via tabelas existentes: hr_placements + jbm_financeiro
+-- Use este SQL apenas se quiser tabelas dedicadas (hr_presentations, logistics_jobs, etc.)
 -- Cole no SQL Editor: https://supabase.com/dashboard/project/fxsakrshmldmkdmbevna/sql/new
 
 -- ── HR: apresentações de candidatos ─────────────────────────────────────────
