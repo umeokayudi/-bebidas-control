@@ -2,16 +2,9 @@
  * Snapshot unificado dos dados do sistema para IA JBM Holding.
  */
 import { filterSupplierVendas } from '../components/utils'
+import { isSupplierVenda } from './supplierVenda'
 import { loadCashflowSnapshot } from './purchaseCashflowAdvisor'
 import { loadHoldingLocal, syncHoldingFromCloud, resolveOpportunityCostPct } from './jbmHolding'
-
-function isSupplierVenda(v) {
-  if (!v) return false
-  const obs = (v.obs || '').toLowerCase()
-  if (obs.includes('balcão') || obs.includes('balcao') || obs.includes('square') || obs.includes('pos')) return false
-  if (v.cast_id) return false
-  return true
-}
 
 function monthKey(d) {
   return String(d || '').slice(0, 7)
@@ -70,7 +63,7 @@ export async function fetchHoldingSystemSnapshot(supabase, holdingProfile = null
   const checks = []
   checks.push({ ok: bars.length > 0, label: 'Bars cadastrados', detail: `${bars.length}` })
   checks.push({ ok: (produtosR.data || []).length > 0, label: 'Produtos ativos', detail: `${(produtosR.data || []).length}` })
-  checks.push({ ok: vendas.filter(v => !isSupplierVenda(v)).length === 0, label: 'Vendas POS separadas', detail: 'OK' })
+  checks.push({ ok: (vendasR.data || []).filter(v => !isSupplierVenda(v)).length === 0, label: 'Vendas POS separadas', detail: `${(vendasR.data || []).filter(v => !isSupplierVenda(v)).length} POS` })
   checks.push({ ok: faturas.length > 0, label: 'Faturas Atomic', detail: `${faturas.length}` })
   checks.push({ ok: bpAtomic >= 10, label: 'Preços POS Atomic', detail: `${bpAtomic}` })
   checks.push({ ok: aReceber >= 0, label: 'A receber bars', detail: `¥${Math.round(aReceber).toLocaleString('ja-JP')}` })

@@ -9,6 +9,7 @@
  *   SUPABASE_SERVICE_ROLE_KEY=xxx VITE_SUPABASE_URL=https://ojirgkqtqvugqktyuhem.supabase.co node scripts/sync-cashflow-snapshot.mjs
  */
 import { createClient } from '@supabase/supabase-js'
+import { isSupplierVenda } from './lib/supplierVenda.mjs'
 
 const DRINKS_URL = process.env.VITE_SUPABASE_URL || 'https://ojirgkqtqvugqktyuhem.supabase.co'
 const DRINKS_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -26,14 +27,6 @@ if (!HOLDING_KEY) {
 }
 
 const holdingSb = createClient(HOLDING_URL, HOLDING_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
-
-function isSupplierVenda(v) {
-  if (!v) return false
-  const obs = (v.obs || '').toLowerCase()
-  if (obs.includes('balcão') || obs.includes('balcao') || obs.includes('square') || obs.includes('pos')) return false
-  if (v.cast_id) return false
-  return true
-}
 
 async function fetchFromApi() {
   const res = await fetch(API_URL)

@@ -6,6 +6,8 @@ import Drinks from './pages/Drinks'
 import KuriPuro from './pages/KuriPuro'
 import HR from './pages/HR'
 import Financeiro from './pages/Financeiro'
+import Logistica from './pages/Logistica'
+import Investimentos from './pages/Investimentos'
 import Saques from './pages/Saques'
 
 const AUTH_KEY = 'jbm_auth'
@@ -13,10 +15,14 @@ const PASSWORD = import.meta.env.VITE_JBM_PASSWORD || ''
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '⬤', end: true },
+  { section: 'Negócios' },
   { to: '/kuripuro', label: 'KuriPuro', icon: '🧹' },
   { to: '/drinks', label: 'JBM Drinks', icon: '🍾' },
   { to: '/hr', label: 'JBM HR', icon: '👥' },
-  { to: '/financeiro', label: 'Financeiro', icon: '💴' },
+  { to: '/logistica', label: 'Logística', icon: '🚚' },
+  { to: '/investimentos', label: 'Investimentos', icon: '📈' },
+  { section: 'Financeiro' },
+  { to: '/financeiro', label: 'Consolidado', icon: '💴' },
   { to: '/saques', label: 'Saques', icon: '💸' },
 ]
 
@@ -62,7 +68,9 @@ function Shell() {
             <div style={{ fontSize: 22, fontWeight: 800, color: '#c19c56' }}>JBM</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', letterSpacing: 2, textTransform: 'uppercase' }}>Holding Master</div>
           </div>
-          {NAV.map(n => (
+          {NAV.map(n => n.section ? (
+            <div key={n.section} style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', letterSpacing: 2, textTransform: 'uppercase', padding: '12px 14px 4px', marginTop: 8 }}>{n.section}</div>
+          ) : (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               <span>{n.icon}</span> {n.label}
             </NavLink>
@@ -75,6 +83,8 @@ function Shell() {
             <Route path="/kuripuro" element={<KuriPuro />} />
             <Route path="/drinks" element={<Drinks />} />
             <Route path="/hr" element={<HR />} />
+            <Route path="/logistica" element={<Logistica />} />
+            <Route path="/investimentos" element={<Investimentos />} />
             <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/saques" element={<Saques />} />
             <Route path="*" element={<Navigate to="/" replace />} />

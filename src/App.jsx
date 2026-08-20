@@ -25,6 +25,7 @@ import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
 import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
+import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel, filterSupplierVendas, roleLabel } from './components/utils'
 
@@ -44,6 +45,7 @@ const ADMIN_TABS = [
   { id:'ai',         label:'🤖 AI'       },
   { id:'suppliers',  label:'Suppliers'  },
   { id:'cashflow',   label:'💸 Cash Flow' },
+  { id:'barfinance', label:'🏛 Bar Finance' },
 ]
 
 const STAFF_TABS = [
@@ -326,6 +328,7 @@ function Shell() {
         {tab==='bi'        && <BusinessIntel />}
         {tab==='ai'        && <AIAssistant />}
         {tab==='suppliers' && <Fornecedores />}
+        {tab==='barfinance' && <BarFinanceAdmin />}
         </div>
       </main>
     </div>

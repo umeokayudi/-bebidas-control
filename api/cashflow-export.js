@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { fixAtomicReceivables } from './_atomicJuneFix.js'
+import { isSupplierVenda } from './_supplierVenda.js'
 
 const BUCKET = 'system-private'
 const FILE = 'cashflow_snapshot.json'
@@ -16,14 +17,6 @@ function adminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
-
-function isSupplierVenda(v) {
-  if (!v) return false
-  const obs = (v.obs || '').toLowerCase()
-  if (obs.includes('balcão') || obs.includes('balcao') || obs.includes('square') || obs.includes('pos')) return false
-  if (v.cast_id) return false
-  return true
 }
 
 async function buildLiveSnapshot(sb) {

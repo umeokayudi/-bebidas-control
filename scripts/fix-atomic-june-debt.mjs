@@ -118,9 +118,7 @@ async function main() {
   console.log('   Julho está limpo para você lançar as novas vendas.\n')
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(e => {
-    console.error('\n❌', e.message, '\n')
-    process.exit(1)
-  })
-}
+main().catch(e => {
+  console.error('\n❌', e.message, '\n')
+  process.exit(1)
+})
