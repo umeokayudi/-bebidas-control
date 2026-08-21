@@ -62,11 +62,18 @@ export function marginFromSales(sales, index, produtos = []) {
   let receita = 0
   let custo = 0
   for (const v of sales || []) {
+    let vReceita = 0
+    let vCusto = 0
     for (const it of v.vendas_itens || []) {
       const m = marginFromVendaItem(it, v.data, index, produtos)
-      receita += m.receita
-      custo += m.custo
+      vReceita += m.receita
+      vCusto += m.custo
     }
+    if (!v.vendas_itens?.length) {
+      vReceita = +v.total || 0
+    }
+    receita += vReceita
+    custo += vCusto
   }
   const lucro = receita - custo
   return {

@@ -117,7 +117,6 @@ export async function syncMissingVendasFromPedidos(sb, opts = {}) {
       total,
       obs: `Auto: order ${key}`,
       criado_por: p.criado_por,
-      origem: 'fornecedor',
     }).select().single()
 
     if (vErr) {
@@ -127,18 +126,82 @@ export async function syncMissingVendasFromPedidos(sb, opts = {}) {
 
     const itens = (p.pedidos_itens || []).filter(it => it.produto_id)
     if (venda && itens.length) {
-      await sb.from('vendas_itens').insert(
-        itens.map(it => ({
-          venda_id: venda.id,
-          produto_id: it.produto_id,
-          qtd: it.qtd,
-          preco_unitario: it.preco_unitario,
-        }))
-      )
+      const { data: vi } = await sb.from('vendas_itens').select('id').eq('venda_id', venda.id).limit(1)
+      if (!(vi || []).length) {
+        await sb.from('vendas_itens').insert(
+          itens.map(it => ({
+            venda_id: venda.id,
+            produto_id: it.produto_id,
+            qtd: it.qtd,
+            preco_unitario: it.preco_unitario,
+          }))
+        )
+      }
     }
 
     report.created++
     report.ids.push({ pedidoId: p.id, vendaId: venda.id, data: saleDate, total })
+  }
+
+  return report
+}
+
+/** Preenche vendas_itens em vendas Auto: order que ficaram só com total */
+export async function backfillVendaItensFromPedidos(sb, opts = {}) {
+  const { barId } = opts
+  let pQuery = sb.from('pedidos')
+    .select('id, bar_id, pedidos_itens(produto_id, qtd, preco_unitario)')
+    .eq('status', 'entregue')
+
+  if (barId) pQuery = pQuery.eq('bar_id', barId)
+
+  const { data: pedidos, error } = await pQuery
+  if (error) throw new Error(error.message)
+
+  const report = { checked: 0, filled: 0, skipped: 0, errors: [] }
+
+  for (const p of pedidos || []) {
+    report.checked++
+    const key = p.id.slice(0, 8)
+    const { data: vendas } = await sb.from('vendas')
+      .select('id')
+      .eq('bar_id', p.bar_id)
+      .ilike('obs', `%${key}%`)
+      .limit(1)
+
+    const venda = vendas?.[0]
+    if (!venda) {
+      report.skipped++
+      continue
+    }
+
+    const { data: vi } = await sb.from('vendas_itens').select('id').eq('venda_id', venda.id).limit(1)
+    if ((vi || []).length) {
+      report.skipped++
+      continue
+    }
+
+    const itens = (p.pedidos_itens || []).filter(it => it.produto_id)
+    if (!itens.length) {
+      report.skipped++
+      continue
+    }
+
+    const { error: iErr } = await sb.from('vendas_itens').insert(
+      itens.map(it => ({
+        venda_id: venda.id,
+        produto_id: it.produto_id,
+        qtd: it.qtd,
+        preco_unitario: it.preco_unitario,
+      }))
+    )
+
+    if (iErr) {
+      report.errors.push({ pedidoId: p.id, vendaId: venda.id, error: iErr.message })
+      continue
+    }
+
+    report.filled++
   }
 
   return report

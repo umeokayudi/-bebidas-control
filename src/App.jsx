@@ -108,15 +108,16 @@ function Dashboard({ onNav }) {
     const purchasesMes=(purchases||[]).filter(c=>c.data?.startsWith(mesAtual))
     const salesMes=(sales||[]).filter(v=>v.data?.startsWith(mesAtual))
     const mesMargin = marginFromSales(salesMes, costIndex, products)
-    const custoMes = mesMargin.custo
     const receitaMes = mesMargin.receita || salesMes.reduce((a,v)=>a+(+v.total||0),0)
-    const lucroMes = mesMargin.lucro
-    const margem = mesMargin.margemPct
+    const custoMes = mesMargin.custo
+    const lucroMes = receitaMes - custoMes
+    const margem = receitaMes > 0 ? Math.round((lucroMes / receitaMes) * 100) : 0
     const markup = custoMes > 0 ? Math.round((receitaMes / custoMes - 1) * 100) : 0
     const porBar=(bars||[]).map(bar=>{
       const vBar=salesMes.filter(v=>v.bar_id===bar.id)
       const m = marginFromSales(vBar, costIndex, products)
-      return {...bar,receita:m.receita,custo:m.custo,lucro:m.lucro,sales:vBar.length}
+      const receita = m.receita || vBar.reduce((a,v)=>a+(+v.total||0),0)
+      return {...bar,receita,custo:m.custo,lucro:receita-m.custo,sales:vBar.length}
     })
     const prodMap={}
     salesMes.forEach(v=>(v.vendas_itens||[]).forEach(it=>{

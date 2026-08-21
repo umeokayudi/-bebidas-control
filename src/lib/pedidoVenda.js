@@ -64,6 +64,12 @@ export async function createVendaFromPedido(supabase, pedido) {
       await supabase.from('vendas').update({ data: saleDate }).eq('id', existing.id)
       existing.data = saleDate
     }
+    const total = pedidoTotal(pedido)
+    if (total && +existing.total !== +total) {
+      await supabase.from('vendas').update({ total }).eq('id', existing.id)
+      existing.total = total
+    }
+    await insertVendaItensFromPedido(supabase, existing, pedido)
     return { venda: existing, created: false }
   }
 
@@ -75,23 +81,33 @@ export async function createVendaFromPedido(supabase, pedido) {
     total,
     obs: pedidoVendaObs(pedido.id),
     criado_por: pedido.criado_por,
-    origem: 'fornecedor',
   }).select().single()
 
   if (error) throw new Error(`venda: ${error.message}`)
 
-  const itens = (pedido.pedidos_itens || []).filter(it => it.produto_id)
-  if (venda && itens.length) {
-    const { error: iErr } = await supabase.from('vendas_itens').insert(
-      itens.map(it => ({
-        venda_id: venda.id,
-        produto_id: it.produto_id,
-        qtd: it.qtd,
-        preco_unitario: it.preco_unitario,
-      }))
-    )
-    if (iErr) throw new Error(`itens da venda: ${iErr.message}`)
-  }
+  await insertVendaItensFromPedido(supabase, venda, pedido)
 
   return { venda, created: true }
+}
+
+async function insertVendaItensFromPedido(supabase, venda, pedido) {
+  const itens = (pedido.pedidos_itens || []).filter(it => it.produto_id)
+  if (!venda?.id || !itens.length) return
+
+  const { data: existing } = await supabase.from('vendas_itens').select('id').eq('venda_id', venda.id).limit(1)
+  if (existing?.length) return
+
+  const { error: iErr } = await supabase.from('vendas_itens').insert(
+    itens.map(it => ({
+      venda_id: venda.id,
+      produto_id: it.produto_id,
+      qtd: it.qtd,
+      preco_unitario: it.preco_unitario,
+    }))
+  )
+  if (iErr) throw new Error(`itens da venda: ${iErr.message}`)
+}
+
+export async function ensureVendaFromPedido(supabase, pedido) {
+  return createVendaFromPedido(supabase, pedido)
 }

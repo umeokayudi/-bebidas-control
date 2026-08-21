@@ -117,7 +117,7 @@ export default function RelatorioTab() {
     const m        = marginFromSales(vBar, costIndex, produtos)
     const receita  = m.receita || vBar.reduce((a,v)=>a+(+v.total||0),0)
     const custoV   = m.custo
-    const lucro    = m.lucro
+    const lucro    = receita - custoV
     const margem   = receita>0 ? Math.round(lucro/receita*100) : 0
 
     const pedBar      = pedidosMes.filter(p=>p.bar_id===bar.id && p.status==='entregue')

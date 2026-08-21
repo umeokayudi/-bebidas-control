@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { createVendaFromPedido, findVendaForPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
+import { ensureVendaFromPedido, findVendaForPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
 
@@ -485,7 +485,7 @@ export function PedidosAdminTab() {
 
   async function registerVendaForPedido(pedido) {
     const fresh = await fetchPedidoCompleto(pedido.id)
-    const { venda } = await createVendaFromPedido(supabase, fresh)
+    const { venda } = await ensureVendaFromPedido(supabase, fresh)
     if (!venda) throw new Error('Não foi possível criar a venda')
     return venda
   }
