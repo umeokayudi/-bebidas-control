@@ -10,6 +10,15 @@ function LogoMark({ size = 40, stroke = 'white', fill = 'white', style }) {
   )
 }
 
+export function LogoMobileHeader() {
+  return (
+    <div className="logo-mobile-header">
+      <LogoMark size={30} stroke="white" fill="white" />
+      <span>JBM Drinks</span>
+    </div>
+  )
+}
+
 export function LogoSidebar() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

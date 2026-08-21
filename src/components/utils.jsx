@@ -2,6 +2,8 @@
 export const fmtYen   = n => `¥${Math.round(+n || 0).toLocaleString('ja-JP')}`
 export const fmtDate  = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) : '—'
 export const monthKey = iso => iso ? iso.slice(0, 7) : ''
+export const saleDate = v => v?.data || v?.data_venda || ''
+export const saleMonthKey = v => monthKey(saleDate(v))
 export const monthLabel = mk => {
   if (!mk) return ''
   const [y, m] = mk.split('-')

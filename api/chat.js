@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
     if (body.module === 'seikyusho') {
       const { handleSeikyushoRequest } = await import('./_seikyushoCore.js')
-      return handleSeikyushoRequest(res, body)
+      return await handleSeikyushoRequest(res, body)
     }
 
     const { messages, system, image, temperature, maxOutputTokens } = body
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     const text = lastUser?.content || messages?.[messages.length - 1]?.content || ''
     if (text) parts.push({ text: String(text) })
 
-    const body = {
+    const geminiBody = {
       contents: parts.length
         ? [{ role: 'user', parts }]
         : toGeminiContents(messages),
@@ -61,12 +61,12 @@ export default async function handler(req, res) {
     }
 
     if (system) {
-      body.systemInstruction = { parts: [{ text: String(system) }] }
+      geminiBody.systemInstruction = { parts: [{ text: String(system) }] }
     } else if (messages?.length > 1 && !image?.data) {
-      body.contents = toGeminiContents(messages)
+      geminiBody.contents = toGeminiContents(messages)
     }
 
-    const data = await geminiGenerate(body)
+    const data = await geminiGenerate(geminiBody)
     return res.status(200).json({ text: extractText(data) })
   } catch (e) {
     return res.status(500).json({ error: e.message })

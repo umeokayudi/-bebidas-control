@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
-import { buildPurchaseCostIndex, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
+import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
 import { pedidoSaleDate } from '../lib/pedidoVenda'
 
 function pedidoMonthKey(p) {
@@ -108,6 +108,11 @@ export default function RelatorioTab() {
     [compras, produtos]
   )
 
+  const pedidoMap = useMemo(
+    () => buildPedidoByVendaPrefix(pedidos.filter(p => p.status === 'entregue')),
+    [pedidos]
+  )
+
   const custoTotal    = comprasMes.reduce((a,c)=>a+(+c.total_real||0),0)
   const descontoTotal = comprasMes.reduce((a,c)=>a+(+c.desconto_pontos||0),0)
   const pontosGanhos  = comprasMes.reduce((a,c)=>a+(+c.pontos_ganhos||0),0)
@@ -115,7 +120,7 @@ export default function RelatorioTab() {
   // Revenue & profit per bar (custo = último custo unitário de compra na data da venda)
   const porBar = bars.map(bar => {
     const vBar     = vendasMes.filter(v=>v.bar_id===bar.id)
-    const m        = marginFromSales(vBar, costIndex, produtos)
+    const m        = marginFromSales(vBar, costIndex, produtos, pedidoMap)
     const receita  = m.receita || vBar.reduce((a,v)=>a+(+v.total||0),0)
     const custoV   = m.custo
     const lucro    = receita - custoV

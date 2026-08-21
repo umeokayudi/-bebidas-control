@@ -89,7 +89,9 @@ export function NotificationBell({ notifs, unread, markRead, markAllRead, delete
             position:'fixed', inset:0, zIndex:998
           }}/>
           <div style={{
-            position:'fixed', bottom:80, left:16,
+            position:'absolute',
+            bottom:'calc(100% + 8px)',
+            right:0,
             width:320, maxHeight:450, overflowY:'auto',
             background:'var(--bg2)', border:'1px solid var(--border)',
             borderRadius:14, boxShadow:'0 8px 30px rgba(0,0,0,0.15)',

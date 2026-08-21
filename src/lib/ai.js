@@ -1,10 +1,19 @@
+async function readApiJson(res) {
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { error: text?.slice(0, 200) || res.statusText || 'Resposta inválida do servidor' }
+  }
+}
+
 export async function callGeminiChat({ messages, system, image, temperature, maxOutputTokens }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, system, image, temperature, maxOutputTokens }),
   })
-  const data = await res.json()
+  const data = await readApiJson(res)
   if (!res.ok || data.error) return `Error: ${data.error || res.statusText}`
   return data.text || 'No response'
 }
