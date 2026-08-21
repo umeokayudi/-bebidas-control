@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { createVendaFromPedido, findVendaForPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
-import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas } from './utils'
+import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────────
 export function ProductsTab() {
@@ -450,11 +450,34 @@ export function PedidosAdminTab() {
     setMissingVenda(miss)
   }
 
+  async function syncMissingVendasIfNeeded(list) {
+    let created = 0
+    for (const p of (list || []).filter(x => x.status === 'entregue')) {
+      const existing = await findVendaForPedido(supabase, p.id)
+      if (existing) continue
+      try {
+        await registerVendaForPedido(p)
+        created++
+      } catch (e) {
+        console.error('auto-sync venda pedido', p.id, e.message)
+      }
+    }
+    return created
+  }
+
   async function load(){
     const [{data:p}]=await Promise.all([
       supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*)), bars(nome)').order('criado_em',{ascending:false})
     ])
-    const list = p || []
+    let list = p || []
+    const synced = await syncMissingVendasIfNeeded(list)
+    if (synced > 0) {
+      const { data: refreshed } = await supabase
+        .from('pedidos')
+        .select('*, pedidos_itens(*, produtos(*)), bars(nome)')
+        .order('criado_em', { ascending: false })
+      list = refreshed || list
+    }
     setPedidos(list)
     await markMissingVendas(list)
     setLoading(false)
@@ -541,7 +564,7 @@ export function PedidosAdminTab() {
     try {
       const venda = await registerVendaForPedido(pedido)
       await supabase.from("pedidos").update({status:"entregue"}).eq("id",id)
-      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:"Delivered"}).catch(()=>{})
+      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:`Delivered · ¥${Math.round(venda.total||0).toLocaleString()} · ${venda.data}`}).catch(()=>{})
 
       const saleDate = pedidoSaleDate(pedido)
       const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
@@ -566,6 +589,7 @@ export function PedidosAdminTab() {
           })
         }
       } catch (e) { console.error('Invoice auto-create failed:', e) }
+      alert(`Entrega OK · Venda ¥${Math.round(venda.total || 0).toLocaleString('ja-JP')} registrada em ${venda.data}`)
     } catch (e) {
       alert('Erro ao registrar venda: ' + e.message)
     }
@@ -630,9 +654,13 @@ export function PedidosAdminTab() {
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12}}>
                   {(p.pedidos_itens||[]).map(it=>(
-                    <span key={it.id} style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'var(--bg3)',color:'var(--text2)'}}>
-                      {it.produtos?.nome} &times;{it.qtd}
-                    </span>
+                    <PedidoItemChip
+                      key={it.id}
+                      nome={it.produtos?.nome || '?'}
+                      qtd={it.qtd}
+                      precoUnitario={it.preco_unitario}
+                      custoUnitario={it.produtos?.custo}
+                    />
                   ))}
                 </div>
                 {missingVenda[p.id]&&(

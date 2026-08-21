@@ -126,6 +126,29 @@ export function Divider() {
   return <div style={{ height:1, background:'var(--border)', margin:'16px 0' }} />
 }
 
+/** Chip de item de pedido — hover mostra preço × qtd = total */
+export function PedidoItemChip({ nome, qtd, precoUnitario, custoUnitario }) {
+  const qty = +qtd || 0
+  const unit = +precoUnitario || 0
+  const line = unit * qty
+  const cost = custoUnitario != null ? +custoUnitario : null
+  const tipLines = [
+    `¥${Math.round(unit).toLocaleString('ja-JP')} × ${qty} = ¥${Math.round(line).toLocaleString('ja-JP')}`,
+  ]
+  if (cost != null && cost > 0) {
+    tipLines.push(`Custo unit.: ¥${Math.round(cost).toLocaleString('ja-JP')}`)
+    const lucro = line - cost * qty
+    tipLines.push(`Lucro linha: ¥${Math.round(lucro).toLocaleString('ja-JP')}`)
+  }
+
+  return (
+    <span className="pedido-item-chip" data-tip={tipLines.join(' · ')}>
+      <span className="pedido-item-chip-name">{nome}</span>
+      <span className="pedido-item-chip-qty">×{qty}</span>
+    </span>
+  )
+}
+
 // ── AI receipt analysis ───────────────────────────────────────────────────────
 export async function analyzeReceipt(base64, mediaType) {
   const key = import.meta.env.VITE_ANTHROPIC_KEY
