@@ -438,6 +438,7 @@ body.menu-open {
 
   .grid4 { grid-template-columns: 1fr 1fr; }
   .grid3 { grid-template-columns: 1fr; }
+  .grid2 { grid-template-columns: 1fr; }
   .form-grid-2 { grid-template-columns: 1fr; }
 
   .metric-value { font-size: 22px; }
