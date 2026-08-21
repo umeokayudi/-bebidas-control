@@ -1,3 +1,4 @@
+import { setCorsHeaders, handleCorsPreflight } from './_cors.js'
 import { geminiGenerate } from './_gemini.js'
 
 function extractText(data) {
@@ -14,6 +15,9 @@ function toGeminiContents(messages = []) {
 }
 
 export default async function handler(req, res) {
+  if (handleCorsPreflight(req, res)) return
+  setCorsHeaders(req, res)
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

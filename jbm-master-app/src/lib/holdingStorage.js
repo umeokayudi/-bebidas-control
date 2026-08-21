@@ -1,9 +1,16 @@
 /**
- * Camada de dados JBM Holding — usa tabelas existentes no Supabase:
- * - hr_placements (colocações)
- * - jbm_financeiro (apresentações, comissões, logística, investimentos, retornos)
+ * Camada de dados JBM Holding — API server-side (bebidas-control) + fallback Supabase
  */
 import { holdingSb } from './supabase'
+import { fetchHoldingModulesRemote, postHoldingAction } from './holdingApi'
+
+async function remoteModules() {
+  try {
+    return await fetchHoldingModulesRemote()
+  } catch {
+    return null
+  }
+}
 
 function parseMeta(row) {
   if (!row?.description) return {}
@@ -22,6 +29,8 @@ function metaRow(module, data, extra = {}) {
 // ── HR Apresentações ──────────────────────────────────────────────────────────
 
 export async function loadPresentations() {
+  const remote = await remoteModules()
+  if (remote) return remote.presentations || []
   const { data } = await holdingSb.from('jbm_financeiro')
     .select('*')
     .eq('unit', 'HR')
@@ -70,6 +79,8 @@ export async function savePresentation(form) {
 // ── HR Colocações ─────────────────────────────────────────────────────────────
 
 export async function loadPlacements() {
+  const remote = await remoteModules()
+  if (remote) return remote.placements || []
   const { data } = await holdingSb.from('hr_placements').select('*').order('placement_date', { ascending: false })
   return data || []
 }
@@ -92,6 +103,8 @@ export async function savePlacement(form) {
 // ── HR Comissões ──────────────────────────────────────────────────────────────
 
 export async function loadCommissions() {
+  const remote = await remoteModules()
+  if (remote) return remote.commissions || []
   const { data } = await holdingSb.from('jbm_financeiro')
     .select('*')
     .eq('unit', 'HR')
@@ -144,6 +157,8 @@ export async function markCommissionPaid(id) {
 // ── Logística ─────────────────────────────────────────────────────────────────
 
 export async function loadLogisticsJobs() {
+  const remote = await remoteModules()
+  if (remote) return remote.jobs || []
   const { data } = await holdingSb.from('jbm_financeiro')
     .select('*')
     .eq('unit', 'Logistica')
@@ -206,6 +221,8 @@ export async function markLogisticsCommPaid(id) {
 // ── Investimentos ─────────────────────────────────────────────────────────────
 
 export async function loadInvestments() {
+  const remote = await remoteModules()
+  if (remote) return { inv: remote.inv || [], ret: remote.ret || [] }
   const { data } = await holdingSb.from('jbm_financeiro')
     .select('*')
     .eq('unit', 'Investimentos')
@@ -247,6 +264,10 @@ export async function loadInvestments() {
 }
 
 export async function saveInvestment(form) {
+  try {
+    await postHoldingAction('saveInvestment', form)
+    return
+  } catch { /* fallback */ }
   const { error } = await holdingSb.from('jbm_financeiro').insert({
     unit: 'Investimentos',
     type: 'despesa',
@@ -270,6 +291,10 @@ export async function saveInvestment(form) {
 }
 
 export async function saveInvestmentReturn(form, personMeta = {}) {
+  try {
+    await postHoldingAction('saveInvestmentReturn', form, personMeta)
+    return
+  } catch { /* fallback */ }
   const { error } = await holdingSb.from('jbm_financeiro').insert({
     unit: 'Investimentos',
     type: 'receita',
