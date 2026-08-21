@@ -129,18 +129,18 @@ export function Divider() {
 }
 
 /** Chip de item de pedido — hover mostra preço × qtd = total */
-export function PedidoItemChip({ nome, qtd, precoUnitario, custoUnitario }) {
+export function PedidoItemChip({ nome, qtd, precoUnitario, custoUnitario, hideCost = false }) {
   const qty = +qtd || 0
   const unit = +precoUnitario || 0
   const line = unit * qty
-  const cost = custoUnitario != null ? +custoUnitario : null
+  const cost = !hideCost && custoUnitario != null ? +custoUnitario : null
   const tipLines = [
     `¥${Math.round(unit).toLocaleString('ja-JP')} × ${qty} = ¥${Math.round(line).toLocaleString('ja-JP')}`,
   ]
   if (cost != null && cost > 0) {
-    tipLines.push(`Custo unit.: ¥${Math.round(cost).toLocaleString('ja-JP')}`)
+    tipLines.push(`Custo JBM: ¥${Math.round(cost).toLocaleString('ja-JP')}`)
     const lucro = line - cost * qty
-    tipLines.push(`Lucro linha: ¥${Math.round(lucro).toLocaleString('ja-JP')}`)
+    tipLines.push(`Margem linha: ¥${Math.round(lucro).toLocaleString('ja-JP')}`)
   }
 
   return (

@@ -171,7 +171,7 @@ export default function ComprasTab() {
                 </div>
               </>
           }
-          <input type="file" id="fileCompra" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+          <input type="file" id="fileCompra" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }} onChange={handleFile} />
         </div>
         {scanning && <div style={{ marginTop: 12 }}><Spinner text="Analisando com IA..." /></div>}
         {scanned && (
@@ -227,7 +227,7 @@ export default function ComprasTab() {
         </div>
         <div style={{marginBottom:12}}>
           <label className="form-label">Foto do recibo</label>
-          <input type="file" accept="image/*" onChange={async e=>{
+          <input type="file" accept="image/*,.pdf,application/pdf" onChange={async e=>{
             const file = e.target.files[0]
             if (!file) return
             const reader = new FileReader()

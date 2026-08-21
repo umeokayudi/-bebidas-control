@@ -2,10 +2,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
-import { HOLDING_DRINKS } from '../lib/holdingLinks'
 import { LogoSidebar } from './Logo'
 import { MobileTopBar, ShellOverlay, useMobileMenuLock } from './MobileShell'
 import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas, PedidoItemChip } from './utils'
+import {
+  filterJbmDrinksFaturas,
+  faturaValor,
+  faturaPago,
+  faturaVencimento,
+  faturaEmissao,
+  faturaRemaining,
+} from '../lib/barPortal'
 import {
   analyzePurchases,
   buildPricingMap,
@@ -16,10 +23,10 @@ import {
 import ClientAnalyticsTab from './ClientAnalyticsTab'
 
 const STATUS_PEDIDO = {
-  pendente:   { label:'Pending',   color:'#8A5A00', bg:'#FDF3E0' },
-  confirmado: { label:'Confirmed', color:'#1A4E8A', bg:'#EAF0FA' },
-  entregue:   { label:'Delivered', color:'#1A7A5E', bg:'#EAF5F0' },
-  cancelado:  { label:'Cancelled', color:'#C0392B', bg:'#FBEAEA' },
+  pendente:   { label:'Pendente',   color:'#8A5A00', bg:'#FDF3E0' },
+  confirmado: { label:'Confirmado', color:'#1A4E8A', bg:'#EAF0FA' },
+  entregue:   { label:'Entregue',   color:'#1A7A5E', bg:'#EAF5F0' },
+  cancelado:  { label:'Cancelado',  color:'#C0392B', bg:'#FBEAEA' },
 }
 
 function Badge({ status }) {
@@ -69,7 +76,7 @@ function HomeTab({ bar, onTab }) {
     setPedidos(pR.data || [])
     setItens((iR.data || []).filter(i => i.vendas && filterSupplierVendas([i.vendas]).length))
     setBarPricing(bpR.data || [])
-    setFaturas(fR.data || [])
+    setFaturas(filterJbmDrinksFaturas(fR.data || []))
     setLoading(false)
   }
 
@@ -119,15 +126,15 @@ function HomeTab({ bar, onTab }) {
 
   const maxMonth = Math.max(...monthlyData, 1)
 
-  if (loading) return <Spinner text="Loading dashboard..." />
+  if (loading) return <Spinner text="Carregando painel..." />
 
   return (
-    <div className="fade-in" style={{ maxWidth:1000 }}>
+    <div className="fade-in portal-page" style={{ maxWidth:1000 }}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
         <div>
           <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Client dashboard · JBM Drinks</div>
+          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Portal do cliente · JBM Drinks</div>
         </div>
         <div style={{ display:'flex', gap:6 }}>
           {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
@@ -141,7 +148,7 @@ function HomeTab({ bar, onTab }) {
       </div>
 
       {/* ── Monthly account + POS projection hero ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:20 }}>
+      <div className="portal-grid-hero" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:20 }}>
         <div style={{
           background:'linear-gradient(135deg, var(--navy) 0%, #002855 100%)',
           borderRadius:20, padding:'22px 24px', color:'white',
@@ -213,19 +220,19 @@ function HomeTab({ bar, onTab }) {
           <span>
             <strong>Últimos {periodo} dias:</strong> compras {fmtYen(periodProjection.jbmTotal)} → projeção POS {fmtYen(periodProjection.posTotal)} (lucro {fmtYen(periodProjection.margin)})
           </span>
-          <button onClick={()=>onTab('pricing')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
+          <button onClick={()=>onTab('precos')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
             Ajustar preços POS →
           </button>
         </div>
       ) : null}
 
       {/* KPI row */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+      <div className="portal-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[
-          { label:'Total spend', value:fmtYen(totalPeriod), sub: growth!==null?(growth>=0?'↑ +'+growth+'% vs prev':'↓ '+growth+'% vs prev'):null, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
-          { label:'Deliveries', value:vendasPeriod.length, sub:'in '+periodo+' days', color:'var(--blue)' },
-          { label:'Avg order', value:fmtYen(avgOrder), sub:'per delivery', color:'var(--green)' },
-          { label:'Active orders', value:ativos.length, sub:ativos.length>0?ativos.map(p=>p.status).join(', '):'all clear ✓', color:ativos.length>0?'var(--gold)':'var(--green)' },
+          { label:'Gasto total', value:fmtYen(totalPeriod), sub: growth!==null?(growth>=0?'↑ +'+growth+'% vs anterior':'↓ '+growth+'% vs anterior'):null, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
+          { label:'Entregas', value:vendasPeriod.length, sub:'em '+periodo+' dias', color:'var(--blue)' },
+          { label:'Média/entrega', value:fmtYen(avgOrder), sub:'por entrega', color:'var(--green)' },
+          { label:'Pedidos ativos', value:ativos.length, sub:ativos.length>0?ativos.map(p=>p.status).join(', '):'tudo ok ✓', color:ativos.length>0?'var(--gold)':'var(--green)' },
         ].map(k => (
           <div key={k.label} style={{
             background:'var(--bg2)', border:'1px solid var(--border)',
@@ -242,14 +249,11 @@ function HomeTab({ bar, onTab }) {
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:8 }}>
           <div>
-            <div style={{ fontSize:14, fontWeight:700 }}>Monthly spend</div>
+            <div style={{ fontSize:14, fontWeight:700 }}>Gasto mensal</div>
             <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>Clique no mês · {chartMonthKey}</div>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <div style={{ fontSize:13, fontWeight:800, color:'var(--navy)' }}>{fmtYen(chartMonthStats.jbmTotal)}</div>
-            <button type="button" onClick={()=>onTab('analytics')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
-              Analytics →
-            </button>
           </div>
         </div>
         <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:100 }}>
@@ -288,7 +292,7 @@ function HomeTab({ bar, onTab }) {
       </div>
 
       {/* Top products */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+      <div className="portal-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
         {/* By revenue */}
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Top by cost</div>
@@ -348,7 +352,7 @@ function HomeTab({ bar, onTab }) {
               <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🏆 Bebidas com mais margem (projeção POS)</div>
               <div style={{ fontSize:11, color:'var(--text2)' }}>Compras JBM × preços do bar · Últimos {periodo} dias</div>
             </div>
-            <button onClick={()=>onTab('pricing')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
+            <button onClick={()=>onTab('precos')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
               Editar preços
             </button>
           </div>
@@ -441,11 +445,11 @@ function HomeTab({ bar, onTab }) {
       {/* Quick actions + recent */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:12 }}>
         <div style={{ background:'var(--navy)', borderRadius:16, padding:'20px 24px', display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>Quick actions</div>
+          <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>Ações rápidas</div>
           {[
-            { label:'+ New order', icon:'🛒', tab:'orders' },
-            { label:'View deliveries', icon:'📦', tab:'deliveries' },
-            { label:'Check inventory', icon:'📊', tab:'inventory' },
+            { label:'+ Novo pedido', icon:'🛒', tab:'pedidos' },
+            { label:'Ver entregas', icon:'📦', tab:'entregas' },
+            { label:'Ver estoque', icon:'📊', tab:'estoque' },
           ].map(a => (
             <button key={a.tab} onClick={()=>onTab(a.tab)} style={{
               background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)',
@@ -456,9 +460,9 @@ function HomeTab({ bar, onTab }) {
         </div>
 
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Recent deliveries</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Entregas recentes</div>
           {vendas.length === 0
-            ? <Empty text="No deliveries yet" />
+            ? <Empty text="Nenhuma entrega ainda" />
             : vendas.slice(-8).reverse().map(v => (
               <div key={v.id} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
                 <span style={{ color:'var(--text2)' }}>{fmtDate(v.data)}</span>
@@ -854,7 +858,7 @@ function OrdersTab({ bar }) {
                     nome={it.produtos?.nome || '?'}
                     qtd={it.qtd}
                     precoUnitario={it.preco_unitario}
-                    custoUnitario={it.produtos?.custo}
+                    hideCost
                   />
                 ))}
               </div>
@@ -940,7 +944,7 @@ function InventoryTab({ bar, onOrder }) {
       supabase.from('estoque_movimentos').select('*').eq('bar_id', bar.id).order('criado_em', { ascending: false }).limit(500),
       supabase.from('estoque_regras').select('*').eq('bar_id', bar.id),
     ])
-    setProdutos(pR.data || [])
+    setProdutos((pR.data || []).filter(isSupplierProduct))
     setMovimentos(mR.data || [])
     const rMap = {}
     ;(rR.data || []).forEach(r => { rMap[r.produto_id] = r.minimo })
@@ -1227,7 +1231,7 @@ function PricingTab({ bar }) {
       supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
       supabase.from('bar_pricing').select('*').eq('bar_id', bar.id),
     ])
-    setProdutos(pR.data || [])
+    setProdutos((pR.data || []).filter(isSupplierProduct))
     const pMap = {}
     ;(prR.data || []).forEach(p => { pMap[p.produto_id] = p })
     setPricing(pMap)
@@ -1844,7 +1848,7 @@ function FaturasTab({ bar }) {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [payModal, setPayModal] = useState(null)
-  const [payForm, setPayForm] = useState({ valor:"", metodo:"Bank Transfer", notas:"" })
+  const [payForm, setPayForm] = useState({ valor:"", metodo:"Transferência", notas:"" })
   const [image, setImage] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -1854,11 +1858,12 @@ function FaturasTab({ bar }) {
 
   async function load() {
     const [fR, vR, pR] = await Promise.all([
-      supabase.from("faturas").select("*").eq("bar_id", bar.id).order("vencimento", { ascending:false }),
+      supabase.from("faturas").select("*").eq("bar_id", bar.id).order("data_vencimento", { ascending:false }),
       supabase.from("vendas").select("total,data").eq("bar_id", bar.id).order("data", { ascending:false }),
-      supabase.from("fatura_pagamentos").select("*").order("criado_em", { ascending:false }),
+      supabase.from("fatura_pagamentos").select("*, faturas!inner(bar_id)").eq("faturas.bar_id", bar.id).order("criado_em", { ascending:false }),
     ])
-    setFaturas(fR.data||[])
+    const jbmFaturas = filterJbmDrinksFaturas(fR.data || [])
+    setFaturas(jbmFaturas)
     setVendas(filterSupplierVendas(vR.data||[]))
     setPagamentos(pR.data||[])
     setLoading(false)
@@ -1894,8 +1899,10 @@ function FaturasTab({ bar }) {
     let comprovante_url = null
     if (image) {
       const blob = await fetch(image).then(r=>r.blob())
-      const filename = "recibos/" + bar.id + "/" + Date.now() + ".jpg"
-      const { data: up } = await supabase.storage.from("recibos").upload(filename, blob, { contentType:"image/jpeg" })
+      const isPdf = blob.type === 'application/pdf'
+      const ext = isPdf ? 'pdf' : 'jpg'
+      const filename = "recibos/" + bar.id + "/" + Date.now() + "." + ext
+      const { data: up } = await supabase.storage.from("recibos").upload(filename, blob, { contentType: blob.type || (isPdf ? 'application/pdf' : 'image/jpeg') })
       if (up) {
         const { data: urlD } = supabase.storage.from("recibos").getPublicUrl(filename)
         comprovante_url = urlD.publicUrl
@@ -1906,18 +1913,20 @@ function FaturasTab({ bar }) {
       notas:payForm.notas, data:new Date().toISOString().slice(0,10),
       comprovante_url, confirmado:false, submetido_por:user?.id
     })
-    setSaving(false); setPayModal(null); setPayForm({ valor:"", metodo:"Bank Transfer", notas:"" }); setImage(null); setScannedData(null); load()
+    setSaving(false); setPayModal(null); setPayForm({ valor:"", metodo:"Transferência", notas:"" }); setImage(null); setScannedData(null); load()
   }
 
   const filtered = faturas.filter(f => {
-    if (dateFrom && f.data_emissao < dateFrom) return false
-    if (dateTo && f.data_vencimento > dateTo) return false
+    const emissao = faturaEmissao(f)
+    const venc = faturaVencimento(f)
+    if (dateFrom && emissao && emissao < dateFrom) return false
+    if (dateTo && venc && venc > dateTo) return false
     return true
   })
   const pending = filtered.filter(f=>f.status!=="pago")
-  const totalPending = pending.reduce((a,f)=>a+(+f.valor||0)-(+f.pago||0),0)
-  const overdue = pending.filter(f=>new Date(f.data_vencimento)<new Date())
-  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.vencimento))
+  const totalPending = pending.reduce((a,f)=>a+faturaRemaining(f),0)
+  const overdue = pending.filter(f=>faturaVencimento(f) && new Date(faturaVencimento(f))<new Date())
+  const upcoming = pending.filter(f=>!faturaVencimento(f) || new Date(faturaVencimento(f))>=new Date()).sort((a,b)=>faturaVencimento(a).localeCompare(faturaVencimento(b)))
   const monthlySpend = []
   const monthLabels = []
   for (let i=5; i>=0; i--) {
@@ -1930,20 +1939,21 @@ function FaturasTab({ bar }) {
   const mwd = monthlySpend.filter(v=>v>0).length
   const avgMonthly = mwd>0?Math.round(monthlySpend.reduce((a,v)=>a+v,0)/mwd):0
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando faturas..." />
   return (
-    <div className="fade-in" style={{ maxWidth:860 }}>
+    <div className="fade-in portal-page" style={{ maxWidth:860 }}>
+      <SectionTitle sub="Somente faturas JBM Drinks — limpeza/KuriPuro não aparecem aqui">Faturas JBM</SectionTitle>
       {overdue.length>0 && (
         <div style={{ background:"linear-gradient(135deg,#ff3b30,#c0392b)", borderRadius:16, padding:"16px 20px", marginBottom:16 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:"white" }}>🚨 {overdue.length} overdue payment{overdue.length>1?"s":""}</div>
+          <div style={{ fontSize:15, fontWeight:700, color:"white" }}>🚨 {overdue.length} pagamento{overdue.length>1?"s":""} em atraso</div>
         </div>
       )}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:20 }}>
+      <div className="portal-grid-4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:20 }}>
         {[
-          { label:"Pending", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
-          { label:"Paid total", value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+(+f.valor||0),0)), color:"var(--green)", icon:"✅" },
-          { label:"Overdue", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
-          { label:"Avg/month", value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
+          { label:"Pendente", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
+          { label:"Total pago", value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+faturaValor(f),0)), color:"var(--green)", icon:"✅" },
+          { label:"Em atraso", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
+          { label:"Média/mês", value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
         ].map(k=>(
           <div key={k.label} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:14, padding:"14px" }}>
             <div style={{ fontSize:18, marginBottom:4 }}>{k.icon}</div>
@@ -1953,7 +1963,7 @@ function FaturasTab({ bar }) {
         ))}
       </div>
       <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Monthly spend</div>
+        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Gasto mensal (compras JBM)</div>
         <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:80 }}>
           {monthlySpend.map((v,i) => (
             <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
@@ -1966,25 +1976,27 @@ function FaturasTab({ bar }) {
       </div>
       {upcoming.length>0 && (
         <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Upcoming payments</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Próximos vencimentos</div>
           {upcoming.map(f => {
-            const daysLeft = Math.ceil((new Date(f.data_vencimento)-new Date())/(1000*60*60*24))
-            const remaining = (+f.valor||0)-(+f.pago||0)
+            const venc = faturaVencimento(f)
+            const daysLeft = Math.ceil((new Date(venc)-new Date())/(1000*60*60*24))
+            const remaining = faturaRemaining(f)
             const fp = pagamentos.filter(p=>p.fatura_id===f.id&&!p.confirmado)
             return (
               <div key={f.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border)" }}>
                 <div style={{ width:44, height:44, borderRadius:12, background:daysLeft<=5?"#fef2f2":"#f0fdf4", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?"var(--red)":"var(--green)", lineHeight:1 }}>{daysLeft}</div>
-                  <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>days</div>
+                  <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>dias</div>
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>Due {fmtDate(f.data_vencimento)}</div>
-                  <div style={{ fontSize:11, color:"var(--text2)" }}>{fmtDate(f.data_emissao)} to {fmtDate(f.data_vencimento)}</div>
-                  {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>⏳ Payment pending confirmation</div>}
+                  <div style={{ fontSize:13, fontWeight:600 }}>Vence {fmtDate(venc)}</div>
+                  <div style={{ fontSize:11, color:"var(--text2)" }}>{fmtDate(faturaEmissao(f))} a {fmtDate(venc)}</div>
+                  {f.obs && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{f.obs}</div>}
+                  {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>⏳ Pagamento aguardando confirmação</div>}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:"var(--red)" }}>{fmtYen(remaining)}</div>
-                  {fp.length===0 && <button onClick={()=>setPayModal(f)} style={{ padding:"5px 12px", fontSize:11, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>Submit payment</button>}
+                  {fp.length===0 && <button onClick={()=>setPayModal(f)} style={{ padding:"5px 12px", fontSize:11, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>Enviar comprovante</button>}
                 </div>
               </div>
             )
@@ -1993,49 +2005,53 @@ function FaturasTab({ bar }) {
       )}
       <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
         <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{ padding:"7px 10px", borderRadius:8, fontSize:12 }} />
-        <span style={{ color:"var(--text2)", fontSize:12 }}>to</span>
+        <span style={{ color:"var(--text2)", fontSize:12 }}>até</span>
         <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{ padding:"7px 10px", borderRadius:8, fontSize:12 }} />
-        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("")}} style={{ fontSize:12, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Clear</button>}
+        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("")}} style={{ fontSize:12, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Limpar</button>}
       </div>
-      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Invoice history</div>
-      {filtered.length===0?<Empty text="No invoices" icon="🧾" />:(
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Histórico de faturas</div>
+      {filtered.length===0?<Empty text="Nenhuma fatura JBM" icon="🧾" />:(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {filtered.map(f => {
-            const remaining = (+f.valor||0)-(+f.pago||0)
-            const pct = f.total>0?Math.round((+f.pago||0)/(+f.total)*100):0
-            const isOverdue = f.status==="pendente"&&new Date(f.data_vencimento)<new Date()
+            const remaining = faturaRemaining(f)
+            const total = faturaValor(f)
+            const pago = faturaPago(f)
+            const pct = total>0?Math.round(pago/total*100):0
+            const venc = faturaVencimento(f)
+            const isOverdue = f.status==="pendente"&&venc&&new Date(venc)<new Date()
             const fp = pagamentos.filter(p=>p.fatura_id===f.id)
             const pendingP = fp.filter(p=>!p.confirmado)
             return (
               <div key={f.id} style={{ background:"var(--bg2)", border:"1px solid", borderColor:isOverdue?"rgba(255,59,48,0.3)":"var(--border)", borderRadius:14, padding:"14px 18px" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(f.data_emissao)} to {fmtDate(f.data_vencimento)}</div>
-                    <div style={{ fontSize:11, color:"var(--text2)" }}>Due: {fmtDate(f.data_vencimento)}</div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(faturaEmissao(f))} a {fmtDate(venc)}</div>
+                    <div style={{ fontSize:11, color:"var(--text2)" }}>Vencimento: {fmtDate(venc)}</div>
+                    {f.obs && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{f.obs}</div>}
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:f.status==="pago"?"#f0fdf4":isOverdue?"#fef2f2":"#EAF0FA", color:f.status==="pago"?"var(--green)":isOverdue?"var(--red)":"var(--navy)" }}>
-                      {f.status==="pago"?"✅ Paid":isOverdue?"🚨 Overdue":"⏳ Pending"}
+                      {f.status==="pago"?"✅ Pago":isOverdue?"🚨 Atrasado":"⏳ Pendente"}
                     </span>
-                    <div style={{ fontSize:16, fontWeight:800, color:"var(--navy)", marginTop:4 }}>{fmtYen(+f.valor||0)}</div>
+                    <div style={{ fontSize:16, fontWeight:800, color:"var(--navy)", marginTop:4 }}>{fmtYen(total)}</div>
                   </div>
                 </div>
                 <div style={{ height:4, background:"var(--bg3)", borderRadius:2, overflow:"hidden", marginBottom:6 }}>
                   <div style={{ height:"100%", width:pct+"%", background:f.status==="pago"?"var(--green)":"var(--gold)", borderRadius:2 }}/>
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--text2)", marginBottom:8 }}>
-                  <span>Paid: {fmtYen(+f.pago||0)} ({pct}%)</span>
-                  {remaining>0&&<span style={{ color:"var(--red)", fontWeight:600 }}>Remaining: {fmtYen(remaining)}</span>}
+                  <span>Pago: {fmtYen(pago)} ({pct}%)</span>
+                  {remaining>0&&<span style={{ color:"var(--red)", fontWeight:600 }}>Restante: {fmtYen(remaining)}</span>}
                 </div>
                 {pendingP.length>0&&(
                   <div style={{ background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12 }}>
-                    ⏳ {pendingP.length} payment{pendingP.length>1?"s":""} pending admin confirmation — {fmtYen(pendingP.reduce((a,p)=>a+p.valor,0))}
+                    ⏳ {pendingP.length} pagamento{pendingP.length>1?"s":""} aguardando confirmação — {fmtYen(pendingP.reduce((a,p)=>a+p.valor,0))}
                   </div>
                 )}
                 <div style={{ display:"flex", gap:8 }}>
-                  {f.status!=="pago"&&pendingP.length===0&&<button onClick={()=>setPayModal(f)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>💳 Submit payment</button>}
+                  {f.status!=="pago"&&pendingP.length===0&&<button onClick={()=>setPayModal(f)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>💳 Enviar comprovante</button>}
                   {fp.length>0&&<button onClick={()=>setSelected(selected===f.id?null:f.id)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>
-                    {selected===f.id?"▲ Hide":"▼ Show"} {fp.length} payment{fp.length>1?"s":""}
+                    {selected===f.id?"▲ Ocultar":"▼ Ver"} {fp.length} pagamento{fp.length>1?"s":""}
                   </button>}
                 </div>
                 {selected===f.id&&fp.length>0&&(
@@ -2045,11 +2061,11 @@ function FaturasTab({ bar }) {
                         <div>
                           <span style={{ fontWeight:600 }}>{fmtDate(p.data)}</span>
                           <span style={{ color:"var(--text2)", marginLeft:8 }}>{p.metodo}</span>
-                          {!p.confirmado&&<span style={{ marginLeft:8, color:"var(--amber)", fontWeight:600 }}>⏳ Pending</span>}
-                          {p.confirmado&&<span style={{ marginLeft:8, color:"var(--green)", fontWeight:600 }}>✅ Confirmed</span>}
+                          {!p.confirmado&&<span style={{ marginLeft:8, color:"var(--amber)", fontWeight:600 }}>⏳ Pendente</span>}
+                          {p.confirmado&&<span style={{ marginLeft:8, color:"var(--green)", fontWeight:600 }}>✅ Confirmado</span>}
                         </div>
                         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                          {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>📎 Receipt</a>}
+                          {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>📎 Comprovante</a>}
                           <span style={{ fontWeight:700, color:"var(--green)" }}>{fmtYen(p.valor)}</span>
                         </div>
                       </div>
@@ -2066,34 +2082,38 @@ function FaturasTab({ bar }) {
           onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}}>
           <div style={{ background:"var(--bg2)", borderRadius:20, padding:"28px", width:"100%", maxWidth:420, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}
             onClick={e=>e.stopPropagation()}>
-            <div style={{ fontSize:16, fontWeight:800, marginBottom:4 }}>Submit Payment</div>
+            <div style={{ fontSize:16, fontWeight:800, marginBottom:4 }}>Enviar comprovante</div>
             <div style={{ fontSize:12, color:"var(--text2)", marginBottom:20 }}>
-              {fmtDate(payModal.periodo_inicio)} to {fmtDate(payModal.periodo_fim)} · Remaining: <strong style={{ color:"var(--red)" }}>{fmtYen((+payModal.total||0)-(+payModal.pago||0))}</strong>
+              {fmtDate(payModal.periodo_inicio)} a {fmtDate(payModal.periodo_fim)} · Restante: <strong style={{ color:"var(--red)" }}>{fmtYen(faturaRemaining(payModal))}</strong>
             </div>
             <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Payment proof</div>
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Comprovante (foto ou PDF)</div>
               <div style={{ border:"2px dashed var(--border)", borderRadius:12, padding:"20px", textAlign:"center", cursor:"pointer", background:"var(--bg3)" }}
                 onClick={()=>document.getElementById("receipt-upload").click()}>
                 {image?(
                   <div>
-                    <img src={image} alt="receipt" style={{ maxHeight:150, maxWidth:"100%", borderRadius:8, marginBottom:8 }} />
-                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>Receipt uploaded ✓</div>
+                    {image.startsWith('data:application/pdf') ? (
+                      <div style={{ fontSize:48, marginBottom:8 }}>📄</div>
+                    ) : (
+                      <img src={image} alt="comprovante" style={{ maxHeight:150, maxWidth:"100%", borderRadius:8, marginBottom:8 }} />
+                    )}
+                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>Arquivo enviado ✓</div>
                   </div>
                 ):(
                   <div>
                     <div style={{ fontSize:24, marginBottom:4 }}>📷</div>
-                    <div style={{ fontSize:13, fontWeight:600 }}>Upload payment proof</div>
-                    <div style={{ fontSize:11, color:"var(--text2)" }}>AI will extract amount automatically</div>
+                    <div style={{ fontSize:13, fontWeight:600 }}>Enviar foto ou PDF</div>
+                    <div style={{ fontSize:11, color:"var(--text2)" }}>A IA extrai o valor automaticamente</div>
                   </div>
                 )}
-                <input id="receipt-upload" type="file" accept="image/*" style={{ display:"none" }}
+                <input id="receipt-upload" type="file" accept="image/*,.pdf,application/pdf" style={{ display:"none" }}
                   onChange={e=>{
                     const file = e.target.files[0]; if (!file) return
                     const reader = new FileReader()
                     reader.onload = ev => {
                       const dataUrl = ev.target.result
                       setImage(dataUrl)
-                      scanReceipt(dataUrl)
+                      if (!file.type?.includes('pdf')) scanReceipt(dataUrl)
                     }
                     reader.readAsDataURL(file)
                   }}
@@ -2101,29 +2121,29 @@ function FaturasTab({ bar }) {
               </div>
             </div>
             <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Amount (¥)</div>
-              {scanning && <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>🤖 Gemini extracting amount...</div>}
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Valor (¥)</div>
+              {scanning && <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>🤖 Extraindo valor...</div>}
               {scannedData?.valor && !scanning && (
                 <div style={{ fontSize:12, color:"var(--green)", marginBottom:8, fontWeight:600 }}>
-                  ✅ Detected: {fmtYen(scannedData.valor)}{scannedData.metodo ? ` · ${scannedData.metodo}` : ''}
+                  ✅ Detectado: {fmtYen(scannedData.valor)}{scannedData.metodo ? ` · ${scannedData.metodo}` : ''}
                 </div>
               )}
               <input type="number" value={payForm.valor} onChange={e=>setPayForm({...payForm,valor:e.target.value})} style={{ width:"100%", padding:"12px 14px", fontSize:18, borderRadius:12, fontWeight:700 }} />
             </div>
             <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Method</div>
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Forma de pagamento</div>
               <select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value})} style={{ width:"100%" }}>
-                {["Bank Transfer","Card","Cash"].map(m=><option key={m}>{m}</option>)}
+                {["Transferência","Cartão","Dinheiro"].map(m=><option key={m}>{m}</option>)}
               </select>
             </div>
             <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Notes</div>
-              <input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} placeholder="Transfer ref..." style={{ width:"100%" }} />
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Observações</div>
+              <input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} placeholder="Ref. transferência..." style={{ width:"100%" }} />
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:8 }}>
-              <button onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}} style={{ padding:"13px", borderRadius:14, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Cancel</button>
+              <button onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}} style={{ padding:"13px", borderRadius:14, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Cancelar</button>
               <button onClick={submitPayment} disabled={saving||!payForm.valor||scanning} style={{ padding:"13px", borderRadius:14, border:"none", background:"var(--navy)", color:"white", fontWeight:700, fontSize:14, cursor:"pointer" }}>
-                {saving?"Submitting...":"Submit payment →"}
+                {saving?"Enviando...":"Enviar comprovante →"}
               </button>
             </div>
           </div>
@@ -2135,132 +2155,25 @@ function FaturasTab({ bar }) {
 
 
 
-// ── CALENDARIO CLIENTE ───────────────────────────────────────────────────────
-function CalendarioTab({ bar }) {
-  const [faturas, setFaturas] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [popup, setPopup] = useState(null)
-  const [selectedDay, setSelectedDay] = useState(null)
-
-  useEffect(() => { load() }, [bar])
-  async function load() {
-    const { data } = await supabase.from('faturas').select('*').eq('bar_id', bar.id).order('data_vencimento')
-    setFaturas(data||[])
-    setLoading(false)
-  }
-
-  const year = currentMonth.getFullYear()
-  const month = currentMonth.getMonth()
-  const firstDay = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month+1, 0).getDate()
-  const monthStr = currentMonth.toISOString().slice(0,7)
-  const today = new Date()
-  const isCurrentMonth = today.getMonth()===month && today.getFullYear()===year
-
-  const events = {}
-  faturas.forEach(f => {
-    if (f.data_vencimento?.startsWith(monthStr)) {
-      const day = +f.data_vencimento.slice(8,10)
-      if (!events[day]) events[day] = []
-      events[day].push({ amount:(+f.valor||0)-(+f.pago||0), status:f.status, date:f.data_vencimento, periodo:f.data_emissao||'' })
-    }
-  })
-
-  const upcoming = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento>=today.toISOString().slice(0,10))
-    .sort((a,b)=>a.data_vencimento.localeCompare(b.vencimento))
-
-  if (loading) return <Spinner text="Loading..." />
-
+// ── PREÇOS + CARDÁPIO (aba unificada) ─────────────────────────────────────────
+function PrecosCardapioTab({ bar }) {
+  const [sub, setSub] = useState('precos')
   return (
-    <div className="fade-in" style={{ maxWidth:800 }}>
-      {/* Upcoming banner */}
-      {upcoming.length>0 && (
-        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:10 }}>⚡ Upcoming payments</div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {upcoming.slice(0,4).map((f,i)=>{
-              const daysLeft = Math.ceil((new Date(f.data_vencimento)-today)/(1000*60*60*24))
-              const remaining = (+f.valor||0)-(+f.pago||0)
-              return (
-                <div key={i} style={{ background:daysLeft<=5?'#fef2f2':'#f0fdf4', border:'1px solid', borderColor:daysLeft<=5?'#fca5a5':'#86efac', borderRadius:12, padding:'10px 14px', minWidth:140 }}>
-                  <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?'var(--red)':'var(--green)' }}>{fmtYen(remaining)}</div>
-                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>Due {fmtDate(f.data_vencimento)}</div>
-                  <div style={{ fontSize:11, fontWeight:700, color:daysLeft<=5?'var(--red)':'var(--text2)', marginTop:4 }}>
-                    {daysLeft===0?'Today!':daysLeft===1?'Tomorrow':'In '+daysLeft+' days'}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Calendar nav */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-        <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>←</button>
-        <div style={{ fontSize:16, fontWeight:700 }}>{currentMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-        <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>→</button>
+    <div className="fade-in portal-page">
+      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+        {[
+          { id:'precos', label:'Preços POS', icon:'💰' },
+          { id:'cardapio', label:'Cardápio', icon:'🍹' },
+        ].map(t => (
+          <button key={t.id} onClick={()=>setSub(t.id)} style={{
+            padding:'10px 18px', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer',
+            border: sub===t.id ? '2px solid var(--navy)' : '1px solid var(--border)',
+            background: sub===t.id ? 'var(--navy)' : 'var(--bg2)',
+            color: sub===t.id ? 'white' : 'var(--text)',
+          }}>{t.icon} {t.label}</button>
+        ))}
       </div>
-
-      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden', marginBottom:20 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--navy)' }}>
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
-            <div key={d} style={{ padding:'10px', textAlign:'center', fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>{d}</div>
-          ))}
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
-          {Array.from({length:firstDay}).map((_,i)=>(
-            <div key={'e'+i} style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:'var(--bg3)' }}/>
-          ))}
-          {Array.from({length:daysInMonth}).map((_,i)=>{
-            const day = i+1
-            const dayEvents = events[day]||[]
-            const isToday = isCurrentMonth && day===today.getDate()
-            return (
-              <div key={day} onClick={()=>{ if(dayEvents.length>0){ setSelectedDay(day); setPopup(dayEvents) }}}
-                style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
-                  background:isToday?'rgba(193,156,86,0.1)':'transparent', cursor:dayEvents.length>0?'pointer':'default' }}>
-                <div style={{ padding:'6px 8px' }}>
-                  <span style={{ fontSize:13, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)',
-                    width:24, height:24, borderRadius:'50%', display:'inline-flex', alignItems:'center', justifyContent:'center',
-                    background:isToday?'var(--navy)':'transparent' }}>{day}</span>
-                  {dayEvents.map((ev,ei)=>{
-                    const daysLeft = Math.ceil((new Date(ev.date)-today)/(1000*60*60*24))
-                    return (
-                      <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:3,
-                        background:'#fef2f2', color:'#dc2626', fontWeight:600, lineHeight:1.4 }}>
-                        💳 {Math.round(ev.amount/1000)}k
-                        <span style={{ display:'block', fontSize:8 }}>{daysLeft===0?'today':daysLeft+'d left'}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {popup && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
-          onClick={()=>setPopup(null)}>
-          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'24px', width:'100%', maxWidth:360, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}
-            onClick={e=>e.stopPropagation()}>
-            <div style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>
-              {currentMonth.toLocaleDateString('en-US',{month:'long'})} {selectedDay}
-            </div>
-            {popup.map((ev,i)=>(
-              <div key={i} style={{ padding:'12px 0', borderBottom:'1px solid var(--border)' }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'var(--red)', marginBottom:4 }}>Payment due: {fmtYen(ev.amount)}</div>
-                <div style={{ fontSize:12, color:'var(--text2)' }}>Period: {ev.periodo}</div>
-                <div style={{ fontSize:12, color:ev.status==='pago'?'var(--green)':'var(--amber)', fontWeight:600, marginTop:4, textTransform:'capitalize' }}>{ev.status}</div>
-              </div>
-            ))}
-            <button onClick={()=>setPopup(null)} style={{ width:'100%', marginTop:16, padding:'12px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Close</button>
-          </div>
-        </div>
-      )}
+      {sub === 'precos' ? <PricingTab bar={bar} /> : <MenuTab bar={bar} />}
     </div>
   )
 }
@@ -2269,7 +2182,7 @@ function CalendarioTab({ bar }) {
 import { NotificationBell } from './Notifications'
 
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
-  const [tab, setTab] = useState('home')
+  const [tab, setTab] = useState('inicio')
   const [menuOpen, setMenuOpen] = useState(false)
 
   useMobileMenuLock(menuOpen)
@@ -2280,15 +2193,12 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   }
 
   const NAV = [
-    { id:'home',       label:'Home',       icon:'🏠' },
-    { id:'analytics',  label:'Analytics',  icon:'📈' },
-    { id:'orders',     label:'Orders',     icon:'🛒' },
-    { id:'deliveries', label:'Deliveries', icon:'📦' },
-    { id:'inventory',  label:'Inventory',  icon:'📊' },
-    { id:'pricing',    label:'Pricing',    icon:'💰' },
-    { id:'menu',       label:'Menu',       icon:'🍹' },
-    { id:'faturas',    label:'Invoices',   icon:'💰' },
-    { id:'calendario',  label:'Calendar',   icon:'📅' },
+    { id:'inicio',    label:'Início',           icon:'🏠' },
+    { id:'pedidos',   label:'Pedidos',          icon:'🛒' },
+    { id:'entregas',  label:'Entregas',         icon:'📦' },
+    { id:'estoque',   label:'Estoque',          icon:'📊' },
+    { id:'precos',    label:'Preços & Cardápio', icon:'💰' },
+    { id:'faturas',   label:'Faturas JBM',      icon:'🧾' },
   ]
 
   return (
@@ -2315,30 +2225,31 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Client portal</div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Portal do cliente</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
-          <a href={HOLDING_DRINKS} target="_blank" rel="noreferrer" className="sidebar-link">
-            ↗ JBM Holding — visão consolidada
-          </a>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>
-            Estoque, preços POS e faturas sincronizados com o painel admin JBM.
+            Compras, estoque, preços POS e faturas JBM Drinks — tudo em um só lugar.
           </div>
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
-          <button onClick={signOut} className="sidebar-signout">Sign out</button>
+          <button onClick={signOut} className="sidebar-signout">Sair</button>
         </div>
       </aside>
       <main className="app-main app-main-wide">
-        {tab==='home'       && <HomeTab bar={bar} onTab={selectTab} />}
-        {tab==='analytics'  && <ClientAnalyticsTab bar={bar} onTab={selectTab} />}
-        {tab==='orders'     && <OrdersTab bar={bar} />}
-        {tab==='deliveries' && <DeliveriesTab bar={bar} />}
-        {tab==='inventory'  && <InventoryTab bar={bar} onOrder={()=>selectTab('orders')} />}
-        {tab==='pricing'    && <PricingTab bar={bar} />}
-        {tab==='menu'       && <MenuTab bar={bar} />}
-        {tab==='faturas'    && <FaturasTab bar={bar} />}
-        {tab==='calendario'  && <CalendarioTab bar={bar} />}
+        {tab==='inicio' && (
+          <>
+            <HomeTab bar={bar} onTab={selectTab} />
+            <div style={{ marginTop: 32, paddingTop: 24, borderTop: '2px solid var(--border)' }}>
+              <ClientAnalyticsTab bar={bar} onTab={selectTab} />
+            </div>
+          </>
+        )}
+        {tab==='pedidos'   && <OrdersTab bar={bar} />}
+        {tab==='entregas'  && <DeliveriesTab bar={bar} />}
+        {tab==='estoque'   && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}
+        {tab==='precos'    && <PrecosCardapioTab bar={bar} />}
+        {tab==='faturas'   && <FaturasTab bar={bar} />}
       </main>
     </div>
   )
