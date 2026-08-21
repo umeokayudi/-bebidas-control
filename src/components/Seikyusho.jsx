@@ -11,6 +11,7 @@ export default function SeikyushoTab() {
   const [extracted, setExtracted] = useState(null)
   const [result, setResult] = useState(null)
   const [context, setContext] = useState('')
+  const [catalog, setCatalog] = useState([])
 
   useEffect(() => {
     loadContext()
@@ -26,7 +27,9 @@ export default function SeikyushoTab() {
       `Bares: ${(bars || []).map(b => b.nome).join(', ')}`,
       `Fornecedores: ${(forn || []).map(f => f.nome).join(', ')}`,
       `Produtos (amostra): ${(prods || []).map(p => p.nome).join(', ')}`,
+      'Entrega direta ao bar: pedidos do cliente serão marcados entregue com data do pedido.',
     ].join('\n'))
+    setCatalog(prods || [])
   }
 
   async function handleFile(e) {
@@ -70,13 +73,14 @@ export default function SeikyushoTab() {
     }
   }
 
-  const lucro = extracted ? calcLucroPreview(extracted) : null
+  const lucro = extracted ? calcLucroPreview(extracted, catalog) : null
 
   return (
     <div className="fade-in">
       <SectionTitle>請求書 — Fatura de Fornecedor (IA Gemini)</SectionTitle>
       <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-        Envie PDF ou foto da 請求書 recebida do fornecedor. A IA extrai custos, entregas e lucro — você confirma antes de registrar.
+        Envie a 請求書 do fornecedor (custo JBM). A IA registra a compra, atualiza preços do fornecedor,
+        sincroniza pedidos do cliente como entregues (com data do pedido) e calcula lucro = venda ao bar − custo JBM.
       </p>
 
       <div
@@ -117,14 +121,25 @@ export default function SeikyushoTab() {
             <Field label="Nº fatura" value={extracted.numero_fatura} />
             <Field label="Data" value={extracted.data ? fmtDate(extracted.data) : '—'} />
             <Field label="Vencimento" value={extracted.data_vencimento ? fmtDate(extracted.data_vencimento) : '—'} />
-            <Field label="Pagamento" value={extracted.pagamento} />
+            <Field label="Período" value={
+              extracted.periodo_inicio && extracted.periodo_fim
+                ? `${fmtDate(extracted.periodo_inicio)} – ${fmtDate(extracted.periodo_fim)}`
+                : '—'
+            } />
+            <Field label="Cliente" value={extracted.cliente_bar || 'Atomic'} />
             <Field label="Total" value={fmtYen(extracted.total)} highlight />
           </div>
 
+          {extracted.entrega_direta !== false && (
+            <div style={{ fontSize: 12, color: 'var(--blue)', marginBottom: 12, padding: '10px 12px', background: 'var(--blue-bg)', borderRadius: 8 }}>
+              📦 Entrega direta — pedidos do cliente serão marcados <strong>entregue</strong> com data do pedido e preço ao bar.
+            </div>
+          )}
+
           {lucro && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-              <MetricCard label="Custo" value={fmtYen(lucro.custo)} color="red" />
-              <MetricCard label="Receita entregas" value={fmtYen(lucro.venda)} color="blue" />
+              <MetricCard label="Custo JBM" value={fmtYen(lucro.custo)} color="red" />
+              <MetricCard label="Receita (preço ao bar)" value={fmtYen(lucro.venda)} color="blue" />
               <MetricCard label="Lucro estimado" value={fmtYen(lucro.lucro)} sub={`${lucro.margemPct}% margem`} color="green" />
             </div>
           )}
@@ -157,11 +172,16 @@ export default function SeikyushoTab() {
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)', marginBottom: 12 }}>✅ Registrado com sucesso</div>
           <ul style={{ fontSize: 13, lineHeight: 1.8, paddingLeft: 20 }}>
             {result.compra && <li>Compra registrada (custo {fmtYen(result.custo)})</li>}
-            {result.vendas?.length > 0 && result.vendas.map(v => (
-              <li key={v.id}>Entrega {v.bar}: {fmtYen(v.total)}</li>
-            ))}
-            {result.pedidosAtualizados > 0 && <li>{result.pedidosAtualizados} pedido(s) marcado(s) como entregue</li>}
-            <li>Lucro: {fmtYen(result.lucro)} ({result.margemPct}% margem)</li>
+            {result.precosAtualizados?.fornecedor_precos > 0 && (
+              <li>Preços do fornecedor atualizados ({result.precosAtualizados.fornecedor_precos} item(ns))</li>
+            )}
+            {result.pedidos?.pedidos > 0 && (
+              <li>{result.pedidos.pedidos} pedido(s) marcado(s) como entregue — receita {fmtYen(result.pedidos.receita)}</li>
+            )}
+            {result.pedidos?.skipped > 0 && (
+              <li>{result.pedidos.skipped} pedido(s) já sincronizado(s)</li>
+            )}
+            <li>Lucro real JBM: {fmtYen(result.lucro)} ({result.margemPct}% margem)</li>
           </ul>
           <button onClick={() => { setImage(null); setExtracted(null); setResult(null) }} style={{ marginTop: 12, padding: '8px 16px', borderRadius: 8 }}>
             Nova 請求書
