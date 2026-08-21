@@ -10,6 +10,14 @@ export function pedidoVendaObs(pedidoId) {
   return `Auto: order ${String(pedidoId).slice(0, 8)}`
 }
 
+export function pedidoTotal(pedido) {
+  const fromItems = (pedido?.pedidos_itens || []).reduce(
+    (a, it) => a + (+it.preco_unitario || 0) * (+it.qtd || 0),
+    0
+  )
+  return +pedido?.total_estimado || fromItems || 0
+}
+
 export async function findVendaForPedido(supabase, pedidoId) {
   const key = String(pedidoId).slice(0, 8)
   const { data } = await supabase.from('vendas')
@@ -60,25 +68,29 @@ export async function createVendaFromPedido(supabase, pedido) {
   }
 
   const saleDate = pedidoSaleDate(pedido)
+  const total = pedidoTotal(pedido)
   const { data: venda, error } = await supabase.from('vendas').insert({
     data: saleDate,
     bar_id: pedido.bar_id,
-    total: pedido.total_estimado,
+    total,
     obs: pedidoVendaObs(pedido.id),
     criado_por: pedido.criado_por,
+    origem: 'fornecedor',
   }).select().single()
 
-  if (error) throw error
+  if (error) throw new Error(`venda: ${error.message}`)
 
-  if (venda && pedido.pedidos_itens?.length) {
-    await supabase.from('vendas_itens').insert(
-      pedido.pedidos_itens.map(it => ({
+  const itens = (pedido.pedidos_itens || []).filter(it => it.produto_id)
+  if (venda && itens.length) {
+    const { error: iErr } = await supabase.from('vendas_itens').insert(
+      itens.map(it => ({
         venda_id: venda.id,
         produto_id: it.produto_id,
         qtd: it.qtd,
         preco_unitario: it.preco_unitario,
       }))
     )
+    if (iErr) throw new Error(`itens da venda: ${iErr.message}`)
   }
 
   return { venda, created: true }

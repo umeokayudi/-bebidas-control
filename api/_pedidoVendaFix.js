@@ -77,3 +77,69 @@ export async function dedupePedidoVendas(sb, opts = {}) {
 
   return report
 }
+
+/** Cria vendas para pedidos entregues que ainda não têm venda vinculada */
+export async function syncMissingVendasFromPedidos(sb, opts = {}) {
+  const { barId } = opts
+  let pQuery = sb.from('pedidos')
+    .select('id, bar_id, criado_por, data_pedido, data_entrega_prevista, criado_em, total_estimado, status, pedidos_itens(produto_id, qtd, preco_unitario)')
+    .eq('status', 'entregue')
+    .order('data_pedido')
+
+  if (barId) pQuery = pQuery.eq('bar_id', barId)
+
+  const { data: pedidos, error } = await pQuery
+  if (error) throw new Error(error.message)
+
+  const report = { checked: 0, created: 0, skipped: 0, errors: [], ids: [] }
+
+  for (const p of pedidos || []) {
+    report.checked++
+    const key = p.id.slice(0, 8)
+    const { data: existing } = await sb.from('vendas')
+      .select('id')
+      .eq('bar_id', p.bar_id)
+      .ilike('obs', `%${key}%`)
+      .limit(1)
+
+    if ((existing || []).length) {
+      report.skipped++
+      continue
+    }
+
+    const saleDate = p.data_pedido || p.data_entrega_prevista || p.criado_em?.slice(0, 10)
+    const total = +p.total_estimado
+      || (p.pedidos_itens || []).reduce((a, it) => a + (+it.preco_unitario || 0) * (+it.qtd || 0), 0)
+
+    const { data: venda, error: vErr } = await sb.from('vendas').insert({
+      data: saleDate,
+      bar_id: p.bar_id,
+      total,
+      obs: `Auto: order ${key}`,
+      criado_por: p.criado_por,
+      origem: 'fornecedor',
+    }).select().single()
+
+    if (vErr) {
+      report.errors.push({ pedidoId: p.id, error: vErr.message })
+      continue
+    }
+
+    const itens = (p.pedidos_itens || []).filter(it => it.produto_id)
+    if (venda && itens.length) {
+      await sb.from('vendas_itens').insert(
+        itens.map(it => ({
+          venda_id: venda.id,
+          produto_id: it.produto_id,
+          qtd: it.qtd,
+          preco_unitario: it.preco_unitario,
+        }))
+      )
+    }
+
+    report.created++
+    report.ids.push({ pedidoId: p.id, vendaId: venda.id, data: saleDate, total })
+  }
+
+  return report
+}

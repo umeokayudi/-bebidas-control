@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { createVendaFromPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
+import { createVendaFromPedido, findVendaForPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas } from './utils'
 
@@ -426,23 +426,67 @@ export function PedidosAdminTab() {
   const [filterStatus,setFilterStatus]=useState('')
   const [checklistPedido,setChecklistPedido]=useState(null)
   const [checkedItems,setCheckedItems]=useState({})
+  const [missingVenda,setMissingVenda]=useState({})
+  const [repairing,setRepairing]=useState(null)
 
   useEffect(()=>{ load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) },[])
+
+  async function fetchPedidoCompleto(id) {
+    const { data, error } = await supabase
+      .from('pedidos')
+      .select('*, pedidos_itens(*, produtos(*)), bars(nome)')
+      .eq('id', id)
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  async function markMissingVendas(list) {
+    const miss = {}
+    await Promise.all((list || []).filter(p => p.status === 'entregue').map(async p => {
+      const v = await findVendaForPedido(supabase, p.id)
+      if (!v) miss[p.id] = true
+    }))
+    setMissingVenda(miss)
+  }
 
   async function load(){
     const [{data:p}]=await Promise.all([
       supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*)), bars(nome)').order('criado_em',{ascending:false})
     ])
-    setPedidos(p||[])
+    const list = p || []
+    setPedidos(list)
+    await markMissingVendas(list)
     setLoading(false)
   }
 
+  async function registerVendaForPedido(pedido) {
+    const fresh = await fetchPedidoCompleto(pedido.id)
+    const { venda } = await createVendaFromPedido(supabase, fresh)
+    if (!venda) throw new Error('Não foi possível criar a venda')
+    return venda
+  }
+
+  async function repairVenda(pedido) {
+    setRepairing(pedido.id)
+    try {
+      const venda = await registerVendaForPedido(pedido)
+      alert(`Venda registrada: ¥${Math.round(venda.total || 0).toLocaleString()} em ${venda.data}`)
+      await load()
+    } catch (e) {
+      alert('Erro ao registrar venda: ' + e.message)
+    } finally {
+      setRepairing(null)
+    }
+  }
+
   async function updateStatus(id,status){
-    await supabase.from('pedidos').update({status}).eq('id',id)
     if(status==='entregue'){
       const pedido=pedidos.find(p=>p.id===id)
-      if(pedido){
-        const { venda } = await createVendaFromPedido(supabase, pedido)
+      if(!pedido) return
+      try {
+        const venda = await registerVendaForPedido(pedido)
+        await supabase.from('pedidos').update({status}).eq('id',id)
         await supabase.from('notificacoes').insert({
           user_id:pedido.criado_por,tipo:'pedido_entregue',
           titulo:'Order delivered',
@@ -460,7 +504,12 @@ export function PedidosAdminTab() {
           periodo_inicio: periodStart,
           periodo_fim: periodEnd,
         }).catch((e)=>{ console.error('auto-fatura error:', e) })
+      } catch (e) {
+        alert('Erro ao registrar venda: ' + e.message)
+        return
       }
+    } else {
+      await supabase.from('pedidos').update({status}).eq('id',id)
     }
     if(status==='confirmado'){
       const pedido=pedidos.find(p=>p.id===id)
@@ -469,7 +518,6 @@ export function PedidosAdminTab() {
         titulo:'Order confirmed',mensagem:'Your order is being prepared.'
       }).catch(()=>{})
     }
-    // Update local state immediately for real-time feel
     setPedidos(prev => prev.map(p => p.id===id ? {...p, status} : p))
     load()
   }
@@ -490,34 +538,37 @@ export function PedidosAdminTab() {
     const id=pedido.id
     setChecklistPedido(null)
     setCheckedItems({})
-    await supabase.from("pedidos").update({status:"entregue"}).eq("id",id)
-    const { venda } = await createVendaFromPedido(supabase, pedido)
-    await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:"Delivered"}).catch(()=>{})
-
-    const saleDate = pedidoSaleDate(pedido)
-    const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
     try {
-      const { data: existingFatura } = await supabase.from('faturas')
-        .select('*').eq('bar_id', pedido.bar_id).eq('periodo_inicio', periodStart).eq('periodo_fim', periodEnd).single()
-      if (existingFatura) {
-        await supabase.from('faturas').update({ total: existingFatura.total + pedido.total_estimado }).eq('id', existingFatura.id)
-      } else {
-        await supabase.from('faturas').insert({
-          bar_id: pedido.bar_id,
-          periodo_inicio: periodStart,
-          periodo_fim: periodEnd,
-          vencimento: dueDate,
-          data_vencimento: dueDate,
-          total: pedido.total_estimado,
-          valor: pedido.total_estimado,
-          pago: 0,
-          status: 'pendente',
-          notas: 'Auto-generated',
-          venda_id: venda?.id || null,
-        })
-      }
-    } catch (e) { console.error('Invoice auto-create failed:', e) }
+      const venda = await registerVendaForPedido(pedido)
+      await supabase.from("pedidos").update({status:"entregue"}).eq("id",id)
+      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:"Delivered"}).catch(()=>{})
 
+      const saleDate = pedidoSaleDate(pedido)
+      const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
+      try {
+        const { data: existingFatura } = await supabase.from('faturas')
+          .select('*').eq('bar_id', pedido.bar_id).eq('periodo_inicio', periodStart).eq('periodo_fim', periodEnd).single()
+        if (existingFatura) {
+          await supabase.from('faturas').update({ total: existingFatura.total + pedido.total_estimado }).eq('id', existingFatura.id)
+        } else {
+          await supabase.from('faturas').insert({
+            bar_id: pedido.bar_id,
+            periodo_inicio: periodStart,
+            periodo_fim: periodEnd,
+            vencimento: dueDate,
+            data_vencimento: dueDate,
+            total: pedido.total_estimado,
+            valor: pedido.total_estimado,
+            pago: 0,
+            status: 'pendente',
+            notas: 'Auto-generated',
+            venda_id: venda?.id || null,
+          })
+        }
+      } catch (e) { console.error('Invoice auto-create failed:', e) }
+    } catch (e) {
+      alert('Erro ao registrar venda: ' + e.message)
+    }
     load()
   }
 
@@ -529,6 +580,7 @@ export function PedidosAdminTab() {
   }
   const filtered=filterStatus?pedidos.filter(p=>p.status===filterStatus):pedidos
   const pendentes=pedidos.filter(p=>p.status==='pendente').length
+  const missingCount=Object.keys(missingVenda).length
 
   return(
     <div className="fade-in">
@@ -536,14 +588,25 @@ export function PedidosAdminTab() {
         <div>
           <div style={{fontSize:16,fontWeight:700}}>Client orders</div>
           {pendentes>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2}}>{pendentes} order(s) awaiting confirmation</div>}
+          {missingCount>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2,fontWeight:600}}>{missingCount} delivered order(s) without a registered sale</div>}
         </div>
-        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{width:'auto'}}>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {missingCount>0&&(
+            <button onClick={async()=>{
+              if(!confirm(`Register sales for ${missingCount} delivered order(s)?`)) return
+              for(const p of pedidos.filter(x=>missingVenda[x.id])) await repairVenda(p)
+            }} style={{padding:'8px 14px',fontSize:11,borderRadius:8,background:'var(--red)',color:'white',border:'none',fontWeight:700,cursor:'pointer'}}>
+              Sync missing sales
+            </button>
+          )}
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{width:'auto'}}>
           <option value="">All</option>
           <option value="pendente">Pending</option>
           <option value="confirmado">Confirmed</option>
           <option value="entregue">Delivered</option>
           <option value="cancelado">Cancelled</option>
         </select>
+        </div>
       </div>
 
       {loading
@@ -572,6 +635,15 @@ export function PedidosAdminTab() {
                     </span>
                   ))}
                 </div>
+                {missingVenda[p.id]&&(
+                  <div style={{marginBottom:12,padding:'10px 14px',borderRadius:10,background:'#FBEAEA',border:'1px solid #f5c6c6',fontSize:12,color:'#7f1d1d'}}>
+                    ⚠️ Sale not registered in Sales / Dashboard.
+                    <button onClick={()=>repairVenda(p)} disabled={repairing===p.id}
+                      style={{marginLeft:10,padding:'4px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',fontWeight:700,cursor:'pointer'}}>
+                      {repairing===p.id?'Registering...':'Register sale now'}
+                    </button>
+                  </div>
+                )}
                 <div style={{display:'flex',gap:8}}>
                   {p.status==='pendente'&&<>
                     <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>Confirm</button>

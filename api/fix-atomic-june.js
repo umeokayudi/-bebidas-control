@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { fixAtomicReceivables, revertAtomicPedidosToJune, ATOMIC_BAR_ID } from './_atomicJuneFix.js'
-import { fixVendaDatesFromPedidos, dedupePedidoVendas } from './_pedidoVendaFix.js'
+import { fixVendaDatesFromPedidos, dedupePedidoVendas, syncMissingVendasFromPedidos } from './_pedidoVendaFix.js'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -63,6 +63,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, sync })
     }
 
+    if (action === 'syncMissingVendas') {
+      const sync = await syncMissingVendasFromPedidos(sb, {
+        barId: body.barId || ATOMIC_BAR_ID,
+      })
+      return res.status(200).json({ ok: true, sync })
+    }
+
     if (action === 'fix') {
       const result = await fixAtomicReceivables(sb)
       const { data: faturas } = await sb.from('faturas').select('valor,total,pago,status').eq('bar_id', ATOMIC_BAR_ID).neq('status', 'pago')
@@ -72,7 +79,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({
       error: 'action inválida',
-      actions: ['fix', 'revertPedidos', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas'],
+      actions: ['fix', 'revertPedidos', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas', 'syncMissingVendas'],
     })
   } catch (e) {
     return res.status(500).json({ error: e.message })
