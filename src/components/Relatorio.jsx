@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
 import { buildPurchaseCostIndex, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
+import { pedidoSaleDate } from '../lib/pedidoVenda'
 
 function pedidoMonthKey(p) {
-  return monthKey(p.data_pedido || p.criado_em?.slice(0, 10))
+  return monthKey(pedidoSaleDate(p))
 }
 
 function MetricCard({ label, value, sub, color='var(--navy)', accent }) {
@@ -122,7 +123,7 @@ export default function RelatorioTab() {
 
     const pedBar      = pedidosMes.filter(p=>p.bar_id===bar.id && p.status==='entregue')
     const projReceita = pedBar.reduce((a,p)=>a+(p.pedidos_itens||[]).reduce((b,it)=>b+(it.preco_unitario*it.qtd),0),0)
-    const projCusto   = pedBar.reduce((a,p)=>a+marginFromPedidoItens(p.pedidos_itens, p.data_pedido, costIndex, produtos).custo,0)
+    const projCusto   = pedBar.reduce((a,p)=>a+marginFromPedidoItens(p.pedidos_itens, pedidoSaleDate(p), costIndex, produtos).custo,0)
     const projLucro   = projReceita - projCusto
 
     // Ryoshusho total for this bar this month
