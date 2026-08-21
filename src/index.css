@@ -158,11 +158,15 @@ tbody tr:hover td { background: var(--bg3); }
 
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-.grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+.grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; overflow: visible; }
 
 @media (max-width: 700px) {
   .grid3, .grid4 { grid-template-columns: 1fr 1fr; }
   .grid2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .grid3, .grid4 { grid-template-columns: 1fr; }
 }
 
 /* Metric cards */
@@ -202,6 +206,278 @@ tbody tr:hover td { background: var(--bg3); }
   height: 100vh;
   flex-shrink: 0;
   box-shadow: 4px 0 20px rgba(0,16,40,0.15);
+  z-index: 200;
+}
+
+.sidebar-brand {
+  padding: 28px 20px 24px;
+  border-bottom: 1px solid rgba(193,156,86,0.15);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(193,156,86,0.15);
+}
+
+.sidebar-footer-notifs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sidebar-signout {
+  width: 100%;
+  padding: 7px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: transparent;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sidebar-link {
+  display: block;
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 10px;
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(193,156,86,0.25);
+  background: rgba(193,156,86,0.08);
+}
+
+/* App shell */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+.app-main {
+  flex: 1;
+  padding: 28px 32px;
+  max-width: 980px;
+  overflow-x: visible;
+  width: 100%;
+  min-width: 0;
+}
+
+.app-main-wide {
+  max-width: 1100px;
+}
+
+.logo-mobile-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.logo-mobile-header span {
+  font-size: 14px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-topbar {
+  display: none;
+}
+
+.shell-overlay {
+  display: none;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Responsive tables */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.table-scroll table {
+  min-width: 520px;
+}
+
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding: 0 14px;
+    padding-top: env(safe-area-inset-top, 0);
+    background: var(--navy);
+    border-bottom: 1px solid rgba(193,156,86,0.2);
+    z-index: 180;
+    box-shadow: 0 4px 20px rgba(0,16,40,0.2);
+  }
+
+  .mobile-topbar-actions {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .menu-toggle {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid rgba(193,156,86,0.25);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .menu-toggle-icon,
+  .menu-toggle-icon::before,
+  .menu-toggle-icon::after {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--gold);
+    border-radius: 2px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+
+  .menu-toggle-icon {
+    position: relative;
+  }
+
+  .menu-toggle-icon::before,
+  .menu-toggle-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+
+  .menu-toggle-icon::before { top: -6px; }
+  .menu-toggle-icon::after { top: 6px; }
+
+  .menu-toggle-icon.is-open { background: transparent; }
+  .menu-toggle-icon.is-open::before { top: 0; transform: rotate(45deg); }
+  .menu-toggle-icon.is-open::after { top: 0; transform: rotate(-45deg); }
+
+  .shell-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    border: none;
+    padding: 0;
+    background: rgba(0,16,40,0.55);
+    backdrop-filter: blur(2px);
+    cursor: pointer;
+  }
+
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(288px, 88vw);
+    height: 100dvh;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: 8px 0 32px rgba(0,16,40,0.35);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-brand {
+    padding-top: calc(16px + env(safe-area-inset-top, 0));
+  }
+
+  .app-main {
+    padding: calc(72px + env(safe-area-inset-top, 0)) 16px 24px;
+    max-width: none;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .grid4 { grid-template-columns: 1fr 1fr; }
+  .grid3 { grid-template-columns: 1fr; }
+  .grid2 { grid-template-columns: 1fr; }
+  .form-grid-2 { grid-template-columns: 1fr; }
+
+  .metric-value { font-size: 22px; }
+
+  button, .btn-primary {
+    min-height: 44px;
+  }
+
+  .nav-item {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .data-hover-row .data-hover-tip {
+    white-space: normal;
+    max-width: min(280px, 90vw);
+    text-align: right;
+  }
+
+  .chart-bar-cell .chart-bar-tip {
+    font-size: 10px;
+    max-width: 120px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .card:has(> table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .card:has(> table) table {
+    min-width: 520px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid4 { grid-template-columns: 1fr; }
+  .metric-card-hover:hover { transform: none; }
 }
 
 .nav-item {
@@ -256,7 +532,8 @@ tbody tr:hover td { background: var(--bg3); }
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding-top: 28px;
+  padding: 36px 8px 0;
+  overflow: visible;
 }
 .chart-bar-cell {
   position: relative;
@@ -266,19 +543,24 @@ tbody tr:hover td { background: var(--bg3); }
   align-items: center;
   gap: 6px;
   cursor: default;
+  overflow: visible;
 }
 .chart-bar-cell .chart-bar-tip {
   position: absolute;
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%) translateY(4px);
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 10px;
   background: var(--navy);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: center;
+  max-width: min(240px, 42vw);
+  width: max-content;
   box-shadow: 0 8px 24px rgba(0,16,40,0.22);
   opacity: 0;
   visibility: hidden;
@@ -286,11 +568,31 @@ tbody tr:hover td { background: var(--bg3); }
   transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
   z-index: 20;
 }
+.chart-bar-cell:first-child .chart-bar-tip {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+.chart-bar-cell:last-child .chart-bar-tip {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(4px);
+}
 .chart-bar-cell:hover .chart-bar-tip,
 .chart-bar-cell.is-active .chart-bar-tip {
   opacity: 1;
   visibility: visible;
+}
+.chart-bar-cell:hover .chart-bar-tip,
+.chart-bar-cell.is-active .chart-bar-tip {
   transform: translateX(-50%) translateY(0);
+}
+.chart-bar-cell:first-child:hover .chart-bar-tip,
+.chart-bar-cell:first-child.is-active .chart-bar-tip {
+  transform: translateX(0) translateY(0);
+}
+.chart-bar-cell:last-child:hover .chart-bar-tip,
+.chart-bar-cell:last-child.is-active .chart-bar-tip {
+  transform: translateX(0) translateY(0);
 }
 .chart-bar-cell .chart-bar-fill {
   width: 100%;
@@ -355,6 +657,7 @@ tbody tr:hover td { background: var(--bg3); }
 /* KPI cards — detalhe no hover */
 .metric-card-hover {
   position: relative;
+  overflow: visible;
   cursor: default;
   transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -386,6 +689,24 @@ tbody tr:hover td { background: var(--bg3); }
 .metric-card-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+  z-index: 50;
+}
+
+.chart-card {
+  overflow: visible;
+}
+
+.chart-bar-cell .chart-bar-value {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--navy);
+  min-height: 14px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.chart-bar-cell:hover .chart-bar-value,
+.chart-bar-cell.is-active .chart-bar-value {
+  opacity: 1;
 }
 
 /* Pedido item chip — hover tooltip com valores */
