@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { fixAtomicReceivables, revertAtomicPedidosToJune, ATOMIC_BAR_ID } from './_atomicJuneFix.js'
+import { fixVendaDatesFromPedidos, dedupePedidoVendas } from './_pedidoVendaFix.js'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -30,6 +31,25 @@ export default async function handler(req, res) {
     if (action === 'revertPedidos') {
       const revert = await revertAtomicPedidosToJune(sb)
       return res.status(200).json({ ok: true, revert })
+    }
+
+    if (action === 'fixVendaDates') {
+      const fix = await fixVendaDatesFromPedidos(sb, { barId: body.barId || ATOMIC_BAR_ID })
+      return res.status(200).json({ ok: true, fix })
+    }
+
+    if (action === 'dedupeVendas') {
+      const dedupe = await dedupePedidoVendas(sb, {
+        barId: body.barId || ATOMIC_BAR_ID,
+        dryRun: body.dryRun === true,
+      })
+      return res.status(200).json({ ok: true, dedupe })
+    }
+
+    if (action === 'reconcileSales') {
+      const dedupe = await dedupePedidoVendas(sb, { barId: body.barId || ATOMIC_BAR_ID })
+      const fix = await fixVendaDatesFromPedidos(sb, { barId: body.barId || ATOMIC_BAR_ID })
+      return res.status(200).json({ ok: true, dedupe, fix })
     }
 
     const result = await fixAtomicReceivables(sb)
