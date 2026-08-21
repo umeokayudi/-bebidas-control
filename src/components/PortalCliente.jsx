@@ -13,6 +13,7 @@ import {
   projectItemRevenue,
 } from '../lib/clientAnalytics'
 import ClientAnalyticsTab from './ClientAnalyticsTab'
+import AtomicPosPanel from './AtomicPos'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pending',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -212,7 +213,7 @@ function HomeTab({ bar, onTab }) {
           <span>
             <strong>Últimos {periodo} dias:</strong> compras {fmtYen(periodProjection.jbmTotal)} → projeção POS {fmtYen(periodProjection.posTotal)} (lucro {fmtYen(periodProjection.margin)})
           </span>
-          <button onClick={()=>onTab('pricing')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
+          <button onClick={()=>onTab('pos')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
             Ajustar preços POS →
           </button>
         </div>
@@ -347,7 +348,7 @@ function HomeTab({ bar, onTab }) {
               <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🏆 Bebidas com mais margem (projeção POS)</div>
               <div style={{ fontSize:11, color:'var(--text2)' }}>Compras JBM × preços do bar · Últimos {periodo} dias</div>
             </div>
-            <button onClick={()=>onTab('pricing')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
+            <button onClick={()=>onTab('pos')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
               Editar preços
             </button>
           </div>
@@ -2269,11 +2270,10 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   const NAV = [
     { id:'home',       label:'Home',       icon:'🏠' },
     { id:'analytics',  label:'Analytics',  icon:'📈' },
+    { id:'pos',        label:'POS',        icon:'🧾' },
     { id:'orders',     label:'Orders',     icon:'🛒' },
     { id:'deliveries', label:'Deliveries', icon:'📦' },
     { id:'inventory',  label:'Inventory',  icon:'📊' },
-    { id:'pricing',    label:'Pricing',    icon:'💰' },
-    { id:'menu',       label:'Menu',       icon:'🍹' },
     { id:'faturas',    label:'Invoices',   icon:'💰' },
     { id:'calendario',  label:'Calendar',   icon:'📅' },
   ]
@@ -2317,11 +2317,12 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
       <main style={{flex:1,padding:'28px 32px',overflowY:'auto',maxWidth:1100}}>
         {tab==='home'       && <HomeTab bar={bar} onTab={setTab} />}
         {tab==='analytics'  && <ClientAnalyticsTab bar={bar} onTab={setTab} />}
+        {tab==='pos'        && <AtomicPosPanel bar={bar} />}
         {tab==='orders'     && <OrdersTab bar={bar} />}
         {tab==='deliveries' && <DeliveriesTab bar={bar} />}
         {tab==='inventory'  && <InventoryTab bar={bar} onOrder={()=>setTab('orders')} />}
-        {tab==='pricing'    && <PricingTab bar={bar} />}
-        {tab==='menu'       && <MenuTab bar={bar} />}
+        {tab==='pricing'    && <AtomicPosPanel bar={bar} />}
+        {tab==='menu'       && <AtomicPosPanel bar={bar} />}
         {tab==='faturas'    && <FaturasTab bar={bar} />}
         {tab==='calendario'  && <CalendarioTab bar={bar} />}
       </main>

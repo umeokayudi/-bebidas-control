@@ -222,7 +222,7 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
           }}>
             Exportar CSV
           </button>
-          <button type="button" onClick={() => onTab?.('pricing')} style={{
+          <button type="button" onClick={() => onTab?.('pos')} style={{
             padding: '8px 14px', borderRadius: 10, border: 'none',
             background: 'var(--navy)', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}>
@@ -388,7 +388,7 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
         <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 14, padding: '14px 16px', marginBottom: 16, fontSize: 12 }}>
           <strong>{missingPricing.length} produto(s)</strong> comprados sem preço POS cadastrado
           ({fmtYen(missingPricing.reduce((a, p) => a + p.jbmTotal, 0))} em compras).
-          <button type="button" onClick={() => onTab?.('pricing')} style={{ marginLeft: 8, border: 'none', background: 'transparent', color: 'var(--navy)', fontWeight: 700, cursor: 'pointer' }}>
+          <button type="button" onClick={() => onTab?.('pos')} style={{ marginLeft: 8, border: 'none', background: 'transparent', color: 'var(--navy)', fontWeight: 700, cursor: 'pointer' }}>
             Cadastrar preços →
           </button>
         </div>
