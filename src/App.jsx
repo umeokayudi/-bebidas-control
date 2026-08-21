@@ -67,7 +67,7 @@ function BarChart({ data, color='#c19c56', height=80, valueLabel=fmtYen }) {
   const max = Math.max(...data.map(d => d.value), 1)
 
   return (
-    <div className="chart-bars" style={{ height: height + 36 }}>
+    <div className="chart-bars" style={{ height: height + 48 }}>
       {data.map((d, i) => {
         const barH = Math.max(4, (d.value / max) * height * 0.85)
         const isLast = i === data.length - 1
@@ -81,6 +81,7 @@ function BarChart({ data, color='#c19c56', height=80, valueLabel=fmtYen }) {
             onMouseLeave={() => setActive(null)}
           >
             <div className="chart-bar-tip">{tip}</div>
+            <div className="chart-bar-value">{valueLabel(d.value)}</div>
             <div
               className="chart-bar-fill"
               style={{
@@ -240,8 +241,8 @@ function Dashboard({ onNav }) {
       </div>
 
       <div className="grid2" style={{marginBottom:16}}>
-        <div className="card"><div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:4}}>Monthly revenue</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months</div><BarChart data={stats.receitaPorMes} color="#001028"/></div>
-        <div className="card"><div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:4}}>Monthly profit</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months</div><BarChart data={stats.lucroPorMes} color="#1a6b4a"/></div>
+        <div className="card chart-card"><div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:4}}>Monthly revenue</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months · passe o mouse nas barras</div><BarChart data={stats.receitaPorMes} color="#001028"/></div>
+        <div className="card chart-card"><div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:4}}>Monthly profit</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months · passe o mouse nas barras</div><BarChart data={stats.lucroPorMes} color="#1a6b4a"/></div>
       </div>
 
       <div className="grid2" style={{marginBottom:16}}>
@@ -282,11 +283,11 @@ function Dashboard({ onNav }) {
         <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
         {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
         :(stats.topLucro||[]).map((p,i)=>(
-          <DataHoverRow key={i} tip={`${p.nome} · ${p.vendido} un. · Lucro ${fmtYen(p.lucro)} · Margem ${p.receita>0?Math.round(p.lucro/p.receita*100):0}%`}>
+          <DataHoverRow key={i} tip={`${p.nome} · ${p.qtd} un. · Lucro ${fmtYen(p.lucro)} · Margem ${p.receita>0?Math.round(p.lucro/p.receita*100):0}%`}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--green)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'white':'var(--text3)'}}>{i+1}</div>
-              <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.vendido} un. · receita {fmtYen(p.receita)}</div></div>
+              <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.qtd} un. · receita {fmtYen(p.receita)}</div></div>
             </div>
             <div style={{textAlign:'right'}}>
               <div style={{fontWeight:700,fontSize:12,color:'var(--green)'}}>{fmtYen(p.lucro)}</div>

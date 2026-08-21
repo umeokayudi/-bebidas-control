@@ -65,6 +65,9 @@ export default function SeikyushoTab() {
     setLoading(true)
     try {
       const imageParts = imageDataUrlToParts(image)
+      if (!imageParts?.data) {
+        throw new Error('Arquivo inválido. Use JPG, PNG ou PDF.')
+      }
       const note = [comentario, commentOverride].filter(Boolean).join('\n').trim()
       const { extracted: data, plano: plan } = await analyzeSeikyusho({
         image: imageParts,
@@ -118,7 +121,15 @@ export default function SeikyushoTab() {
             onClick={() => document.getElementById('seikyusho-input')?.click()}
           >
             {image ? (
-              <img src={image} alt="seikyusho" style={{ maxHeight: 360, maxWidth: '100%', borderRadius: 8 }} />
+              image.startsWith('data:application/pdf') ? (
+                <div style={{ padding: 24 }}>
+                  <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>
+                  <div style={{ fontWeight: 600 }}>PDF selecionado</div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>Pronto para análise com IA</div>
+                </div>
+              ) : (
+                <img src={image} alt="seikyusho" style={{ maxHeight: 360, maxWidth: '100%', borderRadius: 8 }} />
+              )
             ) : (
               <div>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>

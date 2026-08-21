@@ -631,6 +631,7 @@ body.menu-open {
 /* KPI cards — detalhe no hover */
 .metric-card-hover {
   position: relative;
+  overflow: visible;
   cursor: default;
   transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -662,6 +663,24 @@ body.menu-open {
 .metric-card-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+  z-index: 50;
+}
+
+.chart-card {
+  overflow: visible;
+}
+
+.chart-bar-cell .chart-bar-value {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--navy);
+  min-height: 14px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.chart-bar-cell:hover .chart-bar-value,
+.chart-bar-cell.is-active .chart-bar-value {
+  opacity: 1;
 }
 
 /* Pedido item chip — hover tooltip com valores */
