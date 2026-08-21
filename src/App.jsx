@@ -17,6 +17,7 @@ import ComprasTab   from './components/Compras'
 import VendasTab    from './components/Vendas'
 import RelatorioTab from './components/Relatorio'
 import RyoshushoTab from './components/Ryoshusho'
+import SeikyushoTab from './components/Seikyusho'
 import EstoqueTab from './components/Estoque'
 import PortalCliente from './components/PortalCliente'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
@@ -37,6 +38,7 @@ const ADMIN_TABS = [
   { id:'pedidos',   label:'Orders'     },
   { id:'relatorio', label:'Report'     },
   { id:'ryoshusho', label:'領収書'      },
+  { id:'seikyusho', label:'請求書 IA'   },
   { id:'products',  label:'Products'   },
   { id:'bars',      label:'Bars'       },
   { id:'usuarios',  label:'Users'      },
@@ -320,6 +322,7 @@ function Shell() {
           {tab==='pedidos'   && <PedidosAdminTab/>}
           {tab==='relatorio' && <RelatorioTab/>}
           {tab==='ryoshusho' && <RyoshushoTab/>}
+          {tab==='seikyusho' && <SeikyushoTab/>}
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
