@@ -60,19 +60,56 @@ const STAFF_TABS = [
 ]
 
 // ── MINI BAR CHART ────────────────────────────────────────────────────────────
-function BarChart({ data, color='#c19c56', height=80 }) {
-  if (!data||data.length===0) return null
-  const max = Math.max(...data.map(d=>d.value),1)
+function BarChart({ data, color='#c19c56', height=80, valueLabel=fmtYen }) {
+  const [active, setActive] = useState(null)
+  if (!data || data.length === 0) return null
+  const max = Math.max(...data.map(d => d.value), 1)
+
   return (
-    <div style={{display:'flex',alignItems:'flex-end',gap:4,height,paddingTop:8}}>
-      {data.map((d,i)=>(
-        <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-          <div style={{width:'100%',borderRadius:'3px 3px 0 0',
-            height:`${Math.max(4,(d.value/max)*height*0.85)}px`,
-            background:color,opacity:i===data.length-1?1:0.5,transition:'height 0.4s ease'}}/>
-          <div style={{fontSize:9,color:'var(--text3)',whiteSpace:'nowrap'}}>{d.label}</div>
-        </div>
-      ))}
+    <div className="chart-bars" style={{ height: height + 36 }}>
+      {data.map((d, i) => {
+        const barH = Math.max(4, (d.value / max) * height * 0.85)
+        const isLast = i === data.length - 1
+        const isOn = active === i
+        const tip = d.tip || `${d.month || d.label}: ${valueLabel(d.value)}`
+        return (
+          <div
+            key={i}
+            className={`chart-bar-cell${isOn ? ' is-active' : ''}`}
+            onMouseEnter={() => setActive(i)}
+            onMouseLeave={() => setActive(null)}
+          >
+            <div className="chart-bar-tip">{tip}</div>
+            <div
+              className="chart-bar-fill"
+              style={{
+                height: `${barH}px`,
+                background: color,
+                opacity: isOn || isLast ? 1 : 0.45,
+              }}
+            />
+            <div className="chart-bar-label">{d.label}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function DataHoverRow({ tip, children, style }) {
+  return (
+    <div className="data-hover-row" style={style}>
+      <div className="data-hover-tip">{tip}</div>
+      {children}
+    </div>
+  )
+}
+
+function MetricCardHover({ tip, className, children }) {
+  return (
+    <div className={`metric-card metric-card-hover ${className || ''}`}>
+      <div className="metric-hover-tip">{tip}</div>
+      {children}
     </div>
   )
 }
@@ -99,12 +136,26 @@ function Dashboard({ onNav }) {
     const costIndex = buildPurchaseCostIndex(purchases || [], products || [])
     const meses=[]
     for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push(d.toISOString().slice(0,7))}
-    const receitaPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(sales||[]).filter(v=>v.data?.startsWith(m)).reduce((a,v)=>a+(+v.total||0),0)}))
+    const receitaPorMes=meses.map(m=>({
+      label:monthLabel(m).split('/')[0],
+      month:monthLabel(m),
+      value:(sales||[]).filter(v=>v.data?.startsWith(m)).reduce((a,v)=>a+(+v.total||0),0),
+    }))
     const custoPorMes=meses.map(m=>{
       const sMes=(sales||[]).filter(v=>v.data?.startsWith(m))
-      return { label:monthLabel(m).split('/')[0], value: marginFromSales(sMes, costIndex, products).custo }
+      return {
+        label:monthLabel(m).split('/')[0],
+        month:monthLabel(m),
+        value: marginFromSales(sMes, costIndex, products).custo,
+      }
     })
-    const lucroPorMes=meses.map((m,i)=>({label:monthLabel(m).split('/')[0],value:receitaPorMes[i].value-custoPorMes[i].value}))
+    const lucroPorMes=meses.map((m,i)=>({
+      label:monthLabel(m).split('/')[0],
+      month:monthLabel(m),
+      value:receitaPorMes[i].value-custoPorMes[i].value,
+      tip:`${monthLabel(m)} · Lucro ${fmtYen(receitaPorMes[i].value-custoPorMes[i].value)} · Receita ${fmtYen(receitaPorMes[i].value)} · Custo ${fmtYen(custoPorMes[i].value)}`,
+    }))
+    receitaPorMes.forEach((r,i)=>{ r.tip = `${r.month} · Receita ${fmtYen(r.value)}` })
     const purchasesMes=(purchases||[]).filter(c=>c.data?.startsWith(mesAtual))
     const salesMes=(sales||[]).filter(v=>v.data?.startsWith(mesAtual))
     const mesMargin = marginFromSales(salesMes, costIndex, products)
@@ -165,10 +216,26 @@ function Dashboard({ onNav }) {
       )}
 
       <div className="grid4" style={{marginBottom:20}}>
-        <div className="metric-card red"><div className="metric-label">Custo JBM (unitário)</div><div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.custoMes)}</div><div className="metric-sub">Custo real dos itens vendidos · {stats.totalCompras} compras no mês</div></div>
-        <div className="metric-card navy"><div className="metric-label">Monthly revenue</div><div className="metric-value" style={{color:'var(--navy)',fontSize:22}}>{fmtYen(stats.receitaMes)}</div><div className="metric-sub">{stats.totalVendas} sales</div></div>
-        <div className="metric-card green"><div className="metric-label">Lucro real</div><div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div><div className="metric-sub">Venda − custo unitário compras · {stats.margem}%</div></div>
-        <div className="metric-card gold"><div className="metric-label">Avg markup</div><div className="metric-value" style={{color:'var(--gold)',fontSize:22}}>{stats.markup}%</div><div className="metric-sub">{stats.totalProdutos} products</div></div>
+        <MetricCardHover className="red" tip={`Custo unitário dos itens vendidos\n${stats.totalCompras} compra(s) no mês`}>
+          <div className="metric-label">Custo JBM (unitário)</div>
+          <div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.custoMes)}</div>
+          <div className="metric-sub">Custo real dos itens vendidos · {stats.totalCompras} compras no mês</div>
+        </MetricCardHover>
+        <MetricCardHover className="navy" tip={`${stats.totalVendas} venda(s) · Receita total ${fmtYen(stats.receitaMes)}`}>
+          <div className="metric-label">Monthly revenue</div>
+          <div className="metric-value" style={{color:'var(--navy)',fontSize:22}}>{fmtYen(stats.receitaMes)}</div>
+          <div className="metric-sub">{stats.totalVendas} sales</div>
+        </MetricCardHover>
+        <MetricCardHover className="green" tip={`Margem ${stats.margem}% · Receita ${fmtYen(stats.receitaMes)} − Custo ${fmtYen(stats.custoMes)}`}>
+          <div className="metric-label">Lucro real</div>
+          <div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div>
+          <div className="metric-sub">Venda − custo unitário compras · {stats.margem}%</div>
+        </MetricCardHover>
+        <MetricCardHover className="gold" tip={`Markup médio sobre custo · ${stats.totalProdutos} produtos ativos`}>
+          <div className="metric-label">Avg markup</div>
+          <div className="metric-value" style={{color:'var(--gold)',fontSize:22}}>{stats.markup}%</div>
+          <div className="metric-sub">{stats.totalProdutos} products</div>
+        </MetricCardHover>
       </div>
 
       <div className="grid2" style={{marginBottom:16}}>
@@ -181,27 +248,31 @@ function Dashboard({ onNav }) {
           <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Profit by bar</div>
           {stats.porBar.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
           :stats.porBar.map(b=>(
-            <div key={b.id} style={{marginBottom:18}}>
+            <DataHoverRow key={b.id} tip={`${b.nome} · Receita ${fmtYen(b.receita)} · Custo ${fmtYen(b.custo||0)} · Lucro ${fmtYen(b.lucro)} · ${b.sales} venda(s)`}>
+              <div style={{marginBottom:8}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:8,height:8,borderRadius:'50%',background:b.cor}}/><span style={{fontWeight:600,fontSize:13}}>{b.nome}</span></div>
                 <span style={{fontWeight:800,color:b.lucro>=0?'var(--green)':'var(--red)',fontSize:13}}>{fmtYen(b.lucro)}</span>
               </div>
               <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)} · Custo unit. {fmtYen(b.custo||0)}</span><span>{b.sales} sales</span></div>
               <div className="progress-bar"><div className="progress-fill" style={{width:stats.receitaMes>0?`${Math.round(b.receita/stats.receitaMes*100)}%`:'0%',background:b.cor}}/></div>
-            </div>
+              </div>
+            </DataHoverRow>
           ))}
         </div>
         <div className="card">
           <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Top products</div>
           {stats.topProdutos.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
           :stats.topProdutos.map((p,i)=>(
-            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <DataHoverRow key={i} tip={`${p.nome} · ${p.qtd} un. · Receita ${fmtYen(p.receita)} · Custo ${fmtYen(p.custo||0)} · Lucro ${fmtYen(p.lucro||0)}`}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--gold)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'var(--navy)':'var(--text3)'}}>{i+1}</div>
                 <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.qtd} un.</div></div>
               </div>
               <span style={{fontWeight:700,fontSize:12,color:'var(--navy)'}}>{fmtYen(p.receita)}</span>
             </div>
+            </DataHoverRow>
           ))}
         </div>
       </div>
@@ -210,7 +281,8 @@ function Dashboard({ onNav }) {
         <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
         {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
         :(stats.topLucro||[]).map((p,i)=>(
-          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <DataHoverRow key={i} tip={`${p.nome} · ${p.vendido} un. · Lucro ${fmtYen(p.lucro)} · Margem ${p.receita>0?Math.round(p.lucro/p.receita*100):0}%`}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--green)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'white':'var(--text3)'}}>{i+1}</div>
               <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.vendido} un. · receita {fmtYen(p.receita)}</div></div>
@@ -220,6 +292,7 @@ function Dashboard({ onNav }) {
               <div style={{fontSize:10,color:'var(--text3)'}}>{p.receita>0?Math.round(p.lucro/p.receita*100):0}% margin</div>
             </div>
           </div>
+          </DataHoverRow>
         ))}
       </div>
 
