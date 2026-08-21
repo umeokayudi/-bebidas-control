@@ -59,7 +59,11 @@ function extractText(data) {
 
 function parseJson(text) {
   const cleaned = String(text || '').replace(/```json|```/g, '').trim()
-  return JSON.parse(cleaned)
+  try {
+    return JSON.parse(cleaned)
+  } catch (e) {
+    throw new Error(`IA não retornou JSON válido: ${cleaned.slice(0, 120)}…`)
+  }
 }
 
 function buildAnalyzePrompt({ context, comentario, previous }) {
@@ -266,30 +270,35 @@ export async function registerSeikyusho(body) {
 }
 
 export async function handleSeikyushoRequest(res, body) {
-  const action = body.action || 'analyze'
+  try {
+    const action = body.action || 'analyze'
 
-  if (action === 'analyze') {
-    const { extracted, plano } = await analyzeSeikyusho(body)
-    return res.status(200).json({ ok: true, extracted, plano })
-  }
-
-  if (action === 'register') {
-    if (!body.confirmed) {
-      return res.status(400).json({ error: 'Confirme que os dados estão corretos antes de registrar' })
+    if (action === 'analyze') {
+      const { extracted, plano } = await analyzeSeikyusho(body)
+      return res.status(200).json({ ok: true, extracted, plano })
     }
-    const result = await registerSeikyusho(body)
-    return res.status(200).json({ ok: true, ...result })
-  }
 
-  if (action === 'syncPedidos') {
-    const sb = adminClient()
-    const sync = await syncPedidosEntregues(sb, {
-      barId: body.barId || ATOMIC_BAR_ID,
-      dateFrom: body.dateFrom,
-      dateTo: body.dateTo,
-    })
-    return res.status(200).json({ ok: true, ...sync })
-  }
+    if (action === 'register') {
+      if (!body.confirmed) {
+        return res.status(400).json({ error: 'Confirme que os dados estão corretos antes de registrar' })
+      }
+      const result = await registerSeikyusho(body)
+      return res.status(200).json({ ok: true, ...result })
+    }
 
-  return res.status(400).json({ error: 'action must be analyze, register or syncPedidos' })
+    if (action === 'syncPedidos') {
+      const sb = adminClient()
+      const sync = await syncPedidosEntregues(sb, {
+        barId: body.barId || ATOMIC_BAR_ID,
+        dateFrom: body.dateFrom,
+        dateTo: body.dateTo,
+      })
+      return res.status(200).json({ ok: true, ...sync })
+    }
+
+    return res.status(400).json({ error: 'action must be analyze, register or syncPedidos' })
+  } catch (e) {
+    console.error('handleSeikyushoRequest', e)
+    return res.status(500).json({ error: e.message || 'Erro ao processar 請求書' })
+  }
 }

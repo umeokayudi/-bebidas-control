@@ -25,13 +25,22 @@ export function calcLucroPreview(extracted, catalog = []) {
   return { custo, venda, lucro: venda - custo, margemPct: venda > 0 ? Math.round(((venda - custo) / venda) * 100) : 0 }
 }
 
+async function readApiJson(res) {
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(text?.slice(0, 200) || res.statusText || 'Resposta inválida do servidor')
+  }
+}
+
 async function seikyushoFetch(payload) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ module: 'seikyusho', ...payload }),
   })
-  const data = await res.json()
+  const data = await readApiJson(res)
   if (!res.ok || data.error) throw new Error(data.error || res.statusText)
   return data
 }
