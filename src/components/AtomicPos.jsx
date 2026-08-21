@@ -28,8 +28,8 @@ function SetupBanner({ onRefresh }) {
     <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 16, marginBottom: 20, fontSize: 13 }}>
       <strong>⚙️ Setup POS necessário</strong>
       <p style={{ margin: '8px 0', color: '#92400e' }}>
-        Execute <code>ATOMIC_POS_SCHEMA.sql</code> no Supabase SQL Editor ou peça ao admin para rodar{' '}
-        <code>POST /api/setup-atomic-pos</code> com <code>confirm: atomic-pos-2026</code>
+        Execute <code>ATOMIC_POS_SCHEMA.sql</code> no Supabase SQL Editor ou rode{' '}
+        <code>POST /api/fix-atomic-june</code> com <code>action: setupPos</code> e <code>confirm: atomic-pos-2026</code>
       </p>
       <button onClick={onRefresh} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12 }}>Verificar novamente</button>
     </div>

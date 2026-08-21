@@ -64,7 +64,7 @@ export async function checkPosSchema(supabase) {
 
 export async function fetchPosSetupStatus() {
   try {
-    const res = await fetch('/api/setup-atomic-pos')
+    const res = await fetch('/api/fix-atomic-june?action=checkPos')
     return await res.json()
   } catch {
     return { ready: false }
