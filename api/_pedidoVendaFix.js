@@ -1,7 +1,7 @@
 const PEDIDO_OBS = /^Auto: order ([a-f0-9]{8})/i
 
 function pedidoSaleDate(p) {
-  return p.data_pedido || p.data_entrega_prevista || p.criado_em?.slice(0, 10)
+  return p.data_entrega_prevista || p.data_pedido || p.criado_em?.slice(0, 10)
 }
 
 /** Corrige vendas Auto: order → data = data_pedido do pedido */
@@ -30,7 +30,7 @@ export async function fixVendaDatesFromPedidos(sb, opts = {}) {
       report.unchanged++
       continue
     }
-    const { error: uErr } = await sb.from('vendas').update({ data: correctDate }).eq('id', v.id)
+    const { error: uErr } = await sb.from('vendas').update({ data: correctDate, data_venda: correctDate }).eq('id', v.id)
     if (uErr) throw new Error(uErr.message)
     report.updated++
     report.ids.push({ vendaId: v.id, from: v.data, to: correctDate, pedidoId: pedido.id })
@@ -126,10 +126,12 @@ export async function syncMissingVendasFromPedidos(sb, opts = {}) {
 
     const itens = (p.pedidos_itens || []).filter(it => it.produto_id)
     if (venda && itens.length) {
-      const { data: vi } = await sb.from('vendas_itens').select('id').eq('venda_id', venda.id).limit(1)
-      if (!(vi || []).length) {
+      const { data: vi } = await sb.from('vendas_itens').select('produto_id').eq('venda_id', venda.id)
+      const have = new Set((vi || []).map(r => r.produto_id))
+      const missing = itens.filter(it => !have.has(it.produto_id))
+      if (missing.length) {
         await sb.from('vendas_itens').insert(
-          itens.map(it => ({
+          missing.map(it => ({
             venda_id: venda.id,
             produto_id: it.produto_id,
             qtd: it.qtd,
@@ -175,20 +177,22 @@ export async function backfillVendaItensFromPedidos(sb, opts = {}) {
       continue
     }
 
-    const { data: vi } = await sb.from('vendas_itens').select('id').eq('venda_id', venda.id).limit(1)
-    if ((vi || []).length) {
-      report.skipped++
-      continue
-    }
-
     const itens = (p.pedidos_itens || []).filter(it => it.produto_id)
     if (!itens.length) {
       report.skipped++
       continue
     }
 
+    const { data: vi } = await sb.from('vendas_itens').select('produto_id').eq('venda_id', venda.id)
+    const have = new Set((vi || []).map(r => r.produto_id))
+    const missing = itens.filter(it => !have.has(it.produto_id))
+    if (!missing.length) {
+      report.skipped++
+      continue
+    }
+
     const { error: iErr } = await sb.from('vendas_itens').insert(
-      itens.map(it => ({
+      missing.map(it => ({
         venda_id: venda.id,
         produto_id: it.produto_id,
         qtd: it.qtd,
@@ -202,6 +206,44 @@ export async function backfillVendaItensFromPedidos(sb, opts = {}) {
     }
 
     report.filled++
+  }
+
+  return report
+}
+
+/** Ajusta data de compras 請求書 para o período da fatura (não data de registro) */
+export async function fixSeikyushoCompraDates(sb, opts = {}) {
+  const { targetDate = '2026-07-15' } = opts
+  const { data: compras, error } = await sb.from('compras')
+    .select('id, data, obs, criado_em')
+    .ilike('obs', 'Seikyusho%')
+    .order('criado_em', { ascending: false })
+  if (error) throw new Error(error.message)
+
+  const report = { checked: 0, updated: 0, itensLinked: 0, ids: [] }
+  const { data: prods } = await sb.from('produtos').select('id,nome').eq('ativo', true)
+
+  for (const c of compras || []) {
+    report.checked++
+    if (c.data !== targetDate) {
+      const { error: uErr } = await sb.from('compras').update({ data: targetDate }).eq('id', c.id)
+      if (uErr) throw new Error(uErr.message)
+      report.updated++
+      report.ids.push({ compraId: c.id, from: c.data, to: targetDate })
+    }
+
+    const { data: itens } = await sb.from('compras_itens').select('id, nome, produto_id').eq('compra_id', c.id)
+    for (const it of itens || []) {
+      if (it.produto_id) continue
+      const nome = (it.nome || '').toLowerCase()
+      const prod = (prods || []).find(p => {
+        const n = (p.nome || '').toLowerCase()
+        return n === nome || n.includes(nome) || nome.includes(n)
+      })
+      if (!prod) continue
+      await sb.from('compras_itens').update({ produto_id: prod.id }).eq('id', it.id)
+      report.itensLinked++
+    }
   }
 
   return report

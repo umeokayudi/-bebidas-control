@@ -643,7 +643,10 @@ export function PedidosAdminTab() {
               <div key={p.id} className="card" style={{marginBottom:12,borderLeft:p.status==='pendente'?'3px solid var(--gold)':'3px solid var(--border)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
                   <div>
-                    <div style={{fontWeight:700,fontSize:14}}>{p.bars?.nome} &mdash; {p.data_pedido || new Date(p.criado_em).toISOString().slice(0,10)}</div>
+                    <div style={{fontWeight:700,fontSize:14}}>{p.bars?.nome} &mdash; {pedidoSaleDate(p)}</div>
+                    {p.data_entrega_prevista && p.data_pedido && p.data_entrega_prevista !== p.data_pedido && (
+                      <div style={{fontSize:11,color:'var(--text3)'}}>Pedido registrado: {p.data_pedido}</div>
+                    )}
                     {p.data_entrega_prevista&&<div style={{fontSize:12,color:'var(--text3)'}}>Delivery: {p.data_entrega_prevista}</div>}
                     {p.obs&&<div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{p.obs}</div>}
                   </div>

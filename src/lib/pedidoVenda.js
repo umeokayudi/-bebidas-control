@@ -1,7 +1,7 @@
-/** Data contábil da venda = data do pedido/entrega, não quando foi confirmado */
+/** Data contábil = data de entrega requerida, não quando o admin confirmou no sistema */
 export function pedidoSaleDate(pedido) {
-  return pedido?.data_pedido
-    || pedido?.data_entrega_prevista
+  return pedido?.data_entrega_prevista
+    || pedido?.data_pedido
     || pedido?.criado_em?.slice(0, 10)
     || new Date().toISOString().slice(0, 10)
 }
@@ -61,7 +61,7 @@ export async function createVendaFromPedido(supabase, pedido) {
   if (existing) {
     const saleDate = pedidoSaleDate(pedido)
     if (existing.data !== saleDate) {
-      await supabase.from('vendas').update({ data: saleDate }).eq('id', existing.id)
+      await supabase.from('vendas').update({ data: saleDate, data_venda: saleDate }).eq('id', existing.id)
       existing.data = saleDate
     }
     const total = pedidoTotal(pedido)
@@ -77,6 +77,7 @@ export async function createVendaFromPedido(supabase, pedido) {
   const total = pedidoTotal(pedido)
   const { data: venda, error } = await supabase.from('vendas').insert({
     data: saleDate,
+    data_venda: saleDate,
     bar_id: pedido.bar_id,
     total,
     obs: pedidoVendaObs(pedido.id),
@@ -94,11 +95,13 @@ async function insertVendaItensFromPedido(supabase, venda, pedido) {
   const itens = (pedido.pedidos_itens || []).filter(it => it.produto_id)
   if (!venda?.id || !itens.length) return
 
-  const { data: existing } = await supabase.from('vendas_itens').select('id').eq('venda_id', venda.id).limit(1)
-  if (existing?.length) return
+  const { data: existing } = await supabase.from('vendas_itens').select('produto_id').eq('venda_id', venda.id)
+  const have = new Set((existing || []).map(r => r.produto_id))
+  const missing = itens.filter(it => !have.has(it.produto_id))
+  if (!missing.length) return
 
   const { error: iErr } = await supabase.from('vendas_itens').insert(
-    itens.map(it => ({
+    missing.map(it => ({
       venda_id: venda.id,
       produto_id: it.produto_id,
       qtd: it.qtd,

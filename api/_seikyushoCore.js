@@ -145,8 +145,9 @@ export async function registerSeikyusho(body) {
     : (+extracted.total || +extracted.subtotal || 0)
 
   if (totalCusto > 0) {
+    const compraDate = extracted.periodo_inicio || extracted.periodo_fim || extracted.data || new Date().toISOString().slice(0, 10)
     const { data: compra, error } = await sb.from('compras').insert({
-      data: extracted.data || new Date().toISOString().slice(0, 10),
+      data: compraDate,
       fornecedor: extracted.fornecedor || 'Fornecedor',
       pagamento: extracted.pagamento || 'Transfer',
       subtotal: +extracted.subtotal || totalCusto,
@@ -163,12 +164,16 @@ export async function registerSeikyusho(body) {
 
     if (itensCusto.length) {
       await sb.from('compras_itens').insert(
-        itensCusto.map(it => ({
-          compra_id: compra.id,
-          nome: it.nome,
-          qtd: it.qtd || 1,
-          custo_unitario: it.custo_unitario || 0,
-        }))
+        itensCusto.map(it => {
+          const prod = matchProduct(it.nome, prods)
+          return {
+            compra_id: compra.id,
+            produto_id: prod?.id || null,
+            nome: it.nome,
+            qtd: it.qtd || 1,
+            custo_unitario: it.custo_unitario || 0,
+          }
+        })
       )
     }
     report.custo = totalCusto
