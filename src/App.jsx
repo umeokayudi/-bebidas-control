@@ -11,7 +11,7 @@ class ErrorBoundary extends Component {
 import { LogoSidebar } from './components/Logo'
 import { MobileTopBar, ShellOverlay, useMobileMenuLock } from './components/MobileShell'
 import { useNotifications, NotificationBell } from './components/Notifications'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { AuthProvider, useAuth, LoginPage } from './components/Auth'
 import { supabase } from './lib/supabase'
 import ComprasTab   from './components/Compras'
@@ -108,11 +108,48 @@ function DataHoverRow({ tip, children, style }) {
 }
 
 function MetricCardHover({ tip, className, children }) {
+  const ref = useRef(null)
+  const [show, setShow] = useState(false)
+  const [pos, setPos] = useState({ x: 0, y: 0, placeBelow: true })
+
+  function updatePosition() {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const placeBelow = r.top < 80
+    setPos({
+      x: r.left + r.width / 2,
+      y: placeBelow ? r.bottom + 10 : r.top - 10,
+      placeBelow,
+    })
+  }
+
   return (
-    <div className={`metric-card metric-card-hover ${className || ''}`}>
-      <div className="metric-hover-tip">{tip}</div>
-      {children}
-    </div>
+    <>
+      <div
+        ref={ref}
+        className={`metric-card metric-card-hover ${className || ''}`}
+        onMouseEnter={() => { updatePosition(); setShow(true) }}
+        onMouseLeave={() => setShow(false)}
+        onFocus={() => { updatePosition(); setShow(true) }}
+        onBlur={() => setShow(false)}
+      >
+        {children}
+      </div>
+      {show && tip && (
+        <div
+          className="metric-hover-tip-fixed"
+          role="tooltip"
+          style={{
+            left: pos.x,
+            top: pos.y,
+            transform: pos.placeBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+          }}
+        >
+          {tip}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -240,7 +277,7 @@ function Dashboard({ onNav }) {
   const isCurrentMonth = selMonth === mesAtual
 
   return (
-    <div className="fade-in">
+    <div className="fade-in dashboard-page">
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--navy)', letterSpacing: -0.5 }}>Dashboard</div>

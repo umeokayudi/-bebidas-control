@@ -143,7 +143,7 @@ tbody tr:hover td { background: var(--bg3); }
 
 @keyframes spin    { to { transform: rotate(360deg); } }
 @keyframes fadeIn  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-.fade-in { animation: fadeIn 0.22s ease; }
+.fade-in { animation: fadeIn 0.22s ease; overflow: visible; }
 
 .spinner {
   display: inline-block;
@@ -159,6 +159,15 @@ tbody tr:hover td { background: var(--bg3); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 .grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; overflow: visible; }
+
+.dashboard-page {
+  overflow: visible;
+  position: relative;
+}
+.dashboard-page .grid4 {
+  position: relative;
+  z-index: 1;
+}
 
 @media (max-width: 700px) {
   .grid3, .grid4 { grid-template-columns: 1fr 1fr; }
@@ -177,7 +186,6 @@ tbody tr:hover td { background: var(--bg3); }
   padding: 20px 22px;
   box-shadow: var(--shadow);
   position: relative;
-  overflow: hidden;
 }
 .metric-card::after {
   content: '';
@@ -207,6 +215,7 @@ tbody tr:hover td { background: var(--bg3); }
   flex-shrink: 0;
   box-shadow: 4px 0 20px rgba(0,16,40,0.15);
   z-index: 200;
+  overflow-x: hidden;
 }
 
 .sidebar-brand {
@@ -269,7 +278,7 @@ tbody tr:hover td { background: var(--bg3); }
   flex: 1;
   padding: 28px 32px;
   max-width: 980px;
-  overflow-x: visible;
+  overflow: visible;
   width: 100%;
   min-width: 0;
 }
@@ -654,18 +663,19 @@ body.menu-open {
   visibility: visible;
 }
 
-/* KPI cards — detalhe no hover */
-.metric-card-hover {
-  position: relative;
+/* KPI cards — detalhe no hover (fixed para não cortar no topo) */
+.metric-card.metric-card-hover {
   overflow: visible;
   cursor: default;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: box-shadow 0.15s;
 }
-.metric-card-hover .metric-hover-tip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
+.metric-card.metric-card-hover:hover {
+  box-shadow: var(--shadow-md);
+  z-index: 5;
+}
+.metric-hover-tip-fixed {
+  position: fixed;
+  z-index: 9999;
   padding: 10px 14px;
   border-radius: 12px;
   background: var(--navy);
@@ -675,21 +685,19 @@ body.menu-open {
   line-height: 1.55;
   white-space: pre-line;
   text-align: center;
-  box-shadow: 0 10px 28px rgba(0,16,40,0.25);
-  opacity: 0;
-  visibility: hidden;
+  max-width: min(280px, 90vw);
+  box-shadow: 0 10px 28px rgba(0,16,40,0.28);
   pointer-events: none;
-  transition: opacity 0.15s, visibility 0.15s;
-  z-index: 40;
 }
-.metric-card-hover:hover .metric-hover-tip {
-  opacity: 1;
-  visibility: visible;
+/* legado — mantido para outros usos */
+.metric-card-hover {
+  position: relative;
+  overflow: visible;
+  cursor: default;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.metric-card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  z-index: 50;
+.metric-card-hover .metric-hover-tip {
+  display: none;
 }
 
 .chart-card {
