@@ -4,7 +4,7 @@ import { useAuth } from './Auth'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
 import { HOLDING_DRINKS } from '../lib/holdingLinks'
 import { LogoSidebar } from './Logo'
-import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas, PageHeader, PillToggle } from './utils'
 import {
   analyzePurchases,
   buildPricingMap,
@@ -123,21 +123,17 @@ function HomeTab({ bar, onTab }) {
   return (
     <div className="fade-in" style={{ maxWidth:1000 }}>
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
-        <div>
-          <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Client dashboard · JBM Drinks</div>
-        </div>
-        <div style={{ display:'flex', gap:6 }}>
-          {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
-            <button key={v} onClick={()=>setPeriodo(v)} style={{
-              padding:'6px 12px', borderRadius:8, fontSize:12, fontWeight:600,
-              background:periodo===v?'var(--navy)':'var(--bg3)',
-              color:periodo===v?'white':'var(--text2)', border:'none', cursor:'pointer'
-            }}>{l}</button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title={bar.nome}
+        subtitle="Client dashboard · JBM Drinks"
+        actions={
+          <PillToggle
+            options={[['7','7d'],['30','30d'],['90','90d'],['365','1y']]}
+            value={periodo}
+            onChange={setPeriodo}
+          />
+        }
+      />
 
       {/* ── Monthly account + POS projection hero ── */}
       <div style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:20 }}>
@@ -2284,18 +2280,11 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         <div style={{padding:'24px 20px 20px',borderBottom:'1px solid rgba(193,156,86,0.15)'}}>
           <LogoSidebar />
         </div>
-        <div style={{padding:'12px 0',flex:1}}>
+        <div style={{padding:'12px 0',flex:1,overflowY:'auto'}}>
           {NAV.map(n => (
-            <button key={n.id} onClick={() => setTab(n.id)} style={{
-              display:'flex', alignItems:'center', gap:10,
-              padding:'10px 20px', background: tab===n.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-              border:'none', color: tab===n.id ? 'white' : 'rgba(255,255,255,0.55)',
-              fontSize:13, fontWeight: tab===n.id ? 700 : 400,
-              cursor:'pointer', textAlign:'left', width:'100%',
-              borderLeft: tab===n.id ? '3px solid var(--gold)' : '3px solid transparent',
-              transition:'all 0.15s'
-            }}>
-              <span>{n.icon}</span>{n.label}
+            <button key={n.id} onClick={() => setTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
+              <span className="nav-item-icon">{n.icon}</span>
+              <span>{n.label}</span>
             </button>
           ))}
         </div>
@@ -2314,7 +2303,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <button onClick={signOut} style={{width:'100%',padding:'7px',fontSize:11,color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,background:'transparent',textTransform:'uppercase',letterSpacing:'0.04em'}}>Sign out</button>
         </div>
       </aside>
-      <main style={{flex:1,padding:'28px 32px',overflowY:'auto',maxWidth:1100}}>
+      <main className="main-content">
         {tab==='home'       && <HomeTab bar={bar} onTab={setTab} />}
         {tab==='analytics'  && <ClientAnalyticsTab bar={bar} onTab={setTab} />}
         {tab==='orders'     && <OrdersTab bar={bar} />}

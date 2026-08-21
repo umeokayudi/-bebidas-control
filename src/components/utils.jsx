@@ -45,16 +45,67 @@ export function roleLabel(role) {
 
 // ── Metric Card ───────────────────────────────────────────────────────────────
 export function MetricCard({ label, value, sub, color = 'blue', icon }) {
+  const valueColor = {
+    green: 'var(--green)',
+    red: 'var(--red)',
+    gold: 'var(--gold)',
+    navy: 'var(--navy)',
+    blue: 'var(--blue)',
+  }[color] || 'var(--navy)'
+
   return (
     <div className={`metric-card ${color}`}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <div className="metric-label">{label}</div>
-        {icon && <span style={{ fontSize:20, opacity:0.5 }}>{icon}</span>}
+        {icon && <span style={{ fontSize:18, opacity:0.45 }}>{icon}</span>}
       </div>
-      <div className="metric-value" style={{
-        color: color==='green'?'var(--green)':color==='red'?'var(--red)':color==='gold'?'var(--gold)':'var(--blue)'
-      }}>{value}</div>
+      <div className="metric-value" style={{ color: valueColor }}>{value}</div>
       {sub && <div className="metric-sub">{sub}</div>}
+    </div>
+  )
+}
+
+// ── Modern layout primitives (client portal style) ────────────────────────────
+export function PageHeader({ title, subtitle, actions }) {
+  return (
+    <div className="page-header">
+      <div>
+        <div className="page-title">{title}</div>
+        {subtitle && <div className="page-subtitle">{subtitle}</div>}
+      </div>
+      {actions && <div>{actions}</div>}
+    </div>
+  )
+}
+
+export function KpiTile({ label, value, sub, color = 'var(--navy)', subColor }) {
+  return (
+    <div className="kpi-tile">
+      <div className="kpi-tile-label">{label}</div>
+      <div className="kpi-tile-value" style={{ color }}>{value}</div>
+      {sub && <div className="kpi-tile-sub" style={{ color: subColor || undefined, fontWeight: subColor ? 600 : 400 }}>{sub}</div>}
+    </div>
+  )
+}
+
+export function Panel({ children, className = '', hero = false, style }) {
+  const cls = hero ? 'panel-hero' : 'panel'
+  return <div className={`${cls} ${className}`.trim()} style={style}>{children}</div>
+}
+
+export function PillToggle({ options, value, onChange }) {
+  return (
+    <div className="pill-toggle">
+      {options.map(([v, label]) => (
+        <button
+          key={v}
+          type="button"
+          className={value === v ? 'active' : ''}
+          onClick={() => onChange(v)}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -106,9 +157,9 @@ export function Empty({ text, icon = '📭' }) {
 // ── Section Title ─────────────────────────────────────────────────────────────
 export function SectionTitle({ children, sub }) {
   return (
-    <div style={{ marginBottom:18 }}>
-      <div style={{ fontSize:16, fontWeight:700, letterSpacing:-0.3 }}>{children}</div>
-      {sub && <div style={{ fontSize:12, color:'var(--text2)', marginTop:2 }}>{sub}</div>}
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: -0.2, color: 'var(--navy)' }}>{children}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>{sub}</div>}
     </div>
   )
 }

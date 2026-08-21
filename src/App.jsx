@@ -28,7 +28,13 @@ import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, monthLabel, filterSupplierVendas, roleLabel } from './components/utils'
+import { fmtYen, monthLabel, filterSupplierVendas, roleLabel, PageHeader, KpiTile, Panel } from './components/utils'
+
+const TAB_ICONS = {
+  dashboard: '📊', purchases: '🛒', sales: '💰', pedidos: '📋', relatorio: '📈',
+  ryoshusho: '🧾', seikyusho: '📄', products: '🍾', bars: '🏪', usuarios: '👤',
+  faturas: '💳', bi: '📉', ai: '🤖', suppliers: '🚚', cashflow: '💸', barfinance: '🏛',
+}
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -140,55 +146,61 @@ function Dashboard({ onNav }) {
 
   return (
     <div className="fade-in">
-      <div style={{marginBottom:24}}>
-        <div style={{fontSize:22,fontWeight:800,color:'var(--navy)',letterSpacing:-0.5}}>Dashboard</div>
-        <div style={{fontSize:12,color:'var(--text3)',marginTop:2,textTransform:'capitalize'}}>{mes}</div>
-      </div>
+      <PageHeader title="Dashboard" subtitle={`JBM Drinks · ${mes}`} />
 
       {stats.pedidosPendentes > 0 && (
-        <div onClick={()=>onNav('pedidos')} style={{
-          background:'linear-gradient(135deg,var(--navy),var(--navy2))',
-          borderRadius:12, padding:'14px 20px', marginBottom:16, cursor:'pointer',
-          display:'flex', justifyContent:'space-between', alignItems:'center',
-          border:'1px solid rgba(193,156,86,0.3)'
-        }}>
-          <div style={{color:'white',fontSize:13,fontWeight:600}}>
-            ⚠️ {stats.pedidosPendentes} order(s) awaiting your confirmation
+        <div className="alert-banner navy" onClick={()=>onNav('pedidos')} role="button" tabIndex={0}>
+          <div style={{ fontWeight: 600 }}>
+            ⚠️ {stats.pedidosPendentes} pedido(s) aguardando confirmação
           </div>
-          <span style={{color:'var(--gold)',fontSize:12,fontWeight:700}}>View orders →</span>
+          <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: 12 }}>Ver pedidos →</span>
         </div>
       )}
 
-      <div className="grid4" style={{marginBottom:20}}>
-        <div className="metric-card red"><div className="metric-label">Monthly cost</div><div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.custoMes)}</div><div className="metric-sub">{stats.totalCompras} purchases</div></div>
-        <div className="metric-card navy"><div className="metric-label">Monthly revenue</div><div className="metric-value" style={{color:'var(--navy)',fontSize:22}}>{fmtYen(stats.receitaMes)}</div><div className="metric-sub">{stats.totalVendas} sales</div></div>
-        <div className="metric-card green"><div className="metric-label">Net profit</div><div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div><div className="metric-sub">Margin {stats.margem}%</div></div>
-        <div className="metric-card gold"><div className="metric-label">Avg markup</div><div className="metric-value" style={{color:'var(--gold)',fontSize:22}}>{stats.markup}%</div><div className="metric-sub">{stats.totalProdutos} products</div></div>
+      <div style={{ display:'grid', gridTemplateColumns:'1.2fr 1fr 1fr 1fr', gap:14, marginBottom:20 }}>
+        <Panel hero>
+          <div className="panel-label">Lucro líquido · mês</div>
+          <div className="panel-value">{fmtYen(stats.lucroMes)}</div>
+          <div style={{ fontSize:12, opacity:0.75, marginTop:10 }}>
+            Margem {stats.margem}% · receita {fmtYen(stats.receitaMes)}
+          </div>
+        </Panel>
+        <KpiTile label="Custo mensal" value={fmtYen(stats.custoMes)} sub={`${stats.totalCompras} compras`} color="var(--red)" />
+        <KpiTile label="Receita mensal" value={fmtYen(stats.receitaMes)} sub={`${stats.totalVendas} vendas`} color="var(--navy)" />
+        <KpiTile label="Markup médio" value={`${stats.markup}%`} sub={`${stats.totalProdutos} produtos`} color="var(--gold)" />
       </div>
 
       <div className="grid2" style={{marginBottom:16}}>
-        <div className="card"><div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:4}}>Monthly revenue</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months</div><BarChart data={stats.receitaPorMes} color="#001028"/></div>
-        <div className="card"><div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:4}}>Monthly profit</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months</div><BarChart data={stats.lucroPorMes} color="#1a6b4a"/></div>
+        <div className="panel">
+          <div className="chart-panel-title">Receita mensal</div>
+          <div className="chart-panel-sub">Últimos 6 meses</div>
+          <BarChart data={stats.receitaPorMes} color="#001028"/>
+        </div>
+        <div className="panel">
+          <div className="chart-panel-title" style={{ color:'var(--green)' }}>Lucro mensal</div>
+          <div className="chart-panel-sub">Últimos 6 meses</div>
+          <BarChart data={stats.lucroPorMes} color="#1a6b4a"/>
+        </div>
       </div>
 
       <div className="grid2" style={{marginBottom:16}}>
-        <div className="card">
-          <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Profit by bar</div>
-          {stats.porBar.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
+        <div className="panel">
+          <div className="chart-panel-title">Lucro por bar</div>
+          {stats.porBar.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>Sem vendas este mês</div>
           :stats.porBar.map(b=>(
             <div key={b.id} style={{marginBottom:18}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:8,height:8,borderRadius:'50%',background:b.cor}}/><span style={{fontWeight:600,fontSize:13}}>{b.nome}</span></div>
                 <span style={{fontWeight:800,color:b.lucro>=0?'var(--green)':'var(--red)',fontSize:13}}>{fmtYen(b.lucro)}</span>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)}</span><span>{b.sales} sales</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)}</span><span>{b.sales} vendas</span></div>
               <div className="progress-bar"><div className="progress-fill" style={{width:stats.receitaMes>0?`${Math.round(b.receita/stats.receitaMes*100)}%`:'0%',background:b.cor}}/></div>
             </div>
           ))}
         </div>
-        <div className="card">
-          <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Top products</div>
-          {stats.topProdutos.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
+        <div className="panel">
+          <div className="chart-panel-title">Top produtos</div>
+          {stats.topProdutos.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>Sem vendas este mês</div>
           :stats.topProdutos.map((p,i)=>(
             <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -201,9 +213,9 @@ function Dashboard({ onNav }) {
         </div>
       </div>
 
-            <div className="card" style={{marginBottom:16}}>
-        <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
-        {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales this month</div>
+      <div className="panel" style={{marginBottom:16}}>
+        <div className="chart-panel-title" style={{ color:'var(--green)' }}>🏆 Bebidas mais lucrativas</div>
+        {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>Sem vendas este mês</div>
         :(stats.topLucro||[]).map((p,i)=>(
           <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -212,17 +224,17 @@ function Dashboard({ onNav }) {
             </div>
             <div style={{textAlign:'right'}}>
               <div style={{fontWeight:700,fontSize:12,color:'var(--green)'}}>{fmtYen(p.lucro)}</div>
-              <div style={{fontSize:10,color:'var(--text3)'}}>{p.receita>0?Math.round(p.lucro/p.receita*100):0}% margin</div>
+              <div style={{fontSize:10,color:'var(--text3)'}}>{p.receita>0?Math.round(p.lucro/p.receita*100):0}% margem</div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="card">
-        <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:14}}>Quick actions</div>
+      <div className="quick-actions">
+        <div className="panel-label">Ações rápidas</div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-          {[{label:'New purchase',tab:'purchases'},{label:'Register sale',tab:'sales'},{label:'View orders',tab:'pedidos'},{label:'Emitir 領収書',tab:'ryoshusho'}].map(a=>(
-            <button key={a.tab} onClick={()=>onNav(a.tab)} className="btn-primary" style={{padding:'9px 18px',borderRadius:10,fontSize:12}}>{a.label}</button>
+          {[{label:'Nova compra',tab:'purchases'},{label:'Registrar venda',tab:'sales'},{label:'Ver pedidos',tab:'pedidos'},{label:'請求書 IA',tab:'seikyusho'},{label:'Emitir 領収書',tab:'ryoshusho'}].map(a=>(
+            <button key={a.tab} type="button" onClick={()=>onNav(a.tab)}>{a.label}</button>
           ))}
         </div>
       </div>
@@ -287,10 +299,11 @@ function Shell() {
         <div style={{padding:'28px 20px 24px',borderBottom:'1px solid rgba(193,156,86,0.15)'}}>
           <LogoSidebar />
         </div>
-        <nav style={{flex:1,padding:'16px 12px',overflowY:'auto'}}>
+        <nav style={{flex:1,padding:'12px 0',overflowY:'auto'}}>
           {tabs.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
-              <span style={{fontSize:13}}>{t.label}</span>
+              <span className="nav-item-icon">{TAB_ICONS[t.id] || '•'}</span>
+              <span>{t.label}</span>
               {t.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
               )}
@@ -314,7 +327,7 @@ function Shell() {
         </div>
       </aside>
 
-      <main style={{flex:1,padding:'28px 32px',maxWidth:980,overflowX:'hidden'}}>
+      <main className="main-content">
         <div className="fade-in" key={tab}>
           {tab==='dashboard' && <Dashboard onNav={setTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
