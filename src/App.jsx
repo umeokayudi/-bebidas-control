@@ -60,16 +60,41 @@ const STAFF_TABS = [
 
 // ── MINI BAR CHART ────────────────────────────────────────────────────────────
 function BarChart({ data, color='#c19c56', height=80 }) {
+  const [hover, setHover] = useState(null)
   if (!data||data.length===0) return null
   const max = Math.max(...data.map(d=>d.value),1)
   return (
     <div style={{display:'flex',alignItems:'flex-end',gap:4,height,paddingTop:8}}>
       {data.map((d,i)=>(
-        <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+        <div
+          key={i}
+          role="presentation"
+          onMouseEnter={()=>setHover(i)}
+          onMouseLeave={()=>setHover(null)}
+          style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4,position:'relative',cursor:'pointer'}}
+        >
+          {hover===i && (
+            <div style={{
+              position:'absolute', bottom:'calc(100% + 4px)', left:'50%', transform:'translateX(-50%)',
+              background:'var(--navy)', color:'#fff', padding:'6px 10px', borderRadius:8,
+              fontSize:11, fontWeight:700, whiteSpace:'nowrap', zIndex:10,
+              boxShadow:'0 6px 16px rgba(0,0,0,0.18)', pointerEvents:'none',
+            }}>
+              <div style={{ fontSize:9, opacity:0.75, marginBottom:2 }}>{d.label}</div>
+              {fmtYen(d.value)}
+            </div>
+          )}
           <div style={{width:'100%',borderRadius:'3px 3px 0 0',
             height:`${Math.max(4,(d.value/max)*height*0.85)}px`,
-            background:color,opacity:i===data.length-1?1:0.5,transition:'height 0.4s ease'}}/>
-          <div style={{fontSize:9,color:'var(--text3)',whiteSpace:'nowrap'}}>{d.label}</div>
+            background:color,
+            opacity: hover===i ? 1 : (i===data.length-1 ? 1 : 0.5),
+            transition:'height 0.4s ease, opacity 0.15s'}}/>
+          <div style={{
+            fontSize:9,
+            color: hover===i ? 'var(--navy)' : 'var(--text3)',
+            fontWeight: hover===i ? 700 : 400,
+            whiteSpace:'nowrap',
+          }}>{d.label}</div>
         </div>
       ))}
     </div>
