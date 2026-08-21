@@ -8,6 +8,7 @@ import {
   updateSupplierPrices,
   syncPedidosEntregues,
 } from './_deliveryMargin.js'
+import { buildPurchaseCostIndex, unitCostAtDate } from './_marginCost.js'
 
 const SEIKYUSHO_SYSTEM = `Você lê 請求書 (seikyusho) — fatura do FORNECEDOR que a JBM Drinks paga (custo de compra).
 O cliente bar (ex: Atomic) já fez pedidos no portal; a entrega pode ser direta ao bar.
@@ -200,6 +201,11 @@ export async function registerSeikyusho(body) {
     report.lucro = report.receita - report.custo
     report.margemPct = report.receita > 0 ? Math.round((report.lucro / report.receita) * 100) : 0
   } else if (extracted.entregas?.length || extracted.itens_venda?.length) {
+    const { data: comprasHist } = await sb.from('compras')
+      .select('data, compras_itens(produto_id,nome,custo_unitario)')
+      .order('data')
+    const costIndex = buildPurchaseCostIndex(comprasHist || [], prods)
+
     const entregas = [
       ...(extracted.entregas || []),
       ...(extracted.itens_venda?.length ? [{
@@ -219,7 +225,9 @@ export async function registerSeikyusho(body) {
       let custo = 0
       for (const { prod, it } of mapped) {
         const preco = it.preco_unitario || prod.preco_venda || 0
-        const m = calcItemMargin(it.qtd, preco, prod.custo)
+        const saleDate = ent.data || extracted.data
+        const custoUnit = unitCostAtDate(costIndex, prod.id, saleDate, prod.custo)
+        const m = calcItemMargin(it.qtd, preco, custoUnit)
         receita += m.receita
         custo += m.custo
       }

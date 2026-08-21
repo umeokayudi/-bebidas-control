@@ -1,4 +1,5 @@
 import { ATOMIC_BAR_ID } from './_atomicJuneFix.js'
+import { buildPurchaseCostIndex, unitCostAtDate } from './_marginCost.js'
 
 function norm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
@@ -33,6 +34,11 @@ export function calcItemMargin(qtd, precoVenda, custo) {
   const receita = (+qtd || 1) * (+precoVenda || 0)
   const custoTotal = (+qtd || 1) * (+custo || 0)
   return { receita, custo: custoTotal, lucro: receita - custoTotal }
+}
+
+async function loadPurchaseCostIndex(sb, prods) {
+  const { data: compras } = await sb.from('compras').select('data, compras_itens(produto_id,nome,custo_unitario)').order('data')
+  return buildPurchaseCostIndex(compras || [], prods)
 }
 
 export async function updateSupplierPrices(sb, { fornecedorNome, itensCusto, produtos, fornecedores }) {
@@ -92,6 +98,10 @@ export async function syncPedidosEntregues(sb, opts = {}) {
   const { data: pedidos, error } = await query
   if (error) throw new Error(error.message)
 
+  const costIndex = prods.length
+    ? await loadPurchaseCostIndex(sb, prods)
+    : buildPurchaseCostIndex([], prods)
+
   const report = {
     pedidos: 0,
     vendas: 0,
@@ -120,7 +130,7 @@ export async function syncPedidosEntregues(sb, opts = {}) {
     for (const it of p.pedidos_itens || []) {
       const prod = it.produtos || prods.find(x => x.id === it.produto_id)
       const preco = it.preco_unitario || prod?.preco_venda || 0
-      const custoUnit = prod?.custo || 0
+      const custoUnit = unitCostAtDate(costIndex, it.produto_id, p.data_pedido, prod?.custo || 0)
       const m = calcItemMargin(it.qtd, preco, custoUnit)
       receita += m.receita
       custo += m.custo
