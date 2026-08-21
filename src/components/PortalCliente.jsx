@@ -4,7 +4,7 @@ import { useAuth } from './Auth'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
 import { HOLDING_DRINKS } from '../lib/holdingLinks'
 import { LogoSidebar } from './Logo'
-import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas, PedidoItemChip } from './utils'
 import {
   analyzePurchases,
   buildPricingMap,
@@ -848,9 +848,13 @@ function OrdersTab({ bar }) {
               </div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
                 {(p.pedidos_itens||[]).map(it => (
-                  <span key={it.id} style={{ fontSize:11, padding:'3px 10px', borderRadius:20, background:'var(--bg3)', color:'var(--text2)' }}>
-                    {it.produtos?.nome} ×{it.qtd}
-                  </span>
+                  <PedidoItemChip
+                    key={it.id}
+                    nome={it.produtos?.nome || '?'}
+                    qtd={it.qtd}
+                    precoUnitario={it.preco_unitario}
+                    custoUnitario={it.produtos?.custo}
+                  />
                 ))}
               </div>
               <div style={{display:'flex',gap:8}}>

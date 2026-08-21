@@ -29,6 +29,7 @@ import BusinessIntel from './components/BusinessIntel'
 import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel, filterSupplierVendas, roleLabel } from './components/utils'
+import { buildPurchaseCostIndex, marginFromSales, marginFromVendaItem } from './lib/marginCost'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -88,44 +89,48 @@ function Dashboard({ onNav }) {
     const now = new Date()
     const mesAtual = now.toISOString().slice(0,7)
     const [{ data:purchases },{ data:salesRaw },{ data:products },{ data:bars },{ data:pedidos }] = await Promise.all([
-      supabase.from('compras').select('*').order('data'),
+      supabase.from('compras').select('*, compras_itens(produto_id,nome,custo_unitario)').order('data'),
       supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').order('data'),
       supabase.from('produtos').select('*').eq('ativo',true),
       supabase.from('bars').select('*'),
       supabase.from('pedidos').select('*').eq('status','pendente'),
     ])
     const sales = filterSupplierVendas(salesRaw)
+    const costIndex = buildPurchaseCostIndex(purchases || [], products || [])
     const meses=[]
     for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);meses.push(d.toISOString().slice(0,7))}
     const receitaPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(sales||[]).filter(v=>v.data?.startsWith(m)).reduce((a,v)=>a+(+v.total||0),0)}))
-    const custoPorMes=meses.map(m=>({label:monthLabel(m).split('/')[0],value:(purchases||[]).filter(c=>c.data?.startsWith(m)).reduce((a,c)=>a+(+c.total_pago||0),0)}))
+    const custoPorMes=meses.map(m=>{
+      const sMes=(sales||[]).filter(v=>v.data?.startsWith(m))
+      return { label:monthLabel(m).split('/')[0], value: marginFromSales(sMes, costIndex, products).custo }
+    })
     const lucroPorMes=meses.map((m,i)=>({label:monthLabel(m).split('/')[0],value:receitaPorMes[i].value-custoPorMes[i].value}))
     const purchasesMes=(purchases||[]).filter(c=>c.data?.startsWith(mesAtual))
     const salesMes=(sales||[]).filter(v=>v.data?.startsWith(mesAtual))
-    const custoMes=purchasesMes.reduce((a,c)=>a+(+c.total_pago||0),0)
-    const receitaMes=salesMes.reduce((a,v)=>a+(+v.total||0),0)
-    const lucroMes=receitaMes-custoMes
-    const margem=receitaMes>0?Math.round(lucroMes/receitaMes*100):0
-    const markup=custoMes>0?Math.round((receitaMes/custoMes-1)*100):0
+    const mesMargin = marginFromSales(salesMes, costIndex, products)
+    const receitaMes = mesMargin.receita || salesMes.reduce((a,v)=>a+(+v.total||0),0)
+    const custoMes = mesMargin.custo
+    const lucroMes = receitaMes - custoMes
+    const margem = receitaMes > 0 ? Math.round((lucroMes / receitaMes) * 100) : 0
+    const markup = custoMes > 0 ? Math.round((receitaMes / custoMes - 1) * 100) : 0
     const porBar=(bars||[]).map(bar=>{
       const vBar=salesMes.filter(v=>v.bar_id===bar.id)
-      const receita=vBar.reduce((a,v)=>a+(+v.total||0),0)
-      const custo=0
-      return {...bar,receita,lucro:receita-custo,sales:vBar.length}
+      const m = marginFromSales(vBar, costIndex, products)
+      const receita = m.receita || vBar.reduce((a,v)=>a+(+v.total||0),0)
+      return {...bar,receita,custo:m.custo,lucro:receita-m.custo,sales:vBar.length}
     })
     const prodMap={}
     salesMes.forEach(v=>(v.vendas_itens||[]).forEach(it=>{
       const pid=it.produto_id
-      if(!prodMap[pid])prodMap[pid]={nome:it.produtos?.nome||'?',qtd:0,receita:0,custo:0}
-      prodMap[pid].qtd+=it.qtd;prodMap[pid].receita+=it.preco_unitario*it.qtd;prodMap[pid].custo+=(it.produtos?.preco_venda||0)/Math.max(1,(it.produtos?.drinks_por_garrafa||1))*it.qtd
+      const m = marginFromVendaItem(it, v.data, costIndex, products)
+      if(!prodMap[pid])prodMap[pid]={nome:it.produtos?.nome||'?',qtd:0,receita:0,custo:0,lucro:0}
+      prodMap[pid].qtd+=it.qtd
+      prodMap[pid].receita+=m.receita
+      prodMap[pid].custo+=m.custo
+      prodMap[pid].lucro+=m.lucro
     }))
     const topProdutos=Object.values(prodMap).sort((a,b)=>b.receita-a.receita).slice(0,5)
-    const topLucro=(products||[]).map(p=>{
-      const vendido=salesMes.reduce((a,v)=>a+(v.vendas_itens||[]).filter(it=>it.produto_id===p.id).reduce((b,it)=>b+it.qtd,0),0)
-      const receita=vendido*p.preco_venda
-      const custo=vendido*p.custo
-      return {...p,vendido,receita,custo,lucro:receita-custo}
-    }).filter(p=>p.vendido>0).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
+    const topLucro=Object.values(prodMap).sort((a,b)=>b.lucro-a.lucro).slice(0,5)
     const ultimasCompras=(purchases||[]).slice(-4).reverse()
     setStats({custoMes,receitaMes,lucroMes,margem,markup,porBar,topProdutos,ultimasCompras,
               receitaPorMes,lucroPorMes,topLucro,totalProdutos:(products||[]).length,
@@ -160,9 +165,9 @@ function Dashboard({ onNav }) {
       )}
 
       <div className="grid4" style={{marginBottom:20}}>
-        <div className="metric-card red"><div className="metric-label">Monthly cost</div><div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.custoMes)}</div><div className="metric-sub">{stats.totalCompras} purchases</div></div>
+        <div className="metric-card red"><div className="metric-label">Custo JBM (unitário)</div><div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.custoMes)}</div><div className="metric-sub">Custo real dos itens vendidos · {stats.totalCompras} compras no mês</div></div>
         <div className="metric-card navy"><div className="metric-label">Monthly revenue</div><div className="metric-value" style={{color:'var(--navy)',fontSize:22}}>{fmtYen(stats.receitaMes)}</div><div className="metric-sub">{stats.totalVendas} sales</div></div>
-        <div className="metric-card green"><div className="metric-label">Net profit</div><div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div><div className="metric-sub">Margin {stats.margem}%</div></div>
+        <div className="metric-card green"><div className="metric-label">Lucro real</div><div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div><div className="metric-sub">Venda − custo unitário compras · {stats.margem}%</div></div>
         <div className="metric-card gold"><div className="metric-label">Avg markup</div><div className="metric-value" style={{color:'var(--gold)',fontSize:22}}>{stats.markup}%</div><div className="metric-sub">{stats.totalProdutos} products</div></div>
       </div>
 
@@ -181,7 +186,7 @@ function Dashboard({ onNav }) {
                 <div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:8,height:8,borderRadius:'50%',background:b.cor}}/><span style={{fontWeight:600,fontSize:13}}>{b.nome}</span></div>
                 <span style={{fontWeight:800,color:b.lucro>=0?'var(--green)':'var(--red)',fontSize:13}}>{fmtYen(b.lucro)}</span>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)}</span><span>{b.sales} sales</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)} · Custo unit. {fmtYen(b.custo||0)}</span><span>{b.sales} sales</span></div>
               <div className="progress-bar"><div className="progress-fill" style={{width:stats.receitaMes>0?`${Math.round(b.receita/stats.receitaMes*100)}%`:'0%',background:b.cor}}/></div>
             </div>
           ))}

@@ -51,7 +51,7 @@ export default function VendasTab() {
     setSaving(true)
     const { data: venda, error } = await supabase.from('vendas').insert({
       data: form.data, bar_id: form.bar_id,
-      total: totalVendaForm, obs: form.obs || 'Entrega fornecedor', criado_por: user.id, origem: 'fornecedor'
+      total: totalVendaForm, obs: form.obs || 'Entrega fornecedor', criado_por: user.id,
     }).select().single()
     if (!error) {
       await supabase.from('vendas_itens').insert(

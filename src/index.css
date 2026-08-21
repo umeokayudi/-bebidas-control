@@ -251,6 +251,59 @@ tbody tr:hover td { background: var(--bg3); }
 /* Chart container */
 .chart-wrap { width: 100%; overflow-x: auto; }
 
+/* Pedido item chip — hover tooltip com valores */
+.pedido-item-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--bg3);
+  color: var(--text2);
+  cursor: default;
+  max-width: 220px;
+}
+.pedido-item-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pedido-item-chip-qty {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--navy);
+}
+.pedido-item-chip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,16,40,0.25);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 50;
+}
+.pedido-item-chip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+.pedido-item-chip:hover {
+  background: rgba(193,156,86,0.15);
+  color: var(--navy);
+}
+
 @media print {
   body * { visibility: hidden; }
   .print-area, .print-area * { visibility: visible; }
