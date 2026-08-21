@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
+import { buildPurchaseCostIndex, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
 
 function pedidoMonthKey(p) {
   return monthKey(p.data_pedido || p.criado_em?.slice(0, 10))
@@ -69,7 +70,7 @@ export default function RelatorioTab() {
     setLoading(true)
     const [bR, cR, vR, pR, rR, pedR] = await Promise.all([
       supabase.from('bars').select('*'),
-      supabase.from('compras').select('*'),
+      supabase.from('compras').select('*, compras_itens(produto_id,nome,custo_unitario)'),
       supabase.from('vendas').select('*, vendas_itens(*, produtos(*))'),
       supabase.from('produtos').select('*'),
       supabase.from('ryoshusho').select('*'),
@@ -101,22 +102,27 @@ export default function RelatorioTab() {
   const ryoMes      = ryoshusho.filter(r=>r.data_emissao?.startsWith(selMonth))
   const pedidosMes  = pedidos.filter(p=>pedidoMonthKey(p)===selMonth)
 
+  const costIndex = useMemo(
+    () => buildPurchaseCostIndex(compras, produtos),
+    [compras, produtos]
+  )
+
   const custoTotal    = comprasMes.reduce((a,c)=>a+(+c.total_real||0),0)
   const descontoTotal = comprasMes.reduce((a,c)=>a+(+c.desconto_pontos||0),0)
   const pontosGanhos  = comprasMes.reduce((a,c)=>a+(+c.pontos_ganhos||0),0)
 
-  // Revenue & profit per bar
+  // Revenue & profit per bar (custo = último custo unitário de compra na data da venda)
   const porBar = bars.map(bar => {
     const vBar     = vendasMes.filter(v=>v.bar_id===bar.id)
-    const receita  = vBar.reduce((a,v)=>a+(+v.total||0),0)
-    const custoV   = vBar.reduce((a,v)=>a+(v.vendas_itens||[]).reduce((b,it)=>b+((it.produtos?.custo||0)*it.qtd),0),0)
-    const lucro    = receita - custoV
+    const m        = marginFromSales(vBar, costIndex, produtos)
+    const receita  = m.receita || vBar.reduce((a,v)=>a+(+v.total||0),0)
+    const custoV   = m.custo
+    const lucro    = m.lucro
     const margem   = receita>0 ? Math.round(lucro/receita*100) : 0
 
-    // Projected revenue: sum of pedidos_itens price * qty for delivered orders
     const pedBar      = pedidosMes.filter(p=>p.bar_id===bar.id && p.status==='entregue')
     const projReceita = pedBar.reduce((a,p)=>a+(p.pedidos_itens||[]).reduce((b,it)=>b+(it.preco_unitario*it.qtd),0),0)
-    const projCusto   = pedBar.reduce((a,p)=>a+(p.pedidos_itens||[]).reduce((b,it)=>b+((it.produtos?.custo||0)*it.qtd),0),0)
+    const projCusto   = pedBar.reduce((a,p)=>a+marginFromPedidoItens(p.pedidos_itens, p.data_pedido, costIndex, produtos).custo,0)
     const projLucro   = projReceita - projCusto
 
     // Ryoshusho total for this bar this month
@@ -134,12 +140,22 @@ export default function RelatorioTab() {
   const ryoTotal      = porBar.reduce((a,r)=>a+r.ryoTotal,0)
   const margemGeral   = receitaTotal>0 ? Math.round(lucroTotal/receitaTotal*100) : 0
 
-  const porProduto = produtos.map(p=>{
-    const vendido = vendasMes.reduce((a,v)=>a+(v.vendas_itens||[]).filter(it=>it.produto_id===p.id).reduce((b,it)=>b+it.qtd,0),0)
-    const receita = vendido*p.preco_venda
-    const custo   = vendido*p.custo
-    return {...p,vendido,receita,custo,lucro:receita-custo}
-  }).filter(p=>p.vendido>0).sort((a,b)=>b.lucro-a.lucro)
+  const porProduto = (() => {
+    const prodMap = {}
+    vendasMes.forEach(v => (v.vendas_itens || []).forEach(it => {
+      const pid = it.produto_id
+      const m = marginFromVendaItem(it, v.data, costIndex, produtos)
+      if (!prodMap[pid]) {
+        const p = produtos.find(x => x.id === pid) || {}
+        prodMap[pid] = { ...p, nome: it.produtos?.nome || p.nome || '?', vendido: 0, receita: 0, custo: 0, lucro: 0 }
+      }
+      prodMap[pid].vendido += it.qtd
+      prodMap[pid].receita += m.receita
+      prodMap[pid].custo += m.custo
+      prodMap[pid].lucro += m.lucro
+    }))
+    return Object.values(prodMap).filter(p => p.vendido > 0).sort((a, b) => b.lucro - a.lucro)
+  })()
 
   if (loading) return <Spinner text="Loading report..." />
 
@@ -159,7 +175,7 @@ export default function RelatorioTab() {
           sub={descontoTotal>0 ? 'saved '+fmtYen(descontoTotal)+' in points' : undefined} />
         <MetricCard label="Actual revenue" value={fmtYen(receitaTotal)} color="var(--navy)" accent="var(--navy)" />
         <MetricCard label="Actual profit" value={fmtYen(lucroTotal)} color="var(--green)" accent="var(--green)"
-          sub={'margin '+margemGeral+'%'} />
+          sub={'margin '+margemGeral+'% · custo unitário compras'} />
         <MetricCard label="Receipts issued" value={fmtYen(ryoTotal)} color="var(--gold)" accent="var(--gold)"
           sub={ryoMes.length+' ryoshusho'} />
       </div>
@@ -240,7 +256,7 @@ export default function RelatorioTab() {
                 <div style={{ fontSize:12, color:'var(--text2)', marginBottom:2 }}>Revenue</div>
                 <div style={{ fontSize:22, fontWeight:700, marginBottom:12 }}>{fmtYen(r.receita)}</div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
-                  <span style={{ color:'var(--text2)' }}>Product cost</span>
+                  <span style={{ color:'var(--text2)' }}>Unit cost (purchases)</span>
                   <span style={{ color:'var(--red)' }}>{fmtYen(r.custoV)}</span>
                 </div>
                 {r.ryoTotal > 0 && (
