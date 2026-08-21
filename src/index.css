@@ -251,6 +251,143 @@ tbody tr:hover td { background: var(--bg3); }
 /* Chart container */
 .chart-wrap { width: 100%; overflow-x: auto; }
 
+/* Dashboard chart bars — hover mostra valor */
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding-top: 28px;
+}
+.chart-bar-cell {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+.chart-bar-cell .chart-bar-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,16,40,0.22);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+  z-index: 20;
+}
+.chart-bar-cell:hover .chart-bar-tip,
+.chart-bar-cell.is-active .chart-bar-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+.chart-bar-cell .chart-bar-fill {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.chart-bar-cell:hover .chart-bar-fill,
+.chart-bar-cell.is-active .chart-bar-fill {
+  opacity: 1 !important;
+  transform: scaleY(1.04);
+  transform-origin: bottom;
+  box-shadow: 0 4px 14px rgba(0,16,40,0.18);
+}
+.chart-bar-cell .chart-bar-label {
+  font-size: 9px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.chart-bar-cell:hover .chart-bar-label,
+.chart-bar-cell.is-active .chart-bar-label {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+/* Linhas de dados com tooltip no hover */
+.data-hover-row {
+  position: relative;
+  border-radius: 10px;
+  padding: 4px 6px;
+  margin: 0 -6px 10px;
+  transition: background 0.12s;
+}
+.data-hover-row:hover {
+  background: rgba(193,156,86,0.1);
+}
+.data-hover-row .data-hover-tip {
+  position: absolute;
+  right: 0;
+  top: -8px;
+  transform: translateY(-100%);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,16,40,0.22);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 30;
+}
+.data-hover-row:hover .data-hover-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* KPI cards — detalhe no hover */
+.metric-card-hover {
+  position: relative;
+  cursor: default;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.metric-card-hover .metric-hover-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.55;
+  white-space: pre-line;
+  text-align: center;
+  box-shadow: 0 10px 28px rgba(0,16,40,0.25);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 40;
+}
+.metric-card-hover:hover .metric-hover-tip {
+  opacity: 1;
+  visibility: visible;
+}
+.metric-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 /* Pedido item chip — hover tooltip com valores */
 .pedido-item-chip {
   position: relative;
