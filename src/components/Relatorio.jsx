@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
 
+function pedidoMonthKey(p) {
+  return monthKey(p.data_pedido || p.criado_em?.slice(0, 10))
+}
+
 function MetricCard({ label, value, sub, color='var(--navy)', accent }) {
   return (
     <div style={{
@@ -79,7 +83,8 @@ export default function RelatorioTab() {
     setPedidos(pedR.data || [])
     const months = [...new Set([
       ...(cR.data||[]).map(x=>monthKey(x.data)),
-      ...(vR.data||[]).map(x=>monthKey(x.data))
+      ...(vR.data||[]).map(x=>monthKey(x.data)),
+      ...(pedR.data||[]).map(x=>pedidoMonthKey(x)),
     ])].filter(Boolean).sort().reverse()
     if (months[0]) setSelMonth(months[0])
     setLoading(false)
@@ -87,13 +92,14 @@ export default function RelatorioTab() {
 
   const allMonths = [...new Set([
     ...compras.map(c=>monthKey(c.data)),
-    ...vendas.map(v=>monthKey(v.data))
+    ...vendas.map(v=>monthKey(v.data)),
+    ...pedidos.map(p=>pedidoMonthKey(p)),
   ])].filter(Boolean).sort().reverse()
 
   const comprasMes  = compras.filter(c=>monthKey(c.data)===selMonth)
   const vendasMes   = vendas.filter(v=>monthKey(v.data)===selMonth)
   const ryoMes      = ryoshusho.filter(r=>r.data_emissao?.startsWith(selMonth))
-  const pedidosMes  = pedidos.filter(p=>p.criado_em?.startsWith(selMonth))
+  const pedidosMes  = pedidos.filter(p=>pedidoMonthKey(p)===selMonth)
 
   const custoTotal    = comprasMes.reduce((a,c)=>a+(+c.total_real||0),0)
   const descontoTotal = comprasMes.reduce((a,c)=>a+(+c.desconto_pontos||0),0)

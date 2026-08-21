@@ -23,7 +23,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, system, image, temperature, maxOutputTokens } = req.body || {}
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
+
+    if (body.module === 'seikyusho') {
+      const { handleSeikyushoRequest } = await import('./_seikyushoCore.js')
+      return handleSeikyushoRequest(res, body)
+    }
+
+    const { messages, system, image, temperature, maxOutputTokens } = body
 
     if (!messages?.length && !image?.data) {
       return res.status(400).json({ error: 'messages or image is required' })

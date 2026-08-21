@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { createVendaFromPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas } from './utils'
 
@@ -441,40 +442,23 @@ export function PedidosAdminTab() {
     if(status==='entregue'){
       const pedido=pedidos.find(p=>p.id===id)
       if(pedido){
-        const {data:venda}=await supabase.from('vendas').insert({
-          data:new Date().toISOString().slice(0,10),
-          bar_id:pedido.bar_id,
-          total:pedido.total_estimado,
-          obs:'Auto: order '+pedido.id.slice(0,8),
-          criado_por:pedido.criado_por,
-          origem:'fornecedor'
-        }).select().single()
-        if(venda&&pedido.pedidos_itens&&pedido.pedidos_itens.length>0){
-          await supabase.from('vendas_itens').insert(
-            pedido.pedidos_itens.map(it=>({
-              venda_id:venda.id,produto_id:it.produto_id,
-              qtd:it.qtd,preco_unitario:it.preco_unitario
-            }))
-          )
-        }
+        const { venda } = await createVendaFromPedido(supabase, pedido)
         await supabase.from('notificacoes').insert({
           user_id:pedido.criado_por,tipo:'pedido_entregue',
           titulo:'Order delivered',
           mensagem:'Delivered. Total: \u00a5'+Math.round(pedido.total_estimado).toLocaleString()
         }).catch(()=>{})
-        // Auto-generate fatura
-        const hoje = new Date().toISOString().slice(0,10)
-        const dia = new Date().getDate()
-        const venc = dia<=5
-          ? new Date(new Date().getFullYear(),new Date().getMonth(),20).toISOString().slice(0,10)
-          : new Date(new Date().getFullYear(),new Date().getMonth()+1,20).toISOString().slice(0,10)
+        const saleDate = pedidoSaleDate(pedido)
+        const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
         await supabase.from('faturas').insert({
           bar_id: pedido.bar_id,
           venda_id: venda?.id || null,
           valor: pedido.total_estimado,
           status: 'pendente',
-          data_emissao: hoje,
-          data_vencimento: venc
+          data_emissao: saleDate,
+          data_vencimento: dueDate,
+          periodo_inicio: periodStart,
+          periodo_fim: periodEnd,
         }).catch((e)=>{ console.error('auto-fatura error:', e) })
       }
     }
@@ -507,59 +491,32 @@ export function PedidosAdminTab() {
     setChecklistPedido(null)
     setCheckedItems({})
     await supabase.from("pedidos").update({status:"entregue"}).eq("id",id)
-    const {data:venda}=await supabase.from("vendas").insert({
-      data:new Date().toISOString().slice(0,10),
-      bar_id:pedido.bar_id,total:pedido.total_estimado,
-      obs:"Auto: order "+id.slice(0,8),criado_por:pedido.criado_por,
-      origem:'fornecedor'
-    }).select().single()
-    if(venda&&pedido.pedidos_itens&&pedido.pedidos_itens.length>0){
-      await supabase.from("vendas_itens").insert(
-        pedido.pedidos_itens.map(it=>({venda_id:venda.id,produto_id:it.produto_id,qtd:it.qtd,preco_unitario:it.preco_unitario}))
-      )
-    }
+    const { venda } = await createVendaFromPedido(supabase, pedido)
     await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:"Delivered"}).catch(()=>{})
 
-    // Auto-add to invoice for current billing period
+    const saleDate = pedidoSaleDate(pedido)
+    const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
     try {
-      const today = new Date()
-      const day = today.getDate()
-      const year = today.getFullYear()
-      const month = today.getMonth()
-      let periodStart, periodEnd, dueDate
-      if (day <= 5) {
-        periodStart = new Date(year,month,1).toISOString().slice(0,10)
-        periodEnd = new Date(year,month,5).toISOString().slice(0,10)
-        dueDate = new Date(year,month,20).toISOString().slice(0,10)
-      } else if (day <= 20) {
-        periodStart = new Date(year,month,6).toISOString().slice(0,10)
-        periodEnd = new Date(year,month,20).toISOString().slice(0,10)
-        dueDate = new Date(year,month+1,5).toISOString().slice(0,10)
-      } else {
-        periodStart = new Date(year,month,21).toISOString().slice(0,10)
-        periodEnd = new Date(year,month+1,0).toISOString().slice(0,10)
-        dueDate = new Date(year,month+1,20).toISOString().slice(0,10)
-      }
-      // Find existing invoice for this period and bar
-      const {data:existingFatura} = await supabase.from("faturas")
-        .select("*").eq("bar_id",pedido.bar_id).eq("periodo_inicio",periodStart).eq("periodo_fim",periodEnd).single()
+      const { data: existingFatura } = await supabase.from('faturas')
+        .select('*').eq('bar_id', pedido.bar_id).eq('periodo_inicio', periodStart).eq('periodo_fim', periodEnd).single()
       if (existingFatura) {
-        // Update total
-        await supabase.from("faturas").update({ total: existingFatura.total + pedido.total_estimado }).eq("id",existingFatura.id)
+        await supabase.from('faturas').update({ total: existingFatura.total + pedido.total_estimado }).eq('id', existingFatura.id)
       } else {
-        // Create new invoice
-        await supabase.from("faturas").insert({
+        await supabase.from('faturas').insert({
           bar_id: pedido.bar_id,
           periodo_inicio: periodStart,
           periodo_fim: periodEnd,
           vencimento: dueDate,
+          data_vencimento: dueDate,
           total: pedido.total_estimado,
+          valor: pedido.total_estimado,
           pago: 0,
-          status: "pendente",
-          notas: "Auto-generated"
+          status: 'pendente',
+          notas: 'Auto-generated',
+          venda_id: venda?.id || null,
         })
       }
-    } catch(e) { console.error("Invoice auto-create failed:", e) }
+    } catch (e) { console.error('Invoice auto-create failed:', e) }
 
     load()
   }
@@ -599,8 +556,8 @@ export function PedidosAdminTab() {
               <div key={p.id} className="card" style={{marginBottom:12,borderLeft:p.status==='pendente'?'3px solid var(--gold)':'3px solid var(--border)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
                   <div>
-                    <div style={{fontWeight:700,fontSize:14}}>{p.bars?.nome} &mdash; {new Date(p.criado_em).toLocaleDateString('en-US')}</div>
-                    {p.data_entrega_prevista&&<div style={{fontSize:12,color:'var(--text3)'}}>Requested: {p.data_entrega_prevista}</div>}
+                    <div style={{fontWeight:700,fontSize:14}}>{p.bars?.nome} &mdash; {p.data_pedido || new Date(p.criado_em).toISOString().slice(0,10)}</div>
+                    {p.data_entrega_prevista&&<div style={{fontSize:12,color:'var(--text3)'}}>Delivery: {p.data_entrega_prevista}</div>}
                     {p.obs&&<div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{p.obs}</div>}
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
