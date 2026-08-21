@@ -121,6 +121,62 @@ export async function fixAtomicReceivables(sb) {
   return report
 }
 
+/** Marca pedidos confirmados como entregue e cria vendas (entregas) correspondentes */
+export async function markPedidosEntregue(sb, opts = {}) {
+  const {
+    barId = ATOMIC_BAR_ID,
+    dateFrom = '2026-06-01',
+    dateTo = '2026-06-30',
+    statusFrom = 'confirmado',
+  } = opts
+
+  const { data: pedidos, error } = await sb
+    .from('pedidos')
+    .select('id,bar_id,criado_por,data_pedido,total_estimado,pedidos_itens(produto_id,qtd,preco_unitario)')
+    .eq('bar_id', barId)
+    .eq('status', statusFrom)
+    .gte('data_pedido', dateFrom)
+    .lte('data_pedido', dateTo)
+
+  if (error) throw new Error(error.message)
+
+  const report = { updated: 0, vendas: 0, totalEntregue: 0, ids: [] }
+
+  for (const p of pedidos || []) {
+    const { error: uErr } = await sb.from('pedidos').update({ status: 'entregue' }).eq('id', p.id)
+    if (uErr) throw new Error(`pedido ${p.id}: ${uErr.message}`)
+
+    const { data: venda, error: vErr } = await sb.from('vendas').insert({
+      data: p.data_pedido,
+      bar_id: p.bar_id,
+      total: p.total_estimado,
+      obs: `Auto: order ${p.id.slice(0, 8)}`,
+      criado_por: p.criado_por,
+    }).select().single()
+
+    if (vErr) throw new Error(`venda pedido ${p.id}: ${vErr.message}`)
+
+    if (venda && p.pedidos_itens?.length) {
+      const { error: iErr } = await sb.from('vendas_itens').insert(
+        p.pedidos_itens.map(it => ({
+          venda_id: venda.id,
+          produto_id: it.produto_id,
+          qtd: it.qtd,
+          preco_unitario: it.preco_unitario,
+        }))
+      )
+      if (iErr) throw new Error(`itens pedido ${p.id}: ${iErr.message}`)
+    }
+
+    report.updated++
+    report.vendas++
+    report.totalEntregue += Number(p.total_estimado || 0)
+    report.ids.push(p.id)
+  }
+
+  return report
+}
+
 /** @deprecated */
 export async function fixAtomicJuneDebt(sb, debt = 465000) {
   return fixAtomicReceivables(sb)

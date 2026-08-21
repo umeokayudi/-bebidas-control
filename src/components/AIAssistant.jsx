@@ -5,13 +5,14 @@ import { fetchHoldingSystemSnapshot, buildHoldingChatSystem } from '../lib/holdi
 import { syncHoldingFromCloud } from '../lib/jbmHolding'
 import { fmtYen, Spinner } from './utils'
 import JbmHoldingPanel from './JbmHoldingPanel'
+import SeikyushoTab from './Seikyusho'
 
 export default function AIAssistant() {
   const [tab, setTab] = useState('holding')
   return (
     <div>
       <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-        {[['holding','🏛 JBM Holding'],['chat','🤖 Chat'],['purchase','🛒 Compras'],['scan','📷 Recibo']].map(([id,label]) => (
+        {[['holding','🏛 JBM Holding'],['chat','🤖 Chat'],['purchase','🛒 Compras'],['scan','📷 Recibo'],['seikyusho','📄 請求書']].map(([id,label]) => (
           <button key={id} onClick={()=>setTab(id)} style={{
             padding:'8px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer',
             background: tab===id ? 'var(--navy)' : 'var(--bg3)',
@@ -23,6 +24,7 @@ export default function AIAssistant() {
       {tab==='chat'     && <AIChat />}
       {tab==='purchase' && <PurchaseAdvisor />}
       {tab==='scan'     && <ReceiptScanner />}
+      {tab==='seikyusho'&& <SeikyushoTab />}
     </div>
   )
 }
