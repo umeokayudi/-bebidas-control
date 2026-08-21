@@ -52,12 +52,28 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, dedupe, fix })
     }
 
-    const result = await fixAtomicReceivables(sb)
+    if (action === 'resyncJuneVendas') {
+      const { syncPedidosEntregues } = await import('./_deliveryMargin.js')
+      const sync = await syncPedidosEntregues(sb, {
+        barId: body.barId || ATOMIC_BAR_ID,
+        dateFrom: body.dateFrom || '2026-06-01',
+        dateTo: body.dateTo || '2026-06-30',
+        statusIn: ['entregue', 'pendente', 'confirmado'],
+      })
+      return res.status(200).json({ ok: true, sync })
+    }
 
-    const { data: faturas } = await sb.from('faturas').select('valor,total,pago,status').eq('bar_id', ATOMIC_BAR_ID).neq('status', 'pago')
-    const aReceber = (faturas || []).reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
+    if (action === 'fix') {
+      const result = await fixAtomicReceivables(sb)
+      const { data: faturas } = await sb.from('faturas').select('valor,total,pago,status').eq('bar_id', ATOMIC_BAR_ID).neq('status', 'pago')
+      const aReceber = (faturas || []).reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
+      return res.status(200).json({ ok: true, ...result, aReceber })
+    }
 
-    return res.status(200).json({ ok: true, ...result, aReceber })
+    return res.status(400).json({
+      error: 'action inválida',
+      actions: ['fix', 'revertPedidos', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas'],
+    })
   } catch (e) {
     return res.status(500).json({ error: e.message })
   }
