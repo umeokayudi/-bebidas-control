@@ -182,7 +182,7 @@ export default function SeikyushoTab() {
 
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Dados extraídos — revise</div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <Field label="Fornecedor" value={extracted.fornecedor} />
             <Field label="Nº fatura" value={extracted.numero_fatura} />
             <Field label="Data" value={extracted.data ? fmtDate(extracted.data) : '—'} />

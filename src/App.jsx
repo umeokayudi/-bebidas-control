@@ -9,6 +9,7 @@ class ErrorBoundary extends Component {
 }
 
 import { LogoSidebar } from './components/Logo'
+import { MobileTopBar, ShellOverlay, useMobileMenuLock } from './components/MobileShell'
 import { useNotifications, NotificationBell } from './components/Notifications'
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth, LoginPage } from './components/Auth'
@@ -317,6 +318,13 @@ function Shell() {
   const [pedidosPendentes, setPedidosPendentes] = useState(0)
   const { notifs, unread, markRead, markAllRead, deleteNotif, deleteAll } = useNotifications()
 
+  useMobileMenuLock(menuOpen)
+
+  function selectTab(id) {
+    setTab(id)
+    setMenuOpen(false)
+  }
+
   useEffect(() => {
     if (perfil?.role === 'cliente' && perfil.bar_id) {
       supabase.from('bars').select('*').eq('id', perfil.bar_id).single()
@@ -360,14 +368,22 @@ function Shell() {
   if (tab==='dashboard' && perfil?.role!=='admin') setTab('purchases')
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'var(--bg)'}}>
-      <aside className="sidebar">
-        <div style={{padding:'28px 20px 24px',borderBottom:'1px solid rgba(193,156,86,0.15)'}}>
+    <div className="app-shell">
+      <ShellOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <MobileTopBar
+        open={menuOpen}
+        onToggle={() => setMenuOpen(o => !o)}
+      >
+        <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
+      </MobileTopBar>
+
+      <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
+        <div className="sidebar-brand">
           <LogoSidebar />
         </div>
-        <nav style={{flex:1,padding:'16px 12px',overflowY:'auto'}}>
+        <nav className="sidebar-nav">
           {tabs.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
+            <button key={t.id} onClick={()=>selectTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
               <span style={{fontSize:13}}>{t.label}</span>
               {t.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
@@ -375,7 +391,7 @@ function Shell() {
             </button>
           ))}
         </nav>
-        <div style={{padding:'16px 20px',borderTop:'1px solid rgba(193,156,86,0.15)'}}>
+        <div className="sidebar-footer">
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
             <div style={{width:34,height:34,borderRadius:10,background:'rgba(193,156,86,0.2)',border:'1px solid rgba(193,156,86,0.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'var(--gold)',flexShrink:0}}>
               {(perfil?.nome||user.email||'U')[0].toUpperCase()}
@@ -385,16 +401,16 @@ function Shell() {
               <div style={{fontSize:10,color:'rgba(193,156,86,0.7)'}}>{roleLabel(perfil?.role)}</div>
             </div>
           </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
-            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={setTab}/>
+          <div className="sidebar-footer-notifs">
+            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
-          <button onClick={signOut} style={{width:'100%',padding:'7px',fontSize:11,color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,background:'transparent',letterSpacing:'0.04em',textTransform:'uppercase'}}>Sign out</button>
+          <button onClick={signOut} className="sidebar-signout">Sign out</button>
         </div>
       </aside>
 
-      <main style={{flex:1,padding:'28px 32px',maxWidth:980,overflowX:'hidden'}}>
+      <main className="app-main">
         <div className="fade-in" key={tab}>
-          {tab==='dashboard' && <Dashboard onNav={setTab}/>}
+          {tab==='dashboard' && <Dashboard onNav={selectTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
           {tab==='sales'    && <VendasTab/>}
           {tab==='pedidos'   && <PedidosAdminTab/>}
