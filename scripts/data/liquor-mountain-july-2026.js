@@ -80,7 +80,7 @@ export const PURCHASES = [
       { produto: 'Red Bull', qtd: 2, unitPrice: 5900, isCase: true },
       { produto: 'Baileys', qtd: 2, unitPrice: 1850 },
       { produto: 'Jägermeister', qtd: 2, unitPrice: 1980 },
-      { produto: 'Yamazaki NV', qtd: 2, unitPrice: 13800 },
+      { produto: 'Yamazaki 12 Year', qtd: 2, unitPrice: 13800 },
       { produto: 'Hakushu', qtd: 2, unitPrice: 13000 },
       { produto: 'Suntory Lime', qtd: 1, unitPrice: 718 },
       { produto: 'Suntory Cocktail Lemon', qtd: 1, unitPrice: 608 },
@@ -129,7 +129,7 @@ export const PURCHASES = [
     slip: '00069973',
     total: 72629,
     items: [
-      { produto: 'Yamazaki NV', qtd: 2, unitPrice: 16000 },
+      { produto: 'Yamazaki 12 Year', qtd: 2, unitPrice: 16000 },
       { produto: 'Estrella Damm 330ml', qtd: 3, unitPrice: 5560, isCase: true },
       { produto: 'Malibu', qtd: 2, unitPrice: 1210 },
       { produto: 'Cranberry Juice', qtd: 6, unitPrice: 498 },

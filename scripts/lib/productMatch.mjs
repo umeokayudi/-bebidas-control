@@ -2,10 +2,11 @@ export function norm(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
 }
 
-/** Nome na compra → nome canônico no catálogo */
+/** Nome na compra / proxy no pedido → nome canônico no catálogo */
 export const COMPRA_TO_PRODUTO = {
   'jasmine tea (caixa 6)': 'Jasmine Tea (caixa 6)',
   'orange juice': 'Orange Juice',
+  'yamazaki nv': 'Yamazaki 12 Year',
 }
 
 export function matchProduct(nome, produtos) {
