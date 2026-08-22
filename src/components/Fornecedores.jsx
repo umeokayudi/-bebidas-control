@@ -2,6 +2,7 @@ import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, Spinner, Empty } from './utils'
 import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
+import { fromZeikomi, parseSupplierPriceNotas, formatPriceChange } from '../lib/consumptionTax'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -172,14 +173,25 @@ function SupplierPricing() {
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             {produtos.filter(p=>p.categoria===cat).map(p => {
               const sp = supPrecos.find(x=>x.produto_id===p.id)
-              const diff = sp&&p.custo ? Math.round((sp.preco-p.custo)/p.custo*100) : null
+              const meta = sp ? parseSupplierPriceNotas(sp.notas) : {}
+              const zeibetsu = meta.zeibetsu ?? (sp ? fromZeikomi(sp.preco) : null)
+              const variacao = meta.variacao_pct
+              const diff = sp && p.custo ? Math.round((sp.preco - p.custo) / p.custo * 100) : null
               return (
                 <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10 }}>
                   <div style={{ flex:1, fontSize:13, fontWeight:500 }}>{p.nome}</div>
                   <div style={{ fontSize:12, color:'var(--text2)' }}>JBM: {fmtYen(p.custo)}</div>
                   {sp ? <>
-                    <div style={{ fontSize:14, fontWeight:700, color:diff<0?'var(--green)':diff>0?'var(--red)':'var(--navy)' }}>{fmtYen(sp.preco)}</div>
-                    {diff!==null && <div style={{ fontSize:11, fontWeight:600, color:diff<0?'var(--green)':diff>0?'var(--red)':'var(--text2)' }}>{diff>0?'+':''}{diff}%</div>}
+                    {zeibetsu != null && <div style={{ fontSize:11, color:'var(--text3)' }}>税抜 {fmtYen(zeibetsu)}</div>}
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)' }} title="税込 (+10%)">{fmtYen(sp.preco)}</div>
+                    {variacao != null && variacao !== 0 && (
+                      <div style={{ fontSize:11, fontWeight:700, color: variacao > 0 ? 'var(--red)' : 'var(--green)' }}>
+                        jul {formatPriceChange(variacao)}
+                      </div>
+                    )}
+                    {diff !== null && diff !== 0 && (
+                      <div style={{ fontSize:10, color: diff < 0 ? 'var(--green)' : 'var(--red)' }}>vs JBM {diff > 0 ? '+' : ''}{diff}%</div>
+                    )}
                     {sp.url_compra && <a href={sp.url_compra} target="_blank" rel="noreferrer" style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'var(--bg3)', color:'var(--navy)', textDecoration:'none', fontWeight:600 }}>🛒 Buy</a>}
                   </> : <div style={{ fontSize:12, color:'var(--text3)' }}>—</div>}
                   <button onClick={()=>setModal({ fornecedor_id:selSup, produto_id:p.id, preco:sp?.preco||'', url_compra:sp?.url_compra||'', notas:sp?.notas||'' })}

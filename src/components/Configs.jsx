@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { ensureVendaFromPedido, findVendaForPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
+import { SupplierCostHint } from './SupplierPriceCheck'
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────────
 export function ProductsTab() {
@@ -428,8 +429,25 @@ export function PedidosAdminTab() {
   const [checkedItems,setCheckedItems]=useState({})
   const [missingVenda,setMissingVenda]=useState({})
   const [repairing,setRepairing]=useState(null)
+  const [supplierByProdId,setSupplierByProdId]=useState(new Map())
+  const [supplierByProdName,setSupplierByProdName]=useState(new Map())
 
   useEffect(()=>{ load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) },[])
+  useEffect(()=>{
+    supabase.from('fornecedor_precos').select('*, produtos(id,nome), fornecedores(nome)')
+      .then(({ data }) => {
+        const list = data || []
+        const byId = new Map()
+        const byName = new Map()
+        for (const p of list) {
+          if (p.produto_id) byId.set(p.produto_id, p)
+          const n = p.produtos?.nome
+          if (n) byName.set(n.toLowerCase(), p)
+        }
+        setSupplierByProdId(byId)
+        setSupplierByProdName(byName)
+      })
+  },[])
 
   async function fetchPedidoCompleto(id) {
     const { data, error } = await supabase
@@ -709,6 +727,12 @@ export function PedidosAdminTab() {
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:600}}>{it.produtos?.nome}</div>
                   <div style={{fontSize:11,color:'var(--text3)'}}>Qty: {it.qtd} &times; &yen;{(it.preco_unitario||0).toLocaleString()}</div>
+                  <SupplierCostHint
+                    produtoId={it.produto_id}
+                    produtoNome={it.produtos?.nome}
+                    byProductId={supplierByProdId}
+                    byProductName={supplierByProdName}
+                  />
                 </div>
                 <div style={{fontWeight:700,fontSize:13}}>&yen;{((it.preco_unitario||0)*it.qtd).toLocaleString()}</div>
               </div>

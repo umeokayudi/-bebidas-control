@@ -1,6 +1,6 @@
 /**
  * Liquor Mountain (リカーマウンテン 六本木DS) — compras julho/2026
- * Preços da nota = 税込 (zeikomi). custo_unitario no sistema = por unidade do catálogo.
+ * Preços da nota = 税抜 (zeibetsu). O sistema grava 税込 (+10%).
  */
 
 export const SUPPLIER_NAME = 'Liquor Mountain'

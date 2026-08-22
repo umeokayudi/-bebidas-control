@@ -7,6 +7,7 @@ import {
   PAGAMENTOS, analyzeReceipt
 } from './utils'
 import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
+import { SupplierPricePanel } from './SupplierPriceCheck'
 
 export default function ComprasTab() {
   const { user } = useAuth()
@@ -203,6 +204,24 @@ export default function ComprasTab() {
               {PAGAMENTOS.map(p => <option key={p}>{p}</option>)}
             </select></div>
         </div>
+        {selectedSupplier && (
+          <SupplierPricePanel
+            fornecedorId={selectedSupplier.id}
+            fornecedorNome={selectedSupplier.nome}
+            onApplyPrice={(sp) => {
+              const nome = sp.produtos?.nome || ''
+              const exists = form.itens.findIndex(it => it.nome.toLowerCase() === nome.toLowerCase())
+              const row = { nome, qtd: 1, custo_unitario: sp.preco }
+              if (exists >= 0) {
+                const itens = [...form.itens]
+                itens[exists] = { ...itens[exists], custo_unitario: sp.preco }
+                setF('itens', itens)
+              } else {
+                setF('itens', [...form.itens, row])
+              }
+            }}
+          />
+        )}
         <div className="grid4" style={{ marginBottom: 12 }}>
           <div><label className="form-label">Subtotal (¥)</label>
             <input type="number" value={form.subtotal} onChange={e=>setF('subtotal',e.target.value)} /></div>
