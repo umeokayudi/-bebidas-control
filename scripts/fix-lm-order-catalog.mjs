@@ -43,6 +43,14 @@ async function main() {
       key: 'estrella damm 330ml',
       patch: { preco_venda: heineken.preco_venda, volume_ml: 330, ativo: true },
     },
+    {
+      key: 'suntory cocktail lemon',
+      patch: { preco_venda: saleMarkup(byNorm.get('suntory cocktail lemon')?.custo || 669), ativo: true },
+    },
+    {
+      key: 'wilkinson gin 1.8l',
+      patch: { preco_venda: saleMarkup(byNorm.get('wilkinson gin 1.8l')?.custo || 2068), ativo: true },
+    },
   ]
 
   console.log('\n🍶 Catálogo pedidos — Liquor Mountain premium\n')
