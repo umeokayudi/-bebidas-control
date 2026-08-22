@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { ensureVendaFromPedido, findVendaForPedido, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
+import { ensureVendaFromPedido, findVendaForPedido, findVendaKeysForPedidos, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
 import { SupplierCostHint } from './SupplierPriceCheck'
@@ -432,9 +432,11 @@ export function PedidosAdminTab() {
   const [supplierByProdId,setSupplierByProdId]=useState(new Map())
   const [supplierByProdName,setSupplierByProdName]=useState(new Map())
 
-  useEffect(()=>{ load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) },[])
+  const PEDIDOS_SELECT = '*, pedidos_itens(*, produtos(nome,custo,preco_venda,categoria,volume_ml)), bars(nome)'
+
+  useEffect(()=>{ load() },[])
   useEffect(()=>{
-    supabase.from('fornecedor_precos').select('*, produtos(id,nome), fornecedores(nome)')
+    supabase.from('fornecedor_precos').select('produto_id, preco, produtos(id,nome), fornecedores(nome)')
       .then(({ data }) => {
         const list = data || []
         const byId = new Map()
@@ -452,7 +454,7 @@ export function PedidosAdminTab() {
   async function fetchPedidoCompleto(id) {
     const { data, error } = await supabase
       .from('pedidos')
-      .select('*, pedidos_itens(*, produtos(*)), bars(nome)')
+      .select('*, pedidos_itens(*, produtos(nome,custo,preco_venda,categoria,volume_ml)), bars(nome)')
       .eq('id', id)
       .single()
     if (error) throw new Error(error.message)
@@ -460,42 +462,28 @@ export function PedidosAdminTab() {
   }
 
   async function markMissingVendas(list) {
+    const entregues = (list || []).filter(p => p.status === 'entregue')
+    const vendaKeys = await findVendaKeysForPedidos(supabase, entregues)
     const miss = {}
-    await Promise.all((list || []).filter(p => p.status === 'entregue').map(async p => {
-      const v = await findVendaForPedido(supabase, p.id)
-      if (!v) miss[p.id] = true
-    }))
+    for (const p of entregues) {
+      if (!vendaKeys.has(String(p.id).slice(0, 8).toLowerCase())) miss[p.id] = true
+    }
     setMissingVenda(miss)
   }
 
-  async function syncMissingVendasIfNeeded(list) {
-    let created = 0
-    for (const p of (list || []).filter(x => x.status === 'entregue')) {
-      const existing = await findVendaForPedido(supabase, p.id)
-      if (existing) continue
-      try {
-        await registerVendaForPedido(p)
-        created++
-      } catch (e) {
-        console.error('auto-sync venda pedido', p.id, e.message)
-      }
-    }
-    return created
-  }
-
   async function load(){
-    const [{data:p}]=await Promise.all([
-      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*)), bars(nome)').order('criado_em',{ascending:false})
-    ])
-    let list = p || []
-    const synced = await syncMissingVendasIfNeeded(list)
-    if (synced > 0) {
-      const { data: refreshed } = await supabase
-        .from('pedidos')
-        .select('*, pedidos_itens(*, produtos(*)), bars(nome)')
-        .order('criado_em', { ascending: false })
-      list = refreshed || list
-    }
+    const since = new Date()
+    since.setMonth(since.getMonth() - 6)
+    const sinceStr = since.toISOString().slice(0, 10)
+
+    const { data: p } = await supabase
+      .from('pedidos')
+      .select(PEDIDOS_SELECT)
+      .or(`data_entrega_prevista.gte.${sinceStr},criado_em.gte.${sinceStr}T00:00:00`)
+      .order('criado_em', { ascending: false })
+      .limit(80)
+
+    const list = p || []
     setPedidos(list)
     await markMissingVendas(list)
     setLoading(false)

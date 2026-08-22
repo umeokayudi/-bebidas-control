@@ -600,7 +600,7 @@ function OrdersTab({ bar }) {
   async function load() {
     const [pR, pedR] = await Promise.all([
       supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
-      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*))').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
+      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(nome,preco_venda,categoria,volume_ml))').eq('bar_id', bar.id).order('criado_em', { ascending:false }).limit(50),
     ])
     setProdutos((pR.data || []).filter(isSupplierProduct))
     setPedidos(pedR.data || [])
