@@ -30,10 +30,11 @@ async function main() {
   const heineken = byNorm.get('heineken 330ml')
   if (!heineken?.preco_venda) throw new Error('Heineken 330ml sem preco_venda')
 
+  const yamazaki = byNorm.get('yamazaki 12 year') || byNorm.get('yamazaki nv')
   const updates = [
     {
-      key: 'yamazaki nv',
-      patch: { nome: 'Yamazaki 12 Year', preco_venda: saleMarkup(byNorm.get('yamazaki nv')?.custo || 17600), volume_ml: 700, ativo: true },
+      key: yamazaki ? yamazaki.nome.toLowerCase().trim() : 'yamazaki 12 year',
+      patch: { nome: 'Yamazaki 12 Year', preco_venda: saleMarkup(yamazaki?.custo || 17600), volume_ml: 700, ativo: true },
     },
     {
       key: 'hakushu',
