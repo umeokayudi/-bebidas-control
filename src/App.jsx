@@ -29,11 +29,12 @@ import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, monthLabel, monthKey, saleMonthKey, compraMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
+import { fmtYen, monthLabel, monthKey, saleMonthKey, saleDate, compraMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
 import ComprasDetailModal from './components/ComprasDetailModal'
+import DashboardMetricModal from './components/DashboardMetricModal'
 import { barCreditsForMonth } from './lib/barCredits'
 import { loadAllCompras } from './lib/loadCompras'
-import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem } from './lib/marginCost'
+import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem, marginFromVenda } from './lib/marginCost'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -131,7 +132,7 @@ function Dashboard({ onNav }) {
   const [raw, setRaw] = useState(null)
   const [selMonth, setSelMonth] = useState('')
   const [loading, setLoading] = useState(true)
-  const [comprasModal, setComprasModal] = useState(false)
+  const [detailModal, setDetailModal] = useState(null) // 'compras' | 'receita' | 'lucro' | 'markup'
 
   useEffect(() => { if (user) loadStats() }, [user])
 
@@ -237,11 +238,38 @@ function Dashboard({ onNav }) {
     const topLucro = Object.values(prodMap).sort((a, b) => b.lucro - a.lucro).slice(0, 5)
     const ultimasCompras = (purchases || []).slice(-4).reverse()
 
+    const barById = Object.fromEntries((bars || []).map(b => [b.id, b]))
+
+    const vendasDetalhe = salesMes.map(v => {
+      const m = marginFromVenda(v, costIndex, products, pedidoMap)
+      const bar = barById[v.bar_id]
+      return {
+        id: v.id,
+        data: saleDate(v),
+        barNome: bar?.nome || '—',
+        barCor: bar?.cor,
+        receita: m.receita,
+        custo: m.custo,
+        lucro: m.lucro,
+        margem: m.receita > 0 ? Math.round(m.lucro / m.receita * 100) : 0,
+        obs: v.obs,
+      }
+    }).sort((a, b) => a.data.localeCompare(b.data))
+
+    const produtosDetalhe = Object.values(prodMap)
+      .map(p => ({
+        ...p,
+        margem: p.receita > 0 ? Math.round(p.lucro / p.receita * 100) : 0,
+        markup: p.custo > 0 ? Math.round((p.receita / p.custo - 1) * 100) : 0,
+      }))
+      .sort((a, b) => b.lucro - a.lucro)
+
     return {
       custoMes, receitaMes, lucroMes, margem, markup, porBar, topProdutos, ultimasCompras,
       receitaPorMes, lucroPorMes, topLucro, totalProdutos: (products || []).length,
       totalVendas: salesMes.length, totalCompras: purchasesMes.length, totalComprasValor,
       purchasesMes, creditoBar, lucroJbm: lucroMes + creditoBar,
+      vendasDetalhe, produtosDetalhe,
       pedidosPendentes: (pedidos || []).length,
       selMonth,
     }
@@ -290,7 +318,7 @@ function Dashboard({ onNav }) {
       <div className="grid4" style={{marginBottom:20}}>
         <MetricCardHover
           className="red"
-          onClick={() => setComprasModal(true)}
+          onClick={() => setDetailModal('compras')}
           tip={`Custo dos itens vendidos: ${fmtYen(stats.custoMes)}\nCompras pagas no mês: ${fmtYen(stats.totalComprasValor)} (${stats.totalCompras})\nClique para ver cada compra`}
         >
           <div className="metric-label">Custo JBM (unitário)</div>
@@ -300,14 +328,20 @@ function Dashboard({ onNav }) {
           </div>
           <div className="metric-open-hint">Clique para ver detalhes →</div>
         </MetricCardHover>
-        <MetricCardHover className="navy" tip={`${stats.totalVendas} venda(s)\nReceita total ${fmtYen(stats.receitaMes)}`}>
+        <MetricCardHover
+          className="navy"
+          onClick={() => setDetailModal('receita')}
+          tip={`${stats.totalVendas} venda(s)\nReceita total ${fmtYen(stats.receitaMes)}\nClique para ver cada entrega`}
+        >
           <div className="metric-label">Monthly revenue</div>
           <div className="metric-value" style={{color:'var(--navy)',fontSize:22}}>{fmtYen(stats.receitaMes)}</div>
           <div className="metric-sub">{stats.totalVendas} sales</div>
+          <div className="metric-open-hint">Clique para ver detalhes →</div>
         </MetricCardHover>
         <MetricCardHover
           className="green"
-          tip={`Lucro bruto: ${fmtYen(stats.lucroMes)} (${stats.margem}%)\nReceita ${fmtYen(stats.receitaMes)} − Custo ${fmtYen(stats.custoMes)}${stats.creditoBar > 0 ? `\nCrédito bar (LM): +${fmtYen(stats.creditoBar)}\nLucro JBM: ${fmtYen(stats.lucroJbm)}` : ''}`}
+          onClick={() => setDetailModal('lucro')}
+          tip={`Lucro bruto: ${fmtYen(stats.lucroMes)} (${stats.margem}%)\nReceita ${fmtYen(stats.receitaMes)} − Custo ${fmtYen(stats.custoMes)}${stats.creditoBar > 0 ? `\nCrédito bar (LM): +${fmtYen(stats.creditoBar)}\nLucro JBM: ${fmtYen(stats.lucroJbm)}` : ''}\nClique para ver detalhes`}
         >
           <div className="metric-label">Lucro real</div>
           <div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div>
@@ -315,11 +349,17 @@ function Dashboard({ onNav }) {
             Venda − custo unitário · {stats.margem}%
             {stats.creditoBar > 0 && ` · JBM c/ crédito ${fmtYen(stats.lucroJbm)}`}
           </div>
+          <div className="metric-open-hint">Clique para ver detalhes →</div>
         </MetricCardHover>
-        <MetricCardHover className="gold" tip={`Markup médio sobre custo · ${stats.totalProdutos} produtos ativos`}>
+        <MetricCardHover
+          className="gold"
+          onClick={() => setDetailModal('markup')}
+          tip={`Markup médio ${stats.markup}% · Margem ${stats.margem}%\n${stats.produtosDetalhe?.length || 0} produtos vendidos\nClique para ver por produto`}
+        >
           <div className="metric-label">Avg markup</div>
           <div className="metric-value" style={{color:'var(--gold)',fontSize:22}}>{stats.markup}%</div>
-          <div className="metric-sub">{stats.totalProdutos} products</div>
+          <div className="metric-sub">{stats.totalProdutos} products · margem {stats.margem}%</div>
+          <div className="metric-open-hint">Clique para ver detalhes →</div>
         </MetricCardHover>
       </div>
 
@@ -391,12 +431,20 @@ function Dashboard({ onNav }) {
       </div>
 
       <ComprasDetailModal
-        open={comprasModal}
-        onClose={() => setComprasModal(false)}
+        open={detailModal === 'compras'}
+        onClose={() => setDetailModal(null)}
         compras={stats.purchasesMes}
         monthLabel={monthLabel(selMonth)}
         custoVendidos={stats.custoMes}
         creditoBar={stats.creditoBar}
+      />
+
+      <DashboardMetricModal
+        open={detailModal === 'receita' || detailModal === 'lucro' || detailModal === 'markup'}
+        onClose={() => setDetailModal(null)}
+        type={detailModal}
+        monthLabel={monthLabel(selMonth)}
+        stats={stats}
       />
     </div>
   )
