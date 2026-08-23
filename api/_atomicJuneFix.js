@@ -2,34 +2,37 @@ export const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 
 const MOVIDO_TAG = /\[movido de jun→jul 2026\]/gi
 
-/** Faturas Atomic: maio ¥165k + jun ¥150k + jul ¥150k = ¥465k */
+/** Faturas Atomic — maio limpeza, jun bebidas (única), jul faturamento − LM pago pelo bar */
 export const ATOMIC_FATURAS = [
   {
     valor: 165000,
     total: 165000,
+    pago: 0,
     data_emissao: '2026-05-31',
     data_vencimento: '2026-06-30',
     periodo_inicio: '2026-05-01',
     periodo_fim: '2026-05-31',
-    obs: 'Maio/2026 — fornecimento ¥150.000 + equipamentos limpeza ¥15.000',
+    obs: 'Maio/2026 — limpeza e equipamentos (não bebidas)',
   },
   {
-    valor: 150000,
-    total: 150000,
+    valor: 465000,
+    total: 465000,
+    pago: 0,
     data_emissao: '2026-06-30',
     data_vencimento: '2026-07-31',
     periodo_inicio: '2026-06-01',
     periodo_fim: '2026-06-30',
-    obs: 'Junho/2026 — fornecimento Atomic',
+    obs: 'Junho/2026 — bebidas Atomic (cobrança única ¥465.000)',
   },
   {
-    valor: 150000,
-    total: 150000,
+    valor: 1757044,
+    total: 1757044,
+    pago: 488350,
     data_emissao: '2026-07-31',
     data_vencimento: '2026-08-31',
     periodo_inicio: '2026-07-01',
     periodo_fim: '2026-07-31',
-    obs: 'Julho/2026 — fornecimento Atomic',
+    obs: 'Julho/2026 — faturamento ¥1.757.044 · LM pago pelo bar ¥488.350',
   },
 ]
 
@@ -107,10 +110,12 @@ export async function fixAtomicReceivables(sb) {
   await sb.from('faturas').delete().eq('bar_id', ATOMIC_BAR_ID).eq('status', 'pendente')
 
   for (const f of ATOMIC_FATURAS) {
+    const pago = f.pago || 0
+    const status = pago >= f.total ? 'pago' : pago > 0 ? 'parcial' : 'pendente'
     const { data, error } = await sb.from('faturas').insert({
       bar_id: ATOMIC_BAR_ID,
-      pago: 0,
-      status: 'pendente',
+      pago,
+      status,
       ...f,
     }).select('id').single()
     if (error) throw new Error(error.message)

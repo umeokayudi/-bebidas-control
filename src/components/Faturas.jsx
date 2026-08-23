@@ -293,7 +293,9 @@ function InvoiceList() {
             const remaining = (f.total||0)-(f.pago||0)
             const pct = f.valor>0?Math.round((f.pago||0)/f.total*100):0
             const isOverdue = f.status==='pendente'&&new Date(f.data_vencimento)<new Date()
-            const periodVendas = vendas.filter(v=>v.bar_id===f.bar_id&&v.data>=f.data_emissao&&v.data<=f.data_vencimento)
+            const periodStart = f.periodo_inicio || f.data_emissao
+            const periodEnd = f.periodo_fim || f.data_vencimento
+            const periodVendas = vendas.filter(v=>v.bar_id===f.bar_id&&v.data>=periodStart&&v.data<=periodEnd)
             return (
               <div key={f.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor:isOverdue?'rgba(255,59,48,0.3)':'var(--border)', borderRadius:14, overflow:'hidden' }}>
                 <div style={{ padding:'14px 18px' }}>
