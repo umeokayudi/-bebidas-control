@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await admin
       .from('compras')
-      .select('*, compras_itens(produto_id,nome,custo_unitario)')
+      .select('*, compras_itens(*)')
       .order('data', { ascending: true })
 
     if (error) return res.status(400).json({ error: error.message })

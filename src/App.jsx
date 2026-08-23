@@ -31,6 +31,7 @@ import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel, monthKey, saleMonthKey, compraMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
 import ComprasDetailModal from './components/ComprasDetailModal'
+import { useAuth } from './components/Auth'
 import { barCreditsForMonth } from './lib/barCredits'
 import { loadAllCompras } from './lib/loadCompras'
 import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem } from './lib/marginCost'
@@ -127,12 +128,13 @@ function MetricCardHover({ tip, className, children, onClick, tipPosition = 'bot
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({ onNav }) {
+  const { user } = useAuth()
   const [raw, setRaw] = useState(null)
   const [selMonth, setSelMonth] = useState('')
   const [loading, setLoading] = useState(true)
   const [comprasModal, setComprasModal] = useState(false)
 
-  useEffect(() => { loadStats() }, [])
+  useEffect(() => { if (user) loadStats() }, [user])
 
   async function loadStats() {
     try {

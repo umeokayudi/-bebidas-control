@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { compraMonthKey } from '../components/utils'
 
-const SELECT = '*, compras_itens(produto_id,nome,custo_unitario)'
+const SELECT = '*, compras_itens(*)'
 
 /** Carrega compras — tenta Supabase direto; se RLS bloquear, usa API com service role */
 export async function loadCompras(opts = {}) {
@@ -24,9 +24,19 @@ export async function loadCompras(opts = {}) {
         if (res.ok) {
           const json = await res.json()
           all = json.compras || []
+        } else if (import.meta.env.DEV) {
+          console.warn('loadCompras API', res.status, await res.text())
         }
-      } catch { /* fallback abaixo */ }
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn('loadCompras API error', e)
+      }
     }
+  }
+
+  // Se query direta falhou mas retornou array vazio por RLS, tentar sem join primeiro
+  if (!all?.length && !error) {
+    const { data: plain } = await supabase.from('compras').select('*').order('data', { ascending: true })
+    if (plain?.length) all = plain
   }
 
   all = all || direct || []
