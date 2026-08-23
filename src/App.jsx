@@ -29,9 +29,10 @@ import AIAssistant from './components/AIAssistant'
 import BusinessIntel from './components/BusinessIntel'
 import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, monthLabel, monthKey, saleMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
+import { fmtYen, monthLabel, monthKey, saleMonthKey, compraMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
 import ComprasDetailModal from './components/ComprasDetailModal'
 import { barCreditsForMonth } from './lib/barCredits'
+import { loadAllCompras } from './lib/loadCompras'
 import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem } from './lib/marginCost'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
@@ -137,19 +138,19 @@ function Dashboard({ onNav }) {
     try {
       const now = new Date()
       const mesAtual = now.toISOString().slice(0, 7)
-      const [{ data: purchases }, { data: salesRaw }, { data: products }, { data: bars }, { data: pedidos }, { data: pedidosEntregues }] = await Promise.all([
-        supabase.from('compras').select('*, compras_itens(produto_id,nome,custo_unitario)').order('data'),
+      const [{ data: salesRaw }, { data: products }, { data: bars }, { data: pedidos }, { data: pedidosEntregues }] = await Promise.all([
         supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').order('data'),
         supabase.from('produtos').select('*').eq('ativo', true),
         supabase.from('bars').select('*'),
         supabase.from('pedidos').select('*').eq('status', 'pendente'),
         supabase.from('pedidos').select('id, pedidos_itens(produto_id, qtd, preco_unitario, produtos(custo))').eq('status', 'entregue'),
       ])
+      const purchases = await loadAllCompras()
       const sales = filterSupplierVendas(salesRaw)
       const salesMonths = [...new Set((sales || []).map(saleMonthKey))].filter(Boolean).sort().reverse()
       const months = [...new Set([
         ...salesMonths,
-        ...(purchases || []).map(c => monthKey(c.data)),
+        ...(purchases || []).map(c => compraMonthKey(c)),
       ])].filter(Boolean).sort().reverse()
       const defaultMonth = salesMonths.includes(mesAtual) ? mesAtual : (salesMonths[0] || mesAtual)
       setRaw({ purchases, sales, products, bars, pedidos, pedidosEntregues, months })
@@ -200,7 +201,7 @@ function Dashboard({ onNav }) {
       tip: `${monthLabel(m)} · Lucro ${fmtYen(receitaPorMes[i].value - custoPorMes[i].value)} · Receita ${fmtYen(receitaPorMes[i].value)} · Custo ${fmtYen(custoPorMes[i].value)}`,
     }))
 
-    const purchasesMes = (purchases || []).filter(c => monthKey(c.data) === selMonth)
+    const purchasesMes = (purchases || []).filter(c => compraMonthKey(c) === selMonth)
     const totalComprasValor = purchasesMes.reduce((a, c) => a + (+c.total_real || 0), 0)
     const creditoBar = barCreditsForMonth(selMonth)
     const salesMes = (sales || []).filter(v => saleMonthKey(v) === selMonth)

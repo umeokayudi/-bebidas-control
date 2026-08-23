@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import {
-  fmtYen, fmtDate, monthKey, monthLabel,
+  fmtYen, fmtDate, monthKey, monthLabel, compraDate,
   MetricCard, Badge, Spinner, Empty, SectionTitle, DelBtn,
   PAGAMENTOS, analyzeReceipt
 } from './utils'
-import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
+import { loadAllCompras } from '../lib/loadCompras'
 import { SupplierPricePanel } from './SupplierPriceCheck'
 
 export default function ComprasTab() {
@@ -42,17 +42,14 @@ export default function ComprasTab() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('compras')
-      .select('*, compras_itens(*)')
-      .order('data', { ascending: false })
-    setCompras(data || [])
+    const data = await loadAllCompras()
+    setCompras((data || []).sort((a, b) => compraDate(b).localeCompare(compraDate(a))))
     setLoading(false)
   }
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const months = [...new Set(compras.map(c => monthKey(c.data)))].sort().reverse()
-  const filtered = filterMonth ? compras.filter(c => monthKey(c.data) === filterMonth) : compras
+  const months = [...new Set(compras.map(c => monthKey(compraDate(c))))].sort().reverse()
+  const filtered = filterMonth ? compras.filter(c => monthKey(compraDate(c)) === filterMonth) : compras
 
   const totalCusto    = filtered.reduce((a,c) => a + (+c.total_real||0), 0)
   const totalDesconto = filtered.reduce((a,c) => a + (+c.desconto_pontos||0), 0)

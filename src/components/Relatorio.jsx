@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas, saleMonthKey } from './utils'
+import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas, saleMonthKey, compraMonthKey } from './utils'
 import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
 import { pedidoSaleDate } from '../lib/pedidoVenda'
 import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
 import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
+import { loadAllCompras } from '../lib/loadCompras'
 import ComprasDetailModal from './ComprasDetailModal'
 
 function pedidoMonthKey(p) {
@@ -73,22 +74,22 @@ export default function RelatorioTab() {
 
   async function loadAll() {
     setLoading(true)
-    const [bR, cR, vR, pR, rR, pedR] = await Promise.all([
+    const [bR, vR, pR, rR, pedR] = await Promise.all([
       supabase.from('bars').select('*'),
-      supabase.from('compras').select('*, compras_itens(produto_id,nome,custo_unitario)'),
       supabase.from('vendas').select('*, vendas_itens(*, produtos(*))'),
       supabase.from('produtos').select('*'),
       supabase.from('ryoshusho').select('*'),
       supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*))'),
     ])
+    const cData = await loadAllCompras()
     setBars(bR.data || [])
-    setCompras(cR.data || [])
+    setCompras(cData || [])
     setVendas(filterSupplierVendas(vR.data || []))
     setProdutos(pR.data || [])
     setRyoshusho(rR.data || [])
     setPedidos(pedR.data || [])
     const months = [...new Set([
-      ...(cR.data||[]).map(x=>monthKey(x.data)),
+      ...(cData||[]).map(x=>compraMonthKey(x)),
       ...(vR.data||[]).map(x=>monthKey(x.data)),
       ...(pedR.data||[]).map(x=>pedidoMonthKey(x)),
     ])].filter(Boolean).sort().reverse()
@@ -97,12 +98,12 @@ export default function RelatorioTab() {
   }
 
   const allMonths = [...new Set([
-    ...compras.map(c=>monthKey(c.data)),
+    ...compras.map(c=>compraMonthKey(c)),
     ...vendas.map(v=>monthKey(v.data)),
     ...pedidos.map(p=>pedidoMonthKey(p)),
   ])].filter(Boolean).sort().reverse()
 
-  const comprasMes  = compras.filter(c => monthKey(c.data) === selMonth)
+  const comprasMes  = compras.filter(c => compraMonthKey(c) === selMonth)
   const vendasMes   = vendas.filter(v => saleMonthKey(v) === selMonth)
   const ryoMes      = ryoshushoForMonth(ryoshusho, selMonth)
   const pedidosMes  = pedidos.filter(p => pedidoMonthKey(p) === selMonth)

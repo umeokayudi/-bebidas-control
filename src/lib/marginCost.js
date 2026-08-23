@@ -29,12 +29,17 @@ export function buildPedidoByVendaPrefix(pedidos) {
   return map
 }
 
+function compraDate(compra) {
+  const d = compra?.data || compra?.data_compra || ''
+  return d ? String(d).slice(0, 10) : ''
+}
+
 /** Histórico de custo unitário por produto (compras_itens) */
 export function buildPurchaseCostIndex(compras, produtos = []) {
   const index = {}
 
   for (const compra of compras || []) {
-    const date = compra.data
+    const date = compraDate(compra)
     if (!date) continue
     for (const it of compra.compras_itens || []) {
       const custo = +it.custo_unitario || 0
