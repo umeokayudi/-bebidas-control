@@ -1,6 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
+:root,
+[data-theme="light"] {
   /* JBM Brand */
   --navy:     #001028;
   --navy2:    #001d40;
@@ -34,6 +35,38 @@
   --radius:    10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
+}
+
+/* ── Tema escuro (opcional) ───────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:       #070d16;
+  --bg2:      #0f1a28;
+  --bg3:      #152232;
+  --bg4:      #1b2a3d;
+  --text:     #e8ecf2;
+  --text2:    rgba(255,255,255,0.62);
+  --text3:    rgba(255,255,255,0.38);
+  --border:   rgba(255,255,255,0.08);
+  --border2:  rgba(255,255,255,0.14);
+  --gold-bg:  rgba(193,156,86,0.12);
+  --green-bg: rgba(26,107,74,0.18);
+  --red-bg:   rgba(160,41,28,0.18);
+  --blue-bg:  rgba(26,58,107,0.22);
+  --shadow:    0 1px 4px rgba(0,0,0,0.35);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+[data-theme="dark"] .card {
+  border-color: rgba(255,255,255,0.08);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--bg3);
+  border-color: var(--border2);
+  color: var(--text);
 }
 
 body {
@@ -782,6 +815,168 @@ body.menu-open {
 .pedido-item-chip:hover {
   background: rgba(193,156,86,0.15);
   color: var(--navy);
+}
+
+/* ── Preferências UI (tema + layout) ─────────────────────────────────────── */
+.ui-prefs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(193,156,86,0.15);
+  background: rgba(0,0,0,0.15);
+}
+
+.ui-pref-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-pref-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(193,156,86,0.75);
+}
+
+.ui-pref-pill {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 20px;
+  padding: 3px;
+}
+
+.ui-pref-pill button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 10px;
+  font-weight: 600;
+  min-height: 28px;
+  transition: all 0.2s ease;
+}
+
+.ui-pref-pill button.on {
+  background: var(--gold);
+  color: var(--navy);
+}
+
+.ui-pref-pill button:hover:not(.on) {
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.06);
+}
+
+body {
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Layout forçado: desktop (mantém visual atual em telas pequenas) */
+html[data-layout="desktop"] .mobile-topbar,
+html[data-layout="desktop"] .shell-overlay {
+  display: none !important;
+}
+
+html[data-layout="desktop"] .app-shell {
+  flex-direction: row !important;
+  min-width: 1100px;
+}
+
+html[data-layout="desktop"] body {
+  overflow-x: auto;
+}
+
+html[data-layout="desktop"] .sidebar {
+  position: sticky !important;
+  transform: none !important;
+  width: 256px !important;
+  height: 100vh !important;
+}
+
+html[data-layout="desktop"] .app-main {
+  padding: 32px 36px !important;
+  max-width: 1400px;
+}
+
+html[data-layout="desktop"] .grid4 {
+  grid-template-columns: repeat(4, 1fr) !important;
+}
+
+html[data-layout="desktop"] .grid3 {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+html[data-layout="desktop"] .grid2 {
+  grid-template-columns: 1fr 1fr !important;
+}
+
+/* Layout forçado: mobile (compacto mesmo em desktop) */
+html[data-layout="mobile"] .mobile-topbar {
+  display: flex !important;
+}
+
+html[data-layout="mobile"] .app-shell {
+  flex-direction: column !important;
+}
+
+html[data-layout="mobile"] .sidebar {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(288px, 88vw) !important;
+  height: 100dvh !important;
+  transform: translateX(-105%) !important;
+  transition: transform 0.22s ease;
+  z-index: 200;
+}
+
+html[data-layout="mobile"] .sidebar.open {
+  transform: translateX(0) !important;
+}
+
+html[data-layout="mobile"] .shell-overlay {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  border: none;
+  padding: 0;
+  background: rgba(0,16,40,0.55);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+html[data-layout="mobile"] .app-main {
+  padding: calc(72px + env(safe-area-inset-top, 0)) 16px 24px !important;
+  max-width: none !important;
+}
+
+html[data-layout="mobile"] .grid4,
+html[data-layout="mobile"] .grid3,
+html[data-layout="mobile"] .grid2 {
+  grid-template-columns: 1fr !important;
+}
+
+html[data-layout="mobile"] .form-grid-2 {
+  grid-template-columns: 1fr !important;
+}
+
+html[data-layout="mobile"] .metric-value {
+  font-size: 22px !important;
+}
+
+html[data-layout="mobile"] .metric-card-hover:hover {
+  transform: none !important;
 }
 
 @media print {

@@ -32,6 +32,8 @@ import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel, monthKey, saleMonthKey, saleDate, compraMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
 import ComprasDetailModal from './components/ComprasDetailModal'
 import DashboardMetricModal from './components/DashboardMetricModal'
+import UiPrefsPanel from './components/UiPrefsPanel'
+import { UiPrefsProvider } from './lib/uiPrefs'
 import { barCreditsForMonth } from './lib/barCredits'
 import { loadAllCompras } from './lib/loadCompras'
 import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem, marginFromVenda } from './lib/marginCost'
@@ -545,6 +547,7 @@ function Shell() {
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
+          <UiPrefsPanel />
           <button onClick={signOut} className="sidebar-signout">Sign out</button>
         </div>
       </aside>
@@ -574,7 +577,11 @@ function Shell() {
 }
 
 function AppInner() {
-  return <AuthProvider><Shell/></AuthProvider>
+  return (
+    <UiPrefsProvider>
+      <AuthProvider><Shell/></AuthProvider>
+    </UiPrefsProvider>
+  )
 }
 
 export default function App() {
