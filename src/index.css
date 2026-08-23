@@ -179,6 +179,9 @@ tbody tr:hover td { background: var(--bg3); }
   position: relative;
   overflow: hidden;
 }
+.metric-card.metric-card-hover {
+  overflow: visible;
+}
 .metric-card::after {
   content: '';
   position: absolute;
@@ -661,10 +664,13 @@ body.menu-open {
   cursor: default;
   transition: transform 0.15s, box-shadow 0.15s;
 }
+.metric-card-hover.is-clickable {
+  cursor: pointer;
+}
 .metric-card-hover .metric-hover-tip {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 10px);
   transform: translateX(-50%);
   padding: 10px 14px;
   border-radius: 12px;
@@ -674,13 +680,19 @@ body.menu-open {
   font-weight: 600;
   line-height: 1.55;
   white-space: pre-line;
-  text-align: center;
+  text-align: left;
+  max-width: min(280px, 90vw);
+  width: max-content;
   box-shadow: 0 10px 28px rgba(0,16,40,0.25);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.15s, visibility 0.15s;
   z-index: 40;
+}
+.metric-card-hover .metric-hover-tip.tip-top {
+  top: auto;
+  bottom: calc(100% + 10px);
 }
 .metric-card-hover:hover .metric-hover-tip {
   opacity: 1;
@@ -690,6 +702,16 @@ body.menu-open {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   z-index: 50;
+}
+.metric-card-hover .metric-open-hint {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 4px;
+  opacity: 0.85;
+}
+.metric-card-hover.is-clickable:hover .metric-open-hint {
+  color: var(--navy);
+  font-weight: 600;
 }
 
 .chart-card {

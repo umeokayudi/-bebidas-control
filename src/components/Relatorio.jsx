@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, monthKey, monthLabel, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
+import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas, saleMonthKey } from './utils'
 import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
 import { pedidoSaleDate } from '../lib/pedidoVenda'
+import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
+import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
+import ComprasDetailModal from './ComprasDetailModal'
 
 function pedidoMonthKey(p) {
   return monthKey(pedidoSaleDate(p))
@@ -64,6 +67,7 @@ export default function RelatorioTab() {
   const [pedidos,   setPedidos]   = useState([])
   const [loading,   setLoading]   = useState(true)
   const [selMonth,  setSelMonth]  = useState('')
+  const [comprasModal, setComprasModal] = useState(false)
 
   useEffect(() => { loadAll() }, [])
 
@@ -98,10 +102,10 @@ export default function RelatorioTab() {
     ...pedidos.map(p=>pedidoMonthKey(p)),
   ])].filter(Boolean).sort().reverse()
 
-  const comprasMes  = compras.filter(c=>monthKey(c.data)===selMonth)
-  const vendasMes   = vendas.filter(v=>monthKey(v.data)===selMonth)
-  const ryoMes      = ryoshusho.filter(r=>r.data_emissao?.startsWith(selMonth))
-  const pedidosMes  = pedidos.filter(p=>pedidoMonthKey(p)===selMonth)
+  const comprasMes  = compras.filter(c => monthKey(c.data) === selMonth)
+  const vendasMes   = vendas.filter(v => saleMonthKey(v) === selMonth)
+  const ryoMes      = ryoshushoForMonth(ryoshusho, selMonth)
+  const pedidosMes  = pedidos.filter(p => pedidoMonthKey(p) === selMonth)
 
   const costIndex = useMemo(
     () => buildPurchaseCostIndex(compras, produtos),
@@ -113,9 +117,17 @@ export default function RelatorioTab() {
     [pedidos]
   )
 
-  const custoTotal    = comprasMes.reduce((a,c)=>a+(+c.total_real||0),0)
+  const custoCompras  = comprasMes.reduce((a,c)=>a+(+c.total_real||0),0)
   const descontoTotal = comprasMes.reduce((a,c)=>a+(+c.desconto_pontos||0),0)
-  const pontosGanhos  = comprasMes.reduce((a,c)=>a+(+c.pontos_ganhos||0),0)
+  const creditoBar    = barCreditsForMonth(selMonth)
+  const creditosBar   = barCreditsList(selMonth)
+
+  const mesMargin = marginFromSales(vendasMes, costIndex, produtos, pedidoMap)
+  const custoVendidos = mesMargin.custo
+  const lucroBruto    = mesMargin.lucro
+  const lucroJbm      = lucroBruto + creditoBar
+  const margemBruta   = mesMargin.margemPct
+  const margemJbm     = mesMargin.receita > 0 ? Math.round(lucroJbm / mesMargin.receita * 100) : 0
 
   // Revenue & profit per bar (custo = último custo unitário de compra na data da venda)
   const porBar = bars.map(bar => {
@@ -131,20 +143,26 @@ export default function RelatorioTab() {
     const projCusto   = pedBar.reduce((a,p)=>a+marginFromPedidoItens(p.pedidos_itens, pedidoSaleDate(p), costIndex, produtos).custo,0)
     const projLucro   = projReceita - projCusto
 
-    // Ryoshusho total for this bar this month
-    const ryoBar    = ryoMes.filter(r=>r.bar_id===bar.id)
-    const ryoTotal  = ryoBar.reduce((a,r)=>a+(+r.total||0),0)
+    const creditoBarBar = barCreditsForMonth(selMonth, bar.id)
+    const lucroJbmBar   = lucro + creditoBarBar
+
+    // Ryoshusho que cobre este mês (parte proporcional se período multi-mês)
+    const ryoBar    = ryoMes.filter(r => r.bar_id === bar.id)
+    const ryoTotal  = ryoBar.reduce((a, r) => a + ryoshushoMonthShare(r, selMonth), 0)
+    const ryoFull   = ryoBar.reduce((a, r) => a + (+r.total || 0), 0)
 
     return { bar, receita, custoV, lucro, margem, qtdVendas:vBar.length,
-             projReceita, projLucro, ryoTotal }
+             projReceita, projLucro, ryoTotal, ryoFull, ryoBar, creditoBarBar, lucroJbmBar }
   })
 
   const receitaTotal  = porBar.reduce((a,r)=>a+r.receita,0)
   const lucroTotal    = porBar.reduce((a,r)=>a+r.lucro,0)
+  const lucroJbmTotal = lucroTotal + creditoBar
   const projTotal     = porBar.reduce((a,r)=>a+r.projReceita,0)
   const projLucroTot  = porBar.reduce((a,r)=>a+r.projLucro,0)
   const ryoTotal      = porBar.reduce((a,r)=>a+r.ryoTotal,0)
   const margemGeral   = receitaTotal>0 ? Math.round(lucroTotal/receitaTotal*100) : 0
+  const margemJbmGeral = receitaTotal>0 ? Math.round(lucroJbmTotal/receitaTotal*100) : 0
 
   const porProduto = (() => {
     const prodMap = {}
@@ -177,14 +195,29 @@ export default function RelatorioTab() {
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:18 }}>
-        <MetricCard label="Purchase cost" value={fmtYen(custoTotal)} color="var(--red)" accent="var(--red)"
-          sub={descontoTotal>0 ? 'saved '+fmtYen(descontoTotal)+' in points' : undefined} />
-        <MetricCard label="Actual revenue" value={fmtYen(receitaTotal)} color="var(--navy)" accent="var(--navy)" />
-        <MetricCard label="Actual profit" value={fmtYen(lucroTotal)} color="var(--green)" accent="var(--green)"
-          sub={'margin '+margemGeral+'% · custo unitário compras'} />
-        <MetricCard label="Receipts issued" value={fmtYen(ryoTotal)} color="var(--gold)" accent="var(--gold)"
-          sub={ryoMes.length+' ryoshusho'} />
+        <div onClick={() => setComprasModal(true)} style={{ cursor:'pointer' }}>
+          <MetricCard label="Compras pagas no mês" value={fmtYen(custoCompras)} color="var(--red)" accent="var(--red)"
+            sub={`${comprasMes.length} compra(s) · clique para detalhes`} />
+        </div>
+        <MetricCard label="Custo itens vendidos" value={fmtYen(custoVendidos)} color="#9b2c2c" accent="#9b2c2c"
+          sub="último custo unitário na data da venda" />
+        <MetricCard label="Receita" value={fmtYen(receitaTotal)} color="var(--navy)" accent="var(--navy)" />
+        <MetricCard label="Lucro bruto" value={fmtYen(lucroTotal)} color="var(--green)" accent="var(--green)"
+          sub={`margem ${margemGeral}% · receita − custo vendidos`} />
       </div>
+
+      {(creditoBar > 0 || descontoTotal > 0) && (
+        <div style={{ display:'grid', gridTemplateColumns: creditoBar > 0 ? '1fr 1fr' : '1fr', gap:12, marginBottom:18 }}>
+          {creditoBar > 0 && (
+            <MetricCard label="Lucro JBM (c/ crédito bar)" value={fmtYen(lucroJbmTotal)} color="var(--green)" accent="var(--green)"
+              sub={`+${fmtYen(creditoBar)} pago pelo bar · margem ${margemJbmGeral}%`} />
+          )}
+          {descontoTotal > 0 && (
+            <MetricCard label="Pontos economizados" value={fmtYen(descontoTotal)} color="var(--gold)" accent="var(--gold)"
+              sub="desconto em compras do mês" />
+          )}
+        </div>
+      )}
 
       {/* Projected vs Actual */}
       <div className="card" style={{ marginBottom:16 }}>
@@ -217,30 +250,47 @@ export default function RelatorioTab() {
         )}
       </div>
 
-      {/* Profit vs Ryoshusho */}
+      {/* Ryoshusho — período coberto */}
       <div className="card" style={{ marginBottom:16 }}>
-        <SectionTitle>Profit vs Receipts Issued</SectionTitle>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <div style={{ padding:'16px', background:'var(--bg3)', borderRadius:10 }}>
-            <div style={{ fontSize:11, color:'var(--text2)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.06em' }}>Actual Profit</div>
-            <div style={{ fontSize:22, fontWeight:800, color:'var(--green)' }}>{fmtYen(lucroTotal)}</div>
-            <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>margin {margemGeral}%</div>
-          </div>
-          <div style={{ padding:'16px', background:'var(--bg3)', borderRadius:10 }}>
-            <div style={{ fontSize:11, color:'var(--text2)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.06em' }}>Receipts Total</div>
-            <div style={{ fontSize:22, fontWeight:800, color:'var(--gold)' }}>{fmtYen(ryoTotal)}</div>
-            <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>{ryoMes.length} receipts · incl. 10% tax</div>
-          </div>
-        </div>
-        {ryoTotal > 0 && (
-          <div style={{ marginTop:14, padding:'12px 16px', borderRadius:10,
-            background: ryoTotal > receitaTotal*1.1 ? 'rgba(193,156,86,0.1)' : 'var(--bg3)',
-            border: ryoTotal > receitaTotal*1.1 ? '1px solid var(--gold)' : '1px solid var(--border)',
-            fontSize:12, color:'var(--text2)' }}>
-            {ryoTotal > receitaTotal*1.1
-              ? '⚠️ Receipts total is higher than recorded revenue — check if all deliveries were logged as sales.'
-              : '✅ Receipts and revenue are aligned.'}
-          </div>
+        <SectionTitle>領収書 (Receipts) — {monthLabel(selMonth)}</SectionTitle>
+        {ryoMes.length === 0 ? (
+          <Empty text="Nenhum 領収書 cobre este mês" />
+        ) : (
+          <>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+              <div style={{ padding:'16px', background:'var(--bg3)', borderRadius:10 }}>
+                <div style={{ fontSize:11, color:'var(--text2)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.06em' }}>Parte deste mês</div>
+                <div style={{ fontSize:22, fontWeight:800, color:'var(--gold)' }}>{fmtYen(ryoTotal)}</div>
+                <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>proporcional ao período · incl. 10% tax</div>
+              </div>
+              <div style={{ padding:'16px', background:'var(--bg3)', borderRadius:10 }}>
+                <div style={{ fontSize:11, color:'var(--text2)', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.06em' }}>Receita registrada</div>
+                <div style={{ fontSize:22, fontWeight:800, color:'var(--navy)' }}>{fmtYen(receitaTotal)}</div>
+                <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>{vendasMes.length} vendas no mês</div>
+              </div>
+            </div>
+            {ryoMes.map(r => {
+              const share = ryoshushoMonthShare(r, selMonth)
+              const bar = bars.find(b => b.id === r.bar_id)
+              const multiMonth = r.periodo_inicio && r.periodo_fim && monthKey(r.periodo_inicio) !== monthKey(r.periodo_fim)
+              return (
+                <div key={r.id} style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--border)', marginBottom:8, fontSize:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginBottom:4 }}>
+                    <span>{bar?.nome || '—'} · {r.numero || '—'}</span>
+                    <span style={{ color:'var(--gold)' }}>{fmtYen(share)}{multiMonth ? ` / ${fmtYen(r.total)}` : ''}</span>
+                  </div>
+                  <div style={{ color:'var(--text2)' }}>
+                    Período: {fmtDate(r.periodo_inicio)} – {fmtDate(r.periodo_fim)}
+                    {multiMonth && ' · cobre vários meses — valor proporcional mostrado'}
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ marginTop:12, padding:'12px 16px', borderRadius:10, background:'var(--bg3)', fontSize:12, color:'var(--text2)', lineHeight:1.6 }}>
+              ℹ️ 領収書 cobre o <strong>período emitido</strong> (pode incluir jun+juL). A receita acima é só de <strong>{monthLabel(selMonth)}</strong>.
+              Compare com a fatura JBM, não com o lucro.
+            </div>
+          </>
         )}
       </div>
 
@@ -262,20 +312,32 @@ export default function RelatorioTab() {
                 <div style={{ fontSize:12, color:'var(--text2)', marginBottom:2 }}>Revenue</div>
                 <div style={{ fontSize:22, fontWeight:700, marginBottom:12 }}>{fmtYen(r.receita)}</div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
-                  <span style={{ color:'var(--text2)' }}>Unit cost (purchases)</span>
+                  <span style={{ color:'var(--text2)' }}>Custo itens vendidos</span>
                   <span style={{ color:'var(--red)' }}>{fmtYen(r.custoV)}</span>
                 </div>
+                {r.creditoBarBar > 0 && (
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
+                    <span style={{ color:'var(--text2)' }}>Crédito bar (LM)</span>
+                    <span style={{ color:'var(--green)' }}>+{fmtYen(r.creditoBarBar)}</span>
+                  </div>
+                )}
                 {r.ryoTotal > 0 && (
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
-                    <span style={{ color:'var(--text2)' }}>Receipts issued</span>
+                    <span style={{ color:'var(--text2)' }}>領収書 (parte do mês)</span>
                     <span style={{ color:'var(--gold)' }}>{fmtYen(r.ryoTotal)}</span>
                   </div>
                 )}
                 <div style={{ borderTop:'0.5px solid '+r.bar.cor+'33', paddingTop:10, marginTop:4 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:700 }}>
-                    <span>Profit</span>
+                    <span>Lucro bruto</span>
                     <span style={{ color:r.lucro>=0?'var(--green)':'var(--red)' }}>{fmtYen(r.lucro)}</span>
                   </div>
+                  {r.creditoBarBar > 0 && (
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontWeight:700, marginTop:6 }}>
+                      <span>Lucro JBM</span>
+                      <span style={{ color:'var(--green)' }}>{fmtYen(r.lucroJbmBar)}</span>
+                    </div>
+                  )}
                   <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>
                     Margin {r.margem}%
                     <div style={{ height:4, borderRadius:2, background:'var(--border)', marginTop:4, overflow:'hidden' }}>
@@ -329,7 +391,19 @@ export default function RelatorioTab() {
 
       {/* Purchases */}
       <div className="card">
-        <SectionTitle>Purchases this month</SectionTitle>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <SectionTitle>Compras do mês</SectionTitle>
+          {comprasMes.length > 0 && (
+            <button onClick={() => setComprasModal(true)} className="btn-primary" style={{ padding:'8px 14px', fontSize:12, borderRadius:10 }}>
+              Ver detalhes
+            </button>
+          )}
+        </div>
+        {creditoBar > 0 && (
+          <div style={{ marginBottom:14, padding:'10px 14px', borderRadius:10, background:'rgba(26,107,74,0.08)', fontSize:12, color:'var(--text2)' }}>
+            Créditos pagos pelo bar: {creditosBar.map(c => `${c.fornecedor} ${fmtYen(c.valor)}`).join(' · ')}
+          </div>
+        )}
         {comprasMes.length===0 ? <Empty text="No purchases this month" /> : (
           <table>
             <thead><tr><th>Date</th><th>Supplier</th><th>Payment</th><th>Subtotal</th><th>Points disc.</th><th>Real cost</th></tr></thead>
@@ -348,6 +422,15 @@ export default function RelatorioTab() {
           </table>
         )}
       </div>
+
+      <ComprasDetailModal
+        open={comprasModal}
+        onClose={() => setComprasModal(false)}
+        compras={comprasMes}
+        monthLabel={monthLabel(selMonth)}
+        custoVendidos={custoVendidos}
+        creditoBar={creditoBar}
+      />
     </div>
   )
 }
