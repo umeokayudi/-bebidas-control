@@ -33,7 +33,7 @@ import { fmtYen, monthLabel, monthKey, saleMonthKey, saleDate, compraMonthKey, f
 import ComprasDetailModal from './components/ComprasDetailModal'
 import DashboardMetricModal from './components/DashboardMetricModal'
 import UiPrefsPanel from './components/UiPrefsPanel'
-import { UiPrefsProvider } from './lib/uiPrefs'
+import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
 import { barCreditsForMonth } from './lib/barCredits'
 import { loadAllCompras } from './lib/loadCompras'
 import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem, marginFromVenda } from './lib/marginCost'
@@ -455,6 +455,7 @@ function Dashboard({ onNav }) {
 // ── SHELL ─────────────────────────────────────────────────────────────────────
 function Shell() {
   const { user, perfil, loading, signOut } = useAuth()
+  const { layout } = useUiPrefs()
   const [tab, setTab] = useState('dashboard')
   const [bar, setBar] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -462,6 +463,10 @@ function Shell() {
   const { notifs, unread, markRead, markAllRead, deleteNotif, deleteAll } = useNotifications()
 
   useMobileMenuLock(menuOpen)
+
+  useEffect(() => {
+    if (layout === LAYOUTS.desktop) setMenuOpen(false)
+  }, [layout])
 
   function selectTab(id) {
     setTab(id)

@@ -12,7 +12,9 @@
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <script>
       (function () {
-        var t = localStorage.getItem('jbm_drinks_theme') || 'light';
+        var t = localStorage.getItem('jbm_drinks_theme') || 'modern';
+        if (t === 'light') t = 'modern';
+        if (t === 'dark') t = 'classic';
         var l = localStorage.getItem('jbm_drinks_layout') || 'auto';
         document.documentElement.setAttribute('data-theme', t);
         document.documentElement.setAttribute('data-layout', l);

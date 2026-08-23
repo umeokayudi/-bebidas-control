@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root,
-[data-theme="light"] {
+[data-theme="modern"] {
   /* JBM Brand */
   --navy:     #001028;
   --navy2:    #001d40;
@@ -37,8 +37,8 @@
   --radius-xl: 20px;
 }
 
-/* ── Tema escuro (opcional) ───────────────────────────────────────────────── */
-[data-theme="dark"] {
+/* ── Tema clássico / escuro (igual JBM Holding) ───────────────────────────── */
+[data-theme="classic"] {
   --bg:       #070d16;
   --bg2:      #0f1a28;
   --bg3:      #152232;
@@ -57,16 +57,24 @@
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
 }
 
-[data-theme="dark"] .card {
+[data-theme="classic"] .card {
   border-color: rgba(255,255,255,0.08);
 }
 
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {
+[data-theme="classic"] input,
+[data-theme="classic"] select,
+[data-theme="classic"] textarea {
   background: var(--bg3);
   border-color: var(--border2);
   color: var(--text);
+}
+
+[data-theme="modern"] .card {
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="modern"] .metric-card {
+  box-shadow: var(--shadow);
 }
 
 body {
@@ -817,63 +825,98 @@ body.menu-open {
   color: var(--navy);
 }
 
-/* ── Preferências UI (tema + layout) ─────────────────────────────────────── */
+/* ── Preferências UI (igual JBM Holding + layout mobile) ─────────────────── */
 .ui-prefs-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(193,156,86,0.15);
-  background: rgba(0,0,0,0.15);
 }
 
-.ui-pref-row {
+.theme-toggle {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(193,156,86,0.2);
+  background: rgba(0,0,0,0.15);
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.ui-pref-label {
+.theme-toggle:hover {
+  border-color: rgba(193,156,86,0.45);
+  color: rgba(255,255,255,0.85);
+}
+
+.theme-toggle-label {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: rgba(193,156,86,0.75);
+  flex-shrink: 0;
 }
 
-.ui-pref-pill {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  background: rgba(0,0,0,0.2);
+.theme-pill {
+  display: inline-flex;
+  background: rgba(0,0,0,0.25);
   border-radius: 20px;
-  padding: 3px;
+  padding: 2px;
+  gap: 2px;
 }
 
-.ui-pref-pill button {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
-  border: none;
-  border-radius: 16px;
-  background: transparent;
-  color: rgba(255,255,255,0.5);
+.theme-pill span,
+.theme-pill button {
+  padding: 4px 9px;
+  border-radius: 18px;
   font-size: 10px;
   font-weight: 600;
-  min-height: 28px;
-  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  min-height: 0;
 }
 
-.ui-pref-pill button.on {
+.theme-pill span.on,
+.theme-pill button.on {
   background: var(--gold);
   color: var(--navy);
 }
 
-.ui-pref-pill button:hover:not(.on) {
-  color: rgba(255,255,255,0.85);
-  background: rgba(255,255,255,0.06);
+.layout-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(193,156,86,0.2);
+  background: rgba(0,0,0,0.15);
+}
+
+.layout-pill button {
+  padding: 4px 7px;
+  font-size: 9px;
+}
+
+html[data-layout="mobile"] .theme-toggle-label,
+html[data-layout="desktop"] .theme-toggle-label {
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .sidebar:not(.open) .theme-toggle-label,
+  .sidebar:not(.open) .layout-toggle .theme-toggle-label {
+    display: none;
+  }
 }
 
 body {
@@ -977,6 +1020,16 @@ html[data-layout="mobile"] .metric-value {
 
 html[data-layout="mobile"] .metric-card-hover:hover {
   transform: none !important;
+}
+
+.login-wrap .ui-prefs-panel {
+  gap: 8px;
+}
+
+.login-wrap .theme-toggle,
+.login-wrap .layout-toggle {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(193,156,86,0.25);
 }
 
 @media print {
