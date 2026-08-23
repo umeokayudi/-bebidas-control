@@ -2,18 +2,8 @@ export const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 
 const MOVIDO_TAG = /\[movido de jun→jul 2026\]/gi
 
-/** Faturas Atomic — maio limpeza, jun bebidas (única), jul faturamento − LM pago pelo bar */
+/** Faturas JBM Drinks → Atomic (bebidas). Limpeza KuriPuro fica no holding separado. */
 export const ATOMIC_FATURAS = [
-  {
-    valor: 165000,
-    total: 165000,
-    pago: 0,
-    data_emissao: '2026-05-31',
-    data_vencimento: '2026-06-30',
-    periodo_inicio: '2026-05-01',
-    periodo_fim: '2026-05-31',
-    obs: 'Maio/2026 — limpeza e equipamentos (não bebidas)',
-  },
   {
     valor: 465000,
     total: 465000,
