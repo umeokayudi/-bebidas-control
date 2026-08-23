@@ -323,13 +323,13 @@ function Dashboard({ onNav }) {
           onClick={() => setDetailModal('compras')}
           tip={`Compras pagas no mês: ${fmtYen(stats.totalComprasValor)} (${stats.totalCompras})\nCusto dos itens vendidos: ${fmtYen(stats.custoMes)} — usado no cálculo de lucro\nDiferença = estoque / custo catálogo vs nota\nClique para ver cada compra`}
         >
-          <div className="metric-label">Compras do mês</div>
+          <div className="metric-label">Compras pagas no mês</div>
           <div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.totalComprasValor)}</div>
           <div className="metric-sub">
-            {stats.totalCompras} compras pagas
+            {stats.totalCompras} nota{stats.totalCompras === 1 ? '' : 's'} de compra
           </div>
           <div className="metric-sub" style={{ marginTop: 4, fontSize: 10, color: 'var(--text3)' }}>
-            Custo itens vendidos {fmtYen(stats.custoMes)} · lucro
+            Custo dos vendidos {fmtYen(stats.custoMes)} (para lucro)
           </div>
           <div className="metric-open-hint">Clique para ver cada compra →</div>
         </MetricCardHover>
