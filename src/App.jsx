@@ -321,14 +321,17 @@ function Dashboard({ onNav }) {
         <MetricCardHover
           className="red"
           onClick={() => setDetailModal('compras')}
-          tip={`Custo dos itens vendidos: ${fmtYen(stats.custoMes)}\nCompras pagas no mês: ${fmtYen(stats.totalComprasValor)} (${stats.totalCompras})\nClique para ver cada compra`}
+          tip={`Compras pagas no mês: ${fmtYen(stats.totalComprasValor)} (${stats.totalCompras})\nCusto dos itens vendidos: ${fmtYen(stats.custoMes)} — usado no cálculo de lucro\nDiferença = estoque / custo catálogo vs nota\nClique para ver cada compra`}
         >
-          <div className="metric-label">Custo JBM (unitário)</div>
-          <div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.custoMes)}</div>
+          <div className="metric-label">Compras do mês</div>
+          <div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.totalComprasValor)}</div>
           <div className="metric-sub">
-            {stats.totalCompras} compras · {fmtYen(stats.totalComprasValor)} pagas no mês
+            {stats.totalCompras} compras pagas
           </div>
-          <div className="metric-open-hint">Clique para ver detalhes →</div>
+          <div className="metric-sub" style={{ marginTop: 4, fontSize: 10, color: 'var(--text3)' }}>
+            Custo itens vendidos {fmtYen(stats.custoMes)} · lucro
+          </div>
+          <div className="metric-open-hint">Clique para ver cada compra →</div>
         </MetricCardHover>
         <MetricCardHover
           className="navy"
