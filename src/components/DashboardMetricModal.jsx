@@ -89,7 +89,7 @@ export default function DashboardMetricModal({ open, onClose, type, monthLabel: 
 
   const subtitles = {
     receita: `${stats.totalVendas} venda(s) · Total ${fmtYen(stats.receitaMes)}`,
-    lucro: `Lucro bruto ${fmtYen(stats.lucroMes)} (${stats.margem}%) · Receita ${fmtYen(stats.receitaMes)} − Custo ${fmtYen(stats.custoMes)}`,
+    lucro: `Lucro bruto ${fmtYen(stats.lucroMes)} (${stats.margem}%) · Receita ${fmtYen(stats.receitaMes)} − Compras ${fmtYen(stats.custoMes)}`,
     markup: `Markup médio ${stats.markup}% · ${stats.produtosDetalhe?.length || 0} produto(s) vendidos`,
   }
 
@@ -115,7 +115,7 @@ export default function DashboardMetricModal({ open, onClose, type, monthLabel: 
         <>
           <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--bg3)', marginBottom: 14 }}>
             <SummaryRow label="Receita" value={fmtYen(stats.receitaMes)} color="var(--navy)" />
-            <SummaryRow label="Custo unitário (itens vendidos)" value={fmtYen(stats.custoMes)} color="var(--red)" />
+            <SummaryRow label="Compras pagas no mês" value={fmtYen(stats.custoMes)} color="var(--red)" />
             <SummaryRow label="Lucro bruto" value={fmtYen(stats.lucroMes)} color="var(--green)" />
             <SummaryRow label="Margem" value={`${stats.margem}%`} />
             {stats.creditoBar > 0 && (
@@ -139,7 +139,7 @@ export default function DashboardMetricModal({ open, onClose, type, monthLabel: 
                     <span style={{ color: 'var(--green)' }}>{fmtYen(b.lucro)}</span>
                   </div>
                   <div style={{ color: 'var(--text2)' }}>
-                    {b.sales} venda(s) · Receita {fmtYen(b.receita)} · Custo {fmtYen(b.custo)} · Margem {b.receita > 0 ? Math.round(b.lucro / b.receita * 100) : 0}%
+                    {b.sales} venda(s) · Receita {fmtYen(b.receita)} · Compras {fmtYen(b.custo)} · Margem {b.receita > 0 ? Math.round(b.lucro / b.receita * 100) : 0}%
                   </div>
                 </div>
               ))}

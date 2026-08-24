@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas, saleMonthKey, compraMonthKey } from './utils'
-import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, marginFromVendaItem } from '../lib/marginCost'
+import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, allocateInvoiceCost } from '../lib/marginCost'
 import { pedidoSaleDate } from '../lib/pedidoVenda'
 import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
 import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
@@ -124,18 +124,18 @@ export default function RelatorioTab() {
   const creditosBar   = barCreditsList(selMonth)
 
   const mesMargin = marginFromSales(vendasMes, costIndex, produtos, pedidoMap)
-  const custoVendidos = mesMargin.custo
-  const lucroBruto    = mesMargin.lucro
+  const receitaTotalMes = mesMargin.receita
+  const lucroBruto    = receitaTotalMes - custoCompras
   const lucroJbm      = lucroBruto + creditoBar
-  const margemBruta   = mesMargin.margemPct
-  const margemJbm     = mesMargin.receita > 0 ? Math.round(lucroJbm / mesMargin.receita * 100) : 0
+  const margemBruta   = receitaTotalMes > 0 ? Math.round(lucroBruto / receitaTotalMes * 100) : 0
+  const margemJbm     = receitaTotalMes > 0 ? Math.round(lucroJbm / receitaTotalMes * 100) : 0
 
-  // Revenue & profit per bar (custo = último custo unitário de compra na data da venda)
+  // Revenue & profit per bar (custo = compras do mês rateadas pela receita)
   const porBar = bars.map(bar => {
     const vBar     = vendasMes.filter(v=>v.bar_id===bar.id)
     const m        = marginFromSales(vBar, costIndex, produtos, pedidoMap)
     const receita  = m.receita || vBar.reduce((a,v)=>a+(+v.total||0),0)
-    const custoV   = m.custo
+    const custoV   = allocateInvoiceCost(custoCompras, receita, receitaTotalMes)
     const lucro    = receita - custoV
     const margem   = receita>0 ? Math.round(lucro/receita*100) : 0
 
@@ -169,16 +169,18 @@ export default function RelatorioTab() {
     const prodMap = {}
     vendasMes.forEach(v => (v.vendas_itens || []).forEach(it => {
       const pid = it.produto_id
-      const m = marginFromVendaItem(it, v.data, costIndex, produtos)
+      const receita = (+it.preco_unitario || 0) * (+it.qtd || 0)
       if (!prodMap[pid]) {
         const p = produtos.find(x => x.id === pid) || {}
         prodMap[pid] = { ...p, nome: it.produtos?.nome || p.nome || '?', vendido: 0, receita: 0, custo: 0, lucro: 0 }
       }
       prodMap[pid].vendido += it.qtd
-      prodMap[pid].receita += m.receita
-      prodMap[pid].custo += m.custo
-      prodMap[pid].lucro += m.lucro
+      prodMap[pid].receita += receita
     }))
+    Object.values(prodMap).forEach(p => {
+      p.custo = allocateInvoiceCost(custoCompras, p.receita, receitaTotalMes)
+      p.lucro = p.receita - p.custo
+    })
     return Object.values(prodMap).filter(p => p.vendido > 0).sort((a, b) => b.lucro - a.lucro)
   })()
 
@@ -195,16 +197,14 @@ export default function RelatorioTab() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:18 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:18 }}>
         <div onClick={() => setComprasModal(true)} style={{ cursor:'pointer' }}>
           <MetricCard label="Compras pagas no mês" value={fmtYen(custoCompras)} color="var(--red)" accent="var(--red)"
-            sub={`${comprasMes.length} compra(s) · clique para detalhes`} />
+            sub={`${comprasMes.length} nota(s) · clique para detalhes`} />
         </div>
-        <MetricCard label="Custo itens vendidos" value={fmtYen(custoVendidos)} color="#9b2c2c" accent="#9b2c2c"
-          sub="último custo unitário na data da venda" />
         <MetricCard label="Receita" value={fmtYen(receitaTotal)} color="var(--navy)" accent="var(--navy)" />
         <MetricCard label="Lucro bruto" value={fmtYen(lucroTotal)} color="var(--green)" accent="var(--green)"
-          sub={`margem ${margemGeral}% · receita − custo vendidos`} />
+          sub={`margem ${margemGeral}% · receita − compras do mês`} />
       </div>
 
       {(creditoBar > 0 || descontoTotal > 0) && (
@@ -313,7 +313,7 @@ export default function RelatorioTab() {
                 <div style={{ fontSize:12, color:'var(--text2)', marginBottom:2 }}>Revenue</div>
                 <div style={{ fontSize:22, fontWeight:700, marginBottom:12 }}>{fmtYen(r.receita)}</div>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
-                  <span style={{ color:'var(--text2)' }}>Custo itens vendidos</span>
+                  <span style={{ color:'var(--text2)' }}>Compras do mês</span>
                   <span style={{ color:'var(--red)' }}>{fmtYen(r.custoV)}</span>
                 </div>
                 {r.creditoBarBar > 0 && (
@@ -429,7 +429,6 @@ export default function RelatorioTab() {
         onClose={() => setComprasModal(false)}
         compras={comprasMes}
         monthLabel={monthLabel(selMonth)}
-        custoVendidos={custoVendidos}
         creditoBar={creditoBar}
       />
     </div>

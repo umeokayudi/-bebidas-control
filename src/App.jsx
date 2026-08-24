@@ -36,7 +36,7 @@ import UiPrefsPanel from './components/UiPrefsPanel'
 import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
 import { barCreditsForMonth } from './lib/barCredits'
 import { loadAllCompras } from './lib/loadCompras'
-import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem, marginFromVenda } from './lib/marginCost'
+import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem, marginFromVenda, comprasTotalForMonth, allocateInvoiceCost } from './lib/marginCost'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -189,38 +189,37 @@ function Dashboard({ onNav }) {
       }
     })
 
-    const custoPorMes = meses.map(m => {
-      const sMes = (sales || []).filter(v => saleMonthKey(v) === m)
-      return {
-        label: monthLabel(m).split('/')[0],
-        month: monthLabel(m),
-        value: marginFromSales(sMes, costIndex, products, pedidoMap).custo,
-      }
-    })
+    const comprasPorMes = meses.map(m => ({
+      label: monthLabel(m).split('/')[0],
+      month: monthLabel(m),
+      value: comprasTotalForMonth(purchases, compraMonthKey, m),
+    }))
 
     const lucroPorMes = meses.map((m, i) => ({
       label: monthLabel(m).split('/')[0],
       month: monthLabel(m),
-      value: receitaPorMes[i].value - custoPorMes[i].value,
-      tip: `${monthLabel(m)} · Lucro ${fmtYen(receitaPorMes[i].value - custoPorMes[i].value)} · Receita ${fmtYen(receitaPorMes[i].value)} · Custo ${fmtYen(custoPorMes[i].value)}`,
+      value: receitaPorMes[i].value - comprasPorMes[i].value,
+      tip: `${monthLabel(m)} · Lucro ${fmtYen(receitaPorMes[i].value - comprasPorMes[i].value)} · Receita ${fmtYen(receitaPorMes[i].value)} · Compras ${fmtYen(comprasPorMes[i].value)}`,
     }))
 
     const purchasesMes = (purchases || []).filter(c => compraMonthKey(c) === selMonth)
-    const totalComprasValor = purchasesMes.reduce((a, c) => a + (+c.total_real || 0), 0)
+    const totalComprasValor = comprasTotalForMonth(purchases, compraMonthKey, selMonth)
     const creditoBar = barCreditsForMonth(selMonth)
     const salesMes = (sales || []).filter(v => saleMonthKey(v) === selMonth)
     const mesMargin = marginFromSales(salesMes, costIndex, products, pedidoMap)
     const receitaMes = mesMargin.receita
-    const custoMes = mesMargin.custo
-    const lucroMes = mesMargin.lucro
-    const margem = mesMargin.margemPct
+    const custoMes = totalComprasValor
+    const lucroMes = receitaMes - custoMes
+    const margem = receitaMes > 0 ? Math.round((lucroMes / receitaMes) * 100) : 0
     const markup = custoMes > 0 ? Math.round((receitaMes / custoMes - 1) * 100) : 0
 
     const porBar = (bars || [])
       .map(bar => {
         const vBar = salesMes.filter(v => v.bar_id === bar.id)
         const m = marginFromSales(vBar, costIndex, products, pedidoMap)
-        return { ...bar, receita: m.receita, custo: m.custo, lucro: m.lucro, sales: vBar.length }
+        const receita = m.receita
+        const custo = allocateInvoiceCost(totalComprasValor, receita, receitaMes)
+        return { ...bar, receita, custo, lucro: receita - custo, sales: vBar.length }
       })
       .filter(b => b.sales > 0 || b.receita > 0)
       .sort((a, b) => b.receita - a.receita)
@@ -228,13 +227,17 @@ function Dashboard({ onNav }) {
     const prodMap = {}
     salesMes.forEach(v => (v.vendas_itens || []).forEach(it => {
       const pid = it.produto_id
-      const m = marginFromVendaItem(it, v.data, costIndex, products)
+      const preco = +it.preco_unitario || 0
+      const qtd = +it.qtd || 0
+      const receita = preco * qtd
       if (!prodMap[pid]) prodMap[pid] = { nome: it.produtos?.nome || '?', qtd: 0, receita: 0, custo: 0, lucro: 0 }
-      prodMap[pid].qtd += it.qtd
-      prodMap[pid].receita += m.receita
-      prodMap[pid].custo += m.custo
-      prodMap[pid].lucro += m.lucro
+      prodMap[pid].qtd += qtd
+      prodMap[pid].receita += receita
     }))
+    Object.values(prodMap).forEach(p => {
+      p.custo = allocateInvoiceCost(totalComprasValor, p.receita, receitaMes)
+      p.lucro = p.receita - p.custo
+    })
 
     const topProdutos = Object.values(prodMap).sort((a, b) => b.receita - a.receita).slice(0, 5)
     const topLucro = Object.values(prodMap).sort((a, b) => b.lucro - a.lucro).slice(0, 5)
@@ -245,15 +248,18 @@ function Dashboard({ onNav }) {
     const vendasDetalhe = salesMes.map(v => {
       const m = marginFromVenda(v, costIndex, products, pedidoMap)
       const bar = barById[v.bar_id]
+      const receita = m.receita
+      const custo = allocateInvoiceCost(totalComprasValor, receita, receitaMes)
+      const lucro = receita - custo
       return {
         id: v.id,
         data: saleDate(v),
         barNome: bar?.nome || '—',
         barCor: bar?.cor,
-        receita: m.receita,
-        custo: m.custo,
-        lucro: m.lucro,
-        margem: m.receita > 0 ? Math.round(m.lucro / m.receita * 100) : 0,
+        receita,
+        custo,
+        lucro,
+        margem: receita > 0 ? Math.round(lucro / receita * 100) : 0,
         obs: v.obs,
       }
     }).sort((a, b) => a.data.localeCompare(b.data))
@@ -321,15 +327,12 @@ function Dashboard({ onNav }) {
         <MetricCardHover
           className="red"
           onClick={() => setDetailModal('compras')}
-          tip={`Compras pagas no mês: ${fmtYen(stats.totalComprasValor)} (${stats.totalCompras})\nCusto dos itens vendidos: ${fmtYen(stats.custoMes)} — usado no cálculo de lucro\nDiferença = estoque / custo catálogo vs nota\nClique para ver cada compra`}
+          tip={`${stats.totalCompras} nota(s) de compra · Total ${fmtYen(stats.totalComprasValor)}\nLucro = receita − compras pagas no mês\nClique para ver cada compra`}
         >
           <div className="metric-label">Compras pagas no mês</div>
           <div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.totalComprasValor)}</div>
           <div className="metric-sub">
             {stats.totalCompras} nota{stats.totalCompras === 1 ? '' : 's'} de compra
-          </div>
-          <div className="metric-sub" style={{ marginTop: 4, fontSize: 10, color: 'var(--text3)' }}>
-            Custo dos vendidos {fmtYen(stats.custoMes)} (para lucro)
           </div>
           <div className="metric-open-hint">Clique para ver cada compra →</div>
         </MetricCardHover>
@@ -346,12 +349,12 @@ function Dashboard({ onNav }) {
         <MetricCardHover
           className="green"
           onClick={() => setDetailModal('lucro')}
-          tip={`Lucro bruto: ${fmtYen(stats.lucroMes)} (${stats.margem}%)\nReceita ${fmtYen(stats.receitaMes)} − Custo ${fmtYen(stats.custoMes)}${stats.creditoBar > 0 ? `\nCrédito bar (LM): +${fmtYen(stats.creditoBar)}\nLucro JBM: ${fmtYen(stats.lucroJbm)}` : ''}\nClique para ver detalhes`}
+          tip={`Lucro bruto: ${fmtYen(stats.lucroMes)} (${stats.margem}%)\nReceita ${fmtYen(stats.receitaMes)} − Compras ${fmtYen(stats.custoMes)}${stats.creditoBar > 0 ? `\nCrédito bar (LM): +${fmtYen(stats.creditoBar)}\nLucro JBM: ${fmtYen(stats.lucroJbm)}` : ''}\nClique para ver detalhes`}
         >
           <div className="metric-label">Lucro real</div>
           <div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div>
           <div className="metric-sub">
-            Venda − custo unitário · {stats.margem}%
+            Receita − compras do mês · {stats.margem}%
             {stats.creditoBar > 0 && ` · JBM c/ crédito ${fmtYen(stats.lucroJbm)}`}
           </div>
           <div className="metric-open-hint">Clique para ver detalhes →</div>
@@ -378,13 +381,13 @@ function Dashboard({ onNav }) {
           <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Profit by bar</div>
           {stats.porBar.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales in {monthLabel(selMonth)}</div>
           :stats.porBar.map(b=>(
-            <DataHoverRow key={b.id} tip={`${b.nome} · Receita ${fmtYen(b.receita)} · Custo ${fmtYen(b.custo||0)} · Lucro ${fmtYen(b.lucro)} · ${b.sales} venda(s)`}>
+            <DataHoverRow key={b.id} tip={`${b.nome} · Receita ${fmtYen(b.receita)} · Compras ${fmtYen(b.custo||0)} · Lucro ${fmtYen(b.lucro)} · ${b.sales} venda(s)`}>
               <div style={{marginBottom:8}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:8,height:8,borderRadius:'50%',background:b.cor}}/><span style={{fontWeight:600,fontSize:13}}>{b.nome}</span></div>
                 <span style={{fontWeight:800,color:b.lucro>=0?'var(--green)':'var(--red)',fontSize:13}}>{fmtYen(b.lucro)}</span>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)} · Custo unit. {fmtYen(b.custo||0)}</span><span>{b.sales} sales</span></div>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)} · Compras {fmtYen(b.custo||0)}</span><span>{b.sales} sales</span></div>
               <div className="progress-bar"><div className="progress-fill" style={{width:stats.receitaMes>0?`${Math.round(b.receita/stats.receitaMes*100)}%`:'0%',background:b.cor}}/></div>
               </div>
             </DataHoverRow>
@@ -440,7 +443,6 @@ function Dashboard({ onNav }) {
         onClose={() => setDetailModal(null)}
         compras={stats.purchasesMes}
         monthLabel={monthLabel(selMonth)}
-        custoVendidos={stats.custoMes}
         creditoBar={stats.creditoBar}
       />
 
