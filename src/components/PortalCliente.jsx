@@ -12,7 +12,6 @@ import {
   faturaVencimento,
   faturaEmissao,
   faturaRemaining,
-  faturaPeriodoFim,
 } from '../lib/barPortal'
 import {
   analyzePurchases,
