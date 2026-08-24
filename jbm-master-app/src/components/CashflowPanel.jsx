@@ -5,7 +5,8 @@ export default function CashflowPanel({ cf, title = '💸 Cashflow', color = 'va
   const items = cf.items || [
     ['Caixa líquido', cf.caixaLiquido, 'var(--blue)'],
     ['A receber', cf.aReceber, 'var(--green)'],
-    ['A pagar', cf.aPagar, 'var(--red)'],
+    ...(cf.aPagarAtrasado > 0 ? [['Atrasado', cf.aPagarAtrasado, 'var(--red)']] : []),
+    ...(cf.aPagarFuturo > 0 ? [['A pagar', cf.aPagarFuturo, 'var(--amber)']] : cf.aPagar > 0 ? [['A pagar', cf.aPagar, 'var(--red)']] : []),
     ['Projetado 30d', cf.projetado30d, color],
   ]
   return (

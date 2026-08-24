@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty, compraDueDate, isCompraOverdue } from './utils'
+import { splitPendingCompras, buildCashflowEvents, pagamentoFor, pagamentoMap } from '../lib/compraPagamentos'
+import { uploadCobrancaDoc, buildCobrancaDocument, downloadTextFile } from '../lib/cobrancaDocs'
 import JbmHoldingPanel from './JbmHoldingPanel'
 import { AdminPage, PortalKpi, PortalSurface, PortalPills } from './ui/PageLayout'
 
@@ -36,18 +38,25 @@ function CashflowOverview() {
   const [loading, setLoading] = useState(true)
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
-    const [fR, cR, pR] = await Promise.all([
+    const [fR, cR, pR, foR] = await Promise.all([
       supabase.from('faturas').select('*').order('data_vencimento'),
       supabase.from('compras').select('*').order('data'),
-      supabase.from('fatura_pagamentos').select('valor,confirmado,metodo').eq('confirmado', false),
+      supabase.from('fatura_pagamentos').select('valor,confirmado,metodo,data').eq('confirmado', false),
+      supabase.from('fornecedores').select('nome,pagamento'),
     ])
-    setData({ faturas: fR.data||[], compras: cR.data||[], pagamentosPendentes: pR.data||[] })
+    setData({
+      faturas: fR.data||[],
+      compras: cR.data||[],
+      pagamentosPendentes: pR.data||[],
+      fornecedores: foR.data||[],
+    })
     setLoading(false)
   }
   if (loading) return <Spinner text="Carregando..." />
 
-  const { faturas, compras, pagamentosPendentes = [] } = data
+  const { faturas, compras, pagamentosPendentes = [], fornecedores = [] } = data
   const today = new Date().toISOString().slice(0,10)
+  const pendingSplit = splitPendingCompras(compras, fornecedores)
 
   // Entradas = valor já recebido dos bars (parcial ou total), não só fatura "paga"
   const paidIn = faturas.reduce((a, f) => a + (+f.pago || 0), 0)
@@ -56,7 +65,9 @@ function CashflowOverview() {
 
   // Saídas = só compras marcadas como pagas (Le Vin pendente não entra no caixa)
   const paidOut = compras.filter(c => c.status_pagamento === 'pago').reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
-  const pendingOut = compras.filter(c => c.status_pagamento === 'pendente').reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
+  const pendingOut = pendingSplit.pendingTotal
+  const overdueOut = pendingSplit.overdueTotal
+  const futureOut = pendingSplit.futureTotal
 
   const netCash = paidIn - paidOut
   const projectedNet = (paidIn + pendingIn) - (paidOut + pendingOut)
@@ -80,7 +91,12 @@ function CashflowOverview() {
     const d = new Date(); d.setDate(d.getDate()+i)
     const ds = d.toISOString().slice(0,10)
     const inAmt = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento===ds).reduce((a,f)=>a+((+f.valor||0)-(+f.pago||0)),0)
-    const outAmt = compras.filter(c=>c.status_pagamento==='pendente'&&(c.data_pagamento||c.data)===ds).reduce((a,c)=>a+(+c.total_pago||0),0)
+    const pagMap = pagamentoMap(fornecedores)
+    const outAmt = compras.filter(c=>{
+      if (c.status_pagamento !== 'pendente') return false
+      const due = compraDueDate(c, pagamentoFor(c.fornecedor, pagMap))
+      return due === ds
+    }).reduce((a,c)=>a+(+c.total_real||+c.total_pago||0),0)
     if (inAmt>0||outAmt>0) next30.push({ date:ds, in:inAmt, out:outAmt })
   }
 
@@ -93,7 +109,8 @@ function CashflowOverview() {
           { label:'Caixa líquido', value:fmtYen(netCash), color:netCash>=0?'var(--green)':'var(--red)', sub:'recebido − pago' },
           { label:'A receber', value:fmtYen(pendingIn), color:'var(--amber)', sub:'saldo faturas em aberto' },
           ...(emAnalise > 0 ? [{ label:'Em análise', value:fmtYen(emAnalise), color:'var(--amber)', sub:'Stripe etc. — ainda não creditado' }] : []),
-          ...(pendingOut > 0 ? [{ label:'A pagar', value:fmtYen(pendingOut), color:'var(--red)', sub:'compras pendentes (ex. Le Vin)' }] : []),
+          ...(overdueOut > 0 ? [{ label:'Atrasado', value:fmtYen(overdueOut), color:'var(--red)', sub:'vencimento já passou (ex. Le Vin)' }] : []),
+          ...(futureOut > 0 ? [{ label:'A pagar', value:fmtYen(futureOut), color:'var(--amber)', sub:'próximos vencimentos' }] : []),
         ].map(k=>(
           <PortalKpi key={k.label} label={k.label} value={k.value} color={k.color} sub={k.sub} />
         ))}
@@ -144,7 +161,7 @@ function CashflowOverview() {
       <PortalSurface title="Posição projetada" style={{ background:'var(--navy)', color:'white', border:'none' }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
           <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Previsto a receber</div><div style={{ fontSize:18, fontWeight:800, color:'#34c759' }}>{fmtYen(pendingIn)}</div></div>
-          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Previsto a pagar</div><div style={{ fontSize:18, fontWeight:800, color:'#ff6b6b' }}>{fmtYen(pendingOut)}</div></div>
+          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Atrasado + a pagar</div><div style={{ fontSize:18, fontWeight:800, color:'#ff6b6b' }}>{fmtYen(pendingOut)}</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:4 }}>{overdueOut > 0 ? `${fmtYen(overdueOut)} atrasado` : ''}{overdueOut > 0 && futureOut > 0 ? ' · ' : ''}{futureOut > 0 ? `${fmtYen(futureOut)} futuro` : ''}</div></div>
           <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Líquido projetado</div><div style={{ fontSize:20, fontWeight:800, color:projectedNet>=0?'var(--gold)':'#ff3b30' }}>{fmtYen(projectedNet)}</div></div>
           <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Caixa líquido atual</div><div style={{ fontSize:20, fontWeight:800, color:netCash>=0?'var(--gold)':'#ff3b30' }}>{fmtYen(netCash)}</div></div>
         </div>
@@ -263,6 +280,7 @@ function PurchasePayments() {
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState({ data_pagamento:'', metodo:'Card', status_pagamento:'pago' })
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [{ data: c }, { data: f }] = await Promise.all([
@@ -271,19 +289,49 @@ function PurchasePayments() {
     ])
     setCompras(c||[]); setFornecedores(f||[]); setLoading(false)
   }
-  const pagamentoFor = nome => fornecedores.find(x => x.nome === nome)?.pagamento
+  const pagMap = pagamentoMap(fornecedores)
+  const pagamentoForNome = nome => pagamentoFor(nome, pagMap)
+  const pendingSplit = splitPendingCompras(compras, fornecedores)
+
   async function save() {
     if (!modal) return; setSaving(true)
     await supabase.from('compras').update({ data_pagamento:form.data_pagamento||null, metodo_pagamento_real:form.metodo, status_pagamento:form.status_pagamento }).eq('id',modal.id)
     setSaving(false); setModal(null); load()
   }
 
+  async function uploadDoc(compra, file) {
+    if (!file) return
+    setUploading(true)
+    try {
+      await uploadCobrancaDoc(compra.id, file)
+      load()
+    } catch (e) {
+      alert(e.message || 'Erro ao salvar documento')
+    }
+    setUploading(false)
+  }
+
+  async function exportDoc(compra) {
+    const { data: itens } = await supabase.from('compras_itens').select('*').eq('compra_id', compra.id)
+    const text = buildCobrancaDocument(compra, itens || [])
+    downloadTextFile(text, `cobranca-${(compra.fornecedor || 'fornecedor').replace(/\s+/g, '-')}-${compra.data || 'doc'}.txt`)
+  }
+
   if (loading) return <Spinner text="Carregando..." />
   const pendingCount = compras.filter(c=>c.status_pagamento==='pendente').length
-  const overdueCount = compras.filter(c=>isCompraOverdue(c, pagamentoFor(c.fornecedor))).length
+  const overdueCount = pendingSplit.overdue.length + pendingSplit.noDue.length
 
   return (
     <div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12, marginBottom:16 }}>
+        {[
+          { label:'Atrasado', value:fmtYen(pendingSplit.overdueTotal), color:'var(--red)', sub:'vencimento passou' },
+          { label:'A pagar', value:fmtYen(pendingSplit.futureTotal), color:'var(--amber)', sub:'próximas datas' },
+          { label:'Pendentes', value:String(pendingCount), color:'var(--navy)', sub:'notas em aberto' },
+        ].map(k=>(
+          <PortalKpi key={k.label} label={k.label} value={k.value} color={k.color} sub={k.sub} />
+        ))}
+      </div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <div style={{ fontSize:16, fontWeight:700 }}>Pagamentos de compras</div>
         <div style={{ display:'flex', gap:12 }}>
@@ -293,8 +341,8 @@ function PurchasePayments() {
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         {compras.map(c=>{
-          const due = compraDueDate(c, pagamentoFor(c.fornecedor))
-          const overdue = isCompraOverdue(c, pagamentoFor(c.fornecedor))
+          const due = compraDueDate(c, pagamentoForNome(c.fornecedor))
+          const overdue = isCompraOverdue(c, pagamentoForNome(c.fornecedor))
           return (
           <div key={c.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor:overdue?'rgba(239,68,68,0.45)':c.status_pagamento==='pendente'?'rgba(255,149,0,0.3)':'var(--border)', borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
             <div style={{ flex:1 }}>
@@ -305,11 +353,26 @@ function PurchasePayments() {
                 {c.status_pagamento==='pago' && c.data_pagamento && <span> · Pago {fmtDate(c.data_pagamento)}</span>}
                 {c.metodo_pagamento_real&&<span> via {c.metodo_pagamento_real}</span>}
               </div>
+              {c.foto_url && (
+                <a href={c.foto_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'var(--blue)', marginTop:4, display:'inline-block' }}>
+                  📎 Documento salvo
+                </a>
+              )}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
               <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:overdue?'#fef2f2':c.status_pagamento==='pendente'?'#fffbeb':'#f0fdf4', color:overdue?'var(--red)':c.status_pagamento==='pendente'?'var(--amber)':'var(--green)' }}>
-                {overdue?'Atrasado':c.status_pagamento==='pendente'?'Pendente':'Pago'}
+                {overdue?'Atrasado':c.status_pagamento==='pendente'?'A pagar':'Pago'}
               </span>
+              {c.status_pagamento==='pendente' && (
+                <>
+                  <label style={{ padding:'5px 10px', fontSize:11, borderRadius:8, border:'1px solid var(--border)', cursor:uploading?'wait':'pointer' }}>
+                    {uploading ? '…' : '📎 Anexar'}
+                    <input type="file" accept="image/*,.pdf,.json,.txt" style={{ display:'none' }} disabled={uploading}
+                      onChange={e=>{ uploadDoc(c, e.target.files?.[0]); e.target.value='' }} />
+                  </label>
+                  <button onClick={()=>exportDoc(c)} style={{ padding:'5px 10px', fontSize:11, borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>💾 Gerar doc</button>
+                </>
+              )}
               <button onClick={()=>{ setModal(c); setForm({ data_pagamento:c.data_pagamento||due||new Date().toISOString().slice(0,10), metodo:c.metodo_pagamento_real||'Bank Transfer', status_pagamento:c.status_pagamento||'pago' }) }}
                 style={{ padding:'5px 12px', fontSize:12, borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>✏️ Editar</button>
             </div>
@@ -452,6 +515,8 @@ function Caixa() {
 function Calendario() {
   const [faturas, setFaturas] = useState([])
   const [compras, setCompras] = useState([])
+  const [fornecedores, setFornecedores] = useState([])
+  const [pagamentosPendentes, setPagamentosPendentes] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
@@ -459,107 +524,127 @@ function Calendario() {
 
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
-    const [fR, cR] = await Promise.all([
+    const [fR, cR, foR, pR] = await Promise.all([
       supabase.from('faturas').select('*, bars(nome)').order('data_vencimento'),
       supabase.from('compras').select('*').order('data'),
+      supabase.from('fornecedores').select('nome,pagamento'),
+      supabase.from('fatura_pagamentos').select('id,valor,confirmado,metodo,data').eq('confirmado', false),
     ])
     setFaturas(fR.data||[])
     setCompras(cR.data||[])
+    setFornecedores(foR.data||[])
+    setPagamentosPendentes(pR.data||[])
     setLoading(false)
   }
+
+  const allEvents = useMemo(
+    () => buildCashflowEvents({ faturas, compras, fornecedores, pagamentosPendentes }),
+    [faturas, compras, fornecedores, pagamentosPendentes]
+  )
 
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month+1, 0).getDate()
-  const monthStr = currentMonth.toISOString().slice(0,7)
+  const monthStr = `${year}-${String(month+1).padStart(2,'0')}`
   const today = new Date()
+  const todayStr = today.toISOString().slice(0,10)
   const isCurrentMonth = today.getMonth()===month && today.getFullYear()===year
 
-  const events = {}
-  faturas.forEach(f => {
-    if (f.data_vencimento?.startsWith(monthStr)) {
-      const day = +f.data_vencimento.slice(8,10)
-      if (!events[day]) events[day] = []
-      events[day].push({ type:'in', label:f.bars?.nome, amount:(+f.valor||0)-(+f.pago||0), status:f.status, date:f.data_vencimento, note:'Invoice due' })
+  const eventsByDay = useMemo(() => {
+    const map = {}
+    for (const ev of allEvents) {
+      if (!ev.date?.startsWith(monthStr)) continue
+      const day = +ev.date.slice(8, 10)
+      if (!map[day]) map[day] = []
+      map[day].push(ev)
     }
-  })
-  compras.forEach(c => {
-    const payDate = c.data_pagamento || c.data
-    if (payDate?.startsWith(monthStr)) {
-      const day = +payDate.slice(8,10)
-      if (!events[day]) events[day] = []
-      events[day].push({ type:'out', label:c.fornecedor||'Supplier', amount:+c.total_pago||0, status:c.status_pagamento, date:payDate, note:'Purchase' })
-    }
-  })
+    return map
+  }, [allEvents, monthStr])
 
-  // Next 3 upcoming events
-  const allEvents = [
-    ...faturas.filter(f=>f.status!=='pago').map(f=>({ date:f.data_vencimento, label:f.bars?.nome, amount:(+f.valor||0)-(+f.pago||0), type:'in', note:'Invoice due' })),
-    ...compras.filter(c=>c.status_pagamento==='pendente').map(c=>({ date:c.data_pagamento||c.data, label:c.fornecedor||'Supplier', amount:+c.total_pago||0, type:'out', note:'Purchase' }))
-  ].sort((a,b)=>(a.date||'').localeCompare(b.date||''))
-
-  const nextEvents = allEvents.filter(e=>e.date>=today.toISOString().slice(0,10)).slice(0,5)
+  const overdueEvents = allEvents.filter(e => e.status === 'atrasado')
+  const upcomingEvents = allEvents.filter(e => e.date >= todayStr && e.status !== 'atrasado').slice(0, 8)
 
   if (loading) return <Spinner text="Carregando..." />
 
+  const statusLabel = {
+    atrasado: 'Atrasado',
+    a_pagar: 'A pagar',
+    a_receber: 'A receber',
+    em_analise: 'Em análise',
+  }
+
   return (
     <div>
-      {/* Next payments banner */}
-      {nextEvents.length>0 && (
-        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:10 }}>⚡ Next upcoming events</div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {nextEvents.map((ev,i)=>{
-              const daysLeft = Math.ceil((new Date(ev.date)-today)/(1000*60*60*24))
+      {overdueEvents.length > 0 && (
+        <PortalSurface title="⚠️ Atrasado — precisa pagar/receber" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {overdueEvents.map((ev, i) => (
+              <div key={i} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 150 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)' }}>{ev.type === 'in' ? '↑ A receber' : '↓ A pagar'} · {statusLabel[ev.status]}</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtYen(ev.amount)}</div>
+                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ev.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(ev.date)}</div>
+                {ev.docUrl && <a href={ev.docUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--blue)' }}>📎 Doc</a>}
+              </div>
+            ))}
+          </div>
+        </PortalSurface>
+      )}
+
+      {upcomingEvents.length > 0 && (
+        <PortalSurface title="📅 Próximos vencimentos" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {upcomingEvents.map((ev, i) => {
+              const daysLeft = Math.ceil((new Date(ev.date + 'T12:00:00') - today) / (1000 * 60 * 60 * 24))
               return (
-                <div key={i} style={{ background:ev.type==='in'?'#f0fdf4':'#fef2f2', border:'1px solid', borderColor:ev.type==='in'?'#86efac':'#fca5a5', borderRadius:12, padding:'10px 14px', minWidth:140 }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:ev.type==='in'?'var(--green)':'var(--red)', marginBottom:2 }}>{ev.type==='in'?'↑ IN':'↓ OUT'}</div>
-                  <div style={{ fontSize:13, fontWeight:700 }}>{fmtYen(ev.amount)}</div>
-                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>{ev.label}</div>
-                  <div style={{ fontSize:11, color:daysLeft<=3?'var(--red)':'var(--text2)', fontWeight:daysLeft<=3?700:400, marginTop:4 }}>
-                    {daysLeft===0?'Today':daysLeft===1?'Tomorrow':'In '+daysLeft+' days'}
+                <div key={i} onClick={() => setCurrentMonth(new Date(ev.date + 'T12:00:00'))}
+                  style={{ background: ev.type === 'in' ? '#f0fdf4' : '#fffbeb', border: '1px solid', borderColor: ev.type === 'in' ? '#86efac' : '#fcd34d', borderRadius: 12, padding: '10px 14px', minWidth: 140, cursor: 'pointer' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: ev.type === 'in' ? 'var(--green)' : 'var(--amber)' }}>{ev.type === 'in' ? '↑ Entrada' : '↓ Saída'} · {statusLabel[ev.status] || ev.status}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{fmtYen(ev.amount)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ev.label}</div>
+                  <div style={{ fontSize: 11, color: daysLeft <= 3 ? 'var(--red)' : 'var(--text2)', fontWeight: daysLeft <= 3 ? 700 : 400, marginTop: 4 }}>
+                    {fmtDate(ev.date)} · {daysLeft === 0 ? 'Hoje' : daysLeft === 1 ? 'Amanhã' : `Em ${daysLeft} dias`}
                   </div>
                 </div>
               )
             })}
           </div>
-        </div>
+        </PortalSurface>
       )}
 
-      {/* Calendar header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
         <button onClick={()=>setCurrentMonth(new Date(year,month-1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>←</button>
-        <div style={{ fontSize:16, fontWeight:700 }}>{currentMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-        <button onClick={()=>setCurrentMonth(new Date(year,month+1,1))} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>→</button>
+        <div style={{ fontSize:16, fontWeight:700 }}>{currentMonth.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</div>
+        <button onClick={()=>{ setCurrentMonth(new Date(year,month+1,1)); setSelectedDay(null); setPopup(null) }} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:16 }}>→</button>
       </div>
 
-      <div style={{ display:'flex', gap:12, marginBottom:12 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#86efac' }}/> Money in</div>
-        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#fca5a5' }}/> Money out</div>
+      <div style={{ display:'flex', gap:12, marginBottom:12, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#86efac' }}/> Entrada</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#fca5a5' }}/> Saída</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#fcd34d' }}/> A pagar (futuro)</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12 }}><div style={{ width:10,height:10,borderRadius:2,background:'#ef4444' }}/> Atrasado</div>
       </div>
 
-      {/* Calendar grid */}
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden', marginBottom:20 }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--navy)' }}>
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
+          {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>(
             <div key={d} style={{ padding:'10px', textAlign:'center', fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>{d}</div>
           ))}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
           {Array.from({length:firstDay}).map((_,i)=>(
-            <div key={'e'+i} style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:'var(--bg3)' }}/>
+            <div key={'e'+i} style={{ minHeight:78, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)', background:'var(--bg3)' }}/>
           ))}
           {Array.from({length:daysInMonth}).map((_,i)=>{
             const day = i+1
-            const dayEvents = events[day]||[]
+            const dayEvents = eventsByDay[day]||[]
             const isToday = isCurrentMonth && day===today.getDate()
-            const hasIn = dayEvents.some(e=>e.type==='in')
-            const hasOut = dayEvents.some(e=>e.type==='out')
+            const hasOverdue = dayEvents.some(e=>e.status==='atrasado')
             return (
               <div key={day} onClick={()=>{ if(dayEvents.length>0){ setSelectedDay(day); setPopup(dayEvents) }}}
-                style={{ minHeight:70, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
-                  background:isToday?'rgba(193,156,86,0.1)':'transparent',
+                style={{ minHeight:78, borderRight:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
+                  background: hasOverdue ? 'rgba(239,68,68,0.08)' : isToday ? 'rgba(193,156,86,0.1)' : 'transparent',
                   cursor:dayEvents.length>0?'pointer':'default',
                   transition:'background 0.15s' }}>
                 <div style={{ padding:'6px 8px' }}>
@@ -567,21 +652,16 @@ function Calendario() {
                     <span style={{ fontSize:13, fontWeight:isToday?800:400, color:isToday?'var(--gold)':'var(--text)',
                       width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
                       background:isToday?'var(--navy)':'transparent' }}>{day}</span>
-                    {dayEvents.length>0 && <span style={{ fontSize:10, color:'var(--text3)' }}>{dayEvents.length}</span>}
+                    {dayEvents.length>0 && <span style={{ fontSize:10, color: hasOverdue ? 'var(--red)' : 'var(--text3)' }}>{dayEvents.length}</span>}
                   </div>
-                  {hasIn && <div style={{ height:4, background:'#86efac', borderRadius:2, marginBottom:2 }}/>}
-                  {hasOut && <div style={{ height:4, background:'#fca5a5', borderRadius:2 }}/>}
-                  {dayEvents.slice(0,2).map((ev,ei)=>{
-                    const daysLeft = Math.ceil((new Date(ev.date)-today)/(1000*60*60*24))
-                    return (
-                      <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:2,
-                        background:ev.type==='in'?'#f0fdf4':'#fef2f2', color:ev.type==='in'?'#16a34a':'#dc2626',
-                        fontWeight:600, lineHeight:1.4 }}>
-                        {ev.type==='in'?'↑':'↓'} {Math.round(ev.amount/1000)}k
-                        {daysLeft>=0 && <span style={{ display:'block', fontSize:8, opacity:0.8 }}>{daysLeft===0?'today':daysLeft+'d'}</span>}
-                      </div>
-                    )
-                  })}
+                  {dayEvents.slice(0,3).map((ev,ei)=>(
+                    <div key={ei} style={{ fontSize:9, padding:'2px 4px', borderRadius:3, marginTop:2,
+                      background: ev.status==='atrasado' ? '#fef2f2' : ev.type==='in' ? '#f0fdf4' : '#fffbeb',
+                      color: ev.status==='atrasado' ? '#dc2626' : ev.type==='in' ? '#16a34a' : '#b45309',
+                      fontWeight:600, lineHeight:1.3 }}>
+                      {ev.type==='in'?'↑':'↓'} {Math.round(ev.amount/1000)}k
+                    </div>
+                  ))}
                 </div>
               </div>
             )
@@ -589,27 +669,30 @@ function Calendario() {
         </div>
       </div>
 
-      {/* Popup */}
       {popup && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
           onClick={()=>setPopup(null)}>
-          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'24px', width:'100%', maxWidth:380, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}
+          <div style={{ background:'var(--bg2)', borderRadius:20, padding:'24px', width:'100%', maxWidth:420, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}
             onClick={e=>e.stopPropagation()}>
             <div style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>
-              {currentMonth.toLocaleDateString('en-US',{month:'long'})} {selectedDay}, {year}
+              {currentMonth.toLocaleDateString('pt-BR',{month:'long'})} {selectedDay}, {year}
             </div>
             {popup.map((ev,i)=>(
               <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', padding:'12px 0', borderBottom:'1px solid var(--border)' }}>
                 <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
                     <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20,
-                      background:ev.type==='in'?'#f0fdf4':'#fef2f2', color:ev.type==='in'?'var(--green)':'var(--red)' }}>
-                      {ev.type==='in'?'↑ RECEIVE':'↓ PAY'}
+                      background:ev.type==='in'?'#f0fdf4':ev.status==='atrasado'?'#fef2f2':'#fffbeb',
+                      color:ev.type==='in'?'var(--green)':ev.status==='atrasado'?'var(--red)':'var(--amber)' }}>
+                      {ev.type==='in'?'↑ RECEBER':'↓ PAGAR'}
                     </span>
-                    {ev.status && <span style={{ fontSize:10, color:'var(--text3)' }}>{ev.status}</span>}
+                    <span style={{ fontSize:10, fontWeight:700, color: ev.status==='atrasado' ? 'var(--red)' : 'var(--text3)' }}>
+                      {statusLabel[ev.status] || ev.status}
+                    </span>
                   </div>
                   <div style={{ fontSize:13, fontWeight:600 }}>{ev.label}</div>
                   <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>{ev.note}</div>
+                  {ev.docUrl && <a href={ev.docUrl} target="_blank" rel="noreferrer" style={{ fontSize:11, color:'var(--blue)', marginTop:4, display:'inline-block' }}>📎 Ver documento</a>}
                 </div>
                 <div style={{ fontSize:16, fontWeight:800, color:ev.type==='in'?'var(--green)':'var(--red)' }}>
                   {ev.type==='in'?'+':'-'}{fmtYen(ev.amount)}
@@ -617,12 +700,12 @@ function Calendario() {
               </div>
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', fontWeight:700, marginTop:12, paddingTop:12, borderTop:'2px solid var(--border)' }}>
-              <span>Net</span>
+              <span>Líquido do dia</span>
               <span style={{ color:popup.reduce((a,e)=>a+(e.type==='in'?e.amount:-e.amount),0)>=0?'var(--green)':'var(--red)' }}>
                 {fmtYen(popup.reduce((a,e)=>a+(e.type==='in'?e.amount:-e.amount),0))}
               </span>
             </div>
-            <button onClick={()=>setPopup(null)} style={{ width:'100%', marginTop:16, padding:'12px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:13 }}>Close</button>
+            <button onClick={()=>setPopup(null)} style={{ width:'100%', marginTop:16, padding:'12px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer', fontSize:13 }}>Fechar</button>
           </div>
         </div>
       )}

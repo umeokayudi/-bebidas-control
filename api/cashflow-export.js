@@ -13,6 +13,36 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ]
 
+function compraDueDate(c, fornecedorPagamento) {
+  const explicit = c?.data_pagamento ? String(c.data_pagamento).slice(0, 10) : ''
+  if (explicit) return explicit
+  const base = c?.data ? String(c.data).slice(0, 10) : ''
+  if (!base) return ''
+  const pag = String(fornecedorPagamento || c?.pagamento || '')
+  const m = pag.match(/dia\s*(\d{1,2})/i) || pag.match(/day\s*(\d{1,2})/i) || pag.match(/(\d{1,2})\s*(?:of|do mês)/i)
+  if (!m) return ''
+  const day = Math.min(28, Math.max(1, +m[1]))
+  const d = new Date(base + 'T12:00:00')
+  d.setMonth(d.getMonth() + 1)
+  d.setDate(day)
+  return d.toISOString().slice(0, 10)
+}
+
+function splitPendingCompras(compras, fornecedores, today) {
+  const map = {}
+  for (const f of fornecedores || []) map[f.nome] = f.pagamento
+  const pending = compras.filter(c => c.status_pagamento === 'pendente')
+  let overdueTotal = 0
+  let futureTotal = 0
+  for (const c of pending) {
+    const amount = +c.total_pago || +c.total_real || 0
+    const due = compraDueDate(c, map[c.fornecedor])
+    if (!due || due < today) overdueTotal += amount
+    else futureTotal += amount
+  }
+  return { overdueTotal, futureTotal, aPagar: overdueTotal + futureTotal }
+}
+
 async function buildLiveSnapshot(sb) {
   const today = new Date().toISOString().slice(0, 10)
   const mes = today.slice(0, 7)
@@ -20,11 +50,12 @@ async function buildLiveSnapshot(sb) {
   in30.setDate(in30.getDate() + 30)
   const end30 = in30.toISOString().slice(0, 10)
 
-  const [barsR, vendasR, comprasR, faturasR] = await Promise.all([
+  const [barsR, vendasR, comprasR, faturasR, fornR] = await Promise.all([
     sb.from('bars').select('id,nome'),
     sb.from('vendas').select('bar_id,data,total,obs,cast_id').order('data', { ascending: false }).limit(100),
     sb.from('compras').select('data,total_real,total_pago,status_pagamento,data_pagamento,fornecedor,pagamento').order('data', { ascending: false }),
     sb.from('faturas').select('bar_id,valor,total,pago,status,data_vencimento').order('data_vencimento', { ascending: false }),
+    sb.from('fornecedores').select('nome,pagamento'),
   ])
 
   const bars = barsR.data || []
@@ -43,7 +74,7 @@ async function buildLiveSnapshot(sb) {
   const faturasVencidas = faturasPendentes.filter(f => f.data_vencimento && f.data_vencimento < today)
 
   const comprasPendentes = compras.filter(c => c.status_pagamento === 'pendente')
-  const aPagar = comprasPendentes.reduce((a, c) => a + (+c.total_pago || +c.total_real || 0), 0)
+  const { overdueTotal, futureTotal, aPagar } = splitPendingCompras(compras, fornR.data, today)
 
   const pendingIn30 = faturasPendentes
     .filter(f => f.data_vencimento >= today && f.data_vencimento <= end30)
@@ -51,7 +82,7 @@ async function buildLiveSnapshot(sb) {
 
   const pendingOut30 = comprasPendentes
     .filter(c => {
-      const d = c.data_pagamento || c.data
+      const d = compraDueDate(c, (fornR.data || []).find(f => f.nome === c.fornecedor)?.pagamento)
       return d >= today && d <= end30
     })
     .reduce((a, c) => a + (+c.total_pago || +c.total_real || 0), 0)
@@ -69,6 +100,8 @@ async function buildLiveSnapshot(sb) {
       projetado30d: caixaLiquido + pendingIn30 - pendingOut30,
       aReceber,
       aPagar,
+      aPagarAtrasado: overdueTotal,
+      aPagarFuturo: futureTotal,
       faturasVencidas: faturasVencidas.length,
       entradas30d: pendingIn30,
       saidas30d: pendingOut30,
