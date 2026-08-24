@@ -10,7 +10,7 @@ class ErrorBoundary extends Component {
 
 import { LogoSidebar } from './components/Logo'
 import { MobileTopBar, ShellOverlay, useMobileMenuLock } from './components/MobileShell'
-import { useNotifications, NotificationBell } from './components/Notifications'
+import { useNotifications, NotificationBell, useOverdueAlerts } from './components/Notifications'
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth, LoginPage } from './components/Auth'
 import { supabase } from './lib/supabase'
@@ -193,6 +193,47 @@ function Dashboard({ onNav }) {
         </PortalAlert>
       )}
 
+      {(data.alertas?.faturasAtrasadasTotal > 0 || data.alertas?.comprasAtrasadasTotal > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+          {data.alertas.faturasAtrasadasTotal > 0 && (
+            <PortalAlert variant="red" onClick={() => onNav('faturas')}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+                    {data.alertas.faturasAtrasadas.length} fatura(s) em atraso — cobrar dos bars
+                  </div>
+                  <div style={{ fontSize: 13, opacity: 0.95 }}>
+                    Total {fmtYen(data.alertas.faturasAtrasadasTotal)}
+                    {data.alertas.faturasAtrasadas.slice(0, 2).map(f => (
+                      <span key={f.id}> · {f.barNome} ({fmtDate(f.vencimento)})</span>
+                    ))}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Ver faturas →</span>
+              </div>
+            </PortalAlert>
+          )}
+          {data.alertas.comprasAtrasadasTotal > 0 && (
+            <PortalAlert variant="amber" onClick={() => onNav('cashflow')}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--red)' }}>
+                    {data.alertas.comprasAtrasadas.length} pagamento(s) atrasado(s)
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+                    Total {fmtYen(data.alertas.comprasAtrasadasTotal)}
+                    {data.alertas.comprasAtrasadas.slice(0, 2).map(c => (
+                      <span key={c.id}> · {c.fornecedor} ({fmtDate(c.vencimento)})</span>
+                    ))}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', whiteSpace: 'nowrap' }}>Fluxo de caixa →</span>
+              </div>
+            </PortalAlert>
+          )}
+        </div>
+      )}
+
       <div className="portal-hero-grid">
         <PortalHero
           label={`Lucro projetado · ${monthLabel(selMonth)}`}
@@ -264,6 +305,7 @@ function Shell() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [pedidosPendentes, setPedidosPendentes] = useState(0)
   const { notifs, unread, markRead, markAllRead, deleteNotif, deleteAll } = useNotifications()
+  const overdueAlerts = useOverdueAlerts()
 
   useMobileMenuLock(menuOpen)
 
@@ -325,7 +367,7 @@ function Shell() {
         open={menuOpen}
         onToggle={() => setMenuOpen(o => !o)}
       >
-        <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
+        <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="header"/>
       </MobileTopBar>
 
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
@@ -354,7 +396,7 @@ function Shell() {
             </div>
           </div>
           <div className="sidebar-footer-notifs">
-            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
+            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="sidebar"/>
           </div>
           <UiPrefsPanel />
           <button onClick={signOut} className="sidebar-signout">Sair</button>

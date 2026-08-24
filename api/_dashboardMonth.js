@@ -106,3 +106,55 @@ export function faturaMonthKeys(faturas) {
   }
   return keys
 }
+
+function faturaOutstanding(f) {
+  return Math.max(0, (+f.total || +f.valor || 0) - (+f.pago || 0))
+}
+
+function compraDueDateServer(c, fornecedorPagamento) {
+  const explicit = c?.data_pagamento ? String(c.data_pagamento).slice(0, 10) : ''
+  if (explicit) return explicit
+  const base = String(c?.data_compra || c?.data || '').slice(0, 10)
+  if (!base) return ''
+  const pag = String(fornecedorPagamento || c?.pagamento || '')
+  const m = pag.match(/dia\s*(\d{1,2})/i) || pag.match(/day\s*(\d{1,2})/i) || pag.match(/(\d{1,2})\s*(?:of|do mês)/i)
+  if (!m) return ''
+  const day = Math.min(28, Math.max(1, +m[1]))
+  const d = new Date(base + 'T12:00:00')
+  d.setMonth(d.getMonth() + 1)
+  d.setDate(day)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Faturas e compras vencidas para alertas no dashboard */
+export function buildDashboardAlertas({ faturas = [], compras = [], fornecedores = [] }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const pagMap = Object.fromEntries((fornecedores || []).map(f => [f.nome, f.pagamento]))
+
+  const faturasAtrasadas = (faturas || [])
+    .filter(f => f.status !== 'pago' && f.data_vencimento && f.data_vencimento < today && faturaOutstanding(f) > 0)
+    .map(f => ({
+      id: f.id,
+      barNome: f.bars?.nome || 'Bar',
+      valor: faturaOutstanding(f),
+      vencimento: f.data_vencimento,
+    }))
+    .sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''))
+
+  const comprasAtrasadas = (compras || [])
+    .filter(c => c.status_pagamento === 'pendente')
+    .map(c => {
+      const vencimento = compraDueDateServer(c, pagMap[c.fornecedor])
+      const valor = +c.total_real || +c.total_pago || 0
+      return { id: c.id, fornecedor: c.fornecedor || 'Fornecedor', valor, vencimento }
+    })
+    .filter(c => c.vencimento && c.vencimento < today && c.valor > 0)
+    .sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''))
+
+  return {
+    faturasAtrasadas,
+    faturasAtrasadasTotal: faturasAtrasadas.reduce((a, f) => a + f.valor, 0),
+    comprasAtrasadas,
+    comprasAtrasadasTotal: comprasAtrasadas.reduce((a, c) => a + c.valor, 0),
+  }
+}
