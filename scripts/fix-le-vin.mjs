@@ -1,29 +1,15 @@
 #!/usr/bin/env node
 /**
- * Corrige Le Vin: preços da 請求書 jul/2026, vencimento dia 10, status atrasado.
+ * Corrige Le Vin com base na 請求書 #971 (PDF jul/2026).
  * Uso: node scripts/fix-le-vin.mjs
  */
 import { readFileSync } from 'fs'
 import { createClient } from '@supabase/supabase-js'
+import invoice from './data/le-vin-invoice-971.json' with { type: 'json' }
 
 const URL = 'https://ojirgkqtqvugqktyuhem.supabase.co'
 const LE_VIN_ID = 'fa471fc2-62e5-4680-b50f-e11586861f17'
-
-/** Preços 税込 da 請求書 Le Vin jul/2026 (Grey Goose corrigido — não ¥472) */
-const INVOICE_ITEMS = [
-  { nome: 'Cuervo 1800 Añejo', qtd: 12, zeikomi: 7873 },
-  { nome: 'Dom Perignon Brut', qtd: 1, zeikomi: 25194 },
-  { nome: 'Grey Goose', qtd: 9, zeikomi: 5280 },
-  { nome: 'Hennessy V.S', qtd: 24, zeikomi: 4042 },
-  { nome: 'Krug Brut', qtd: 1, zeikomi: 31508 },
-  { nome: 'Moet Brut', qtd: 12, zeikomi: 5774 },
-  { nome: 'Moet NIR', qtd: 7, zeikomi: 8398 },
-  { nome: 'Moet Rosé', qtd: 17, zeikomi: 6823 },
-  { nome: 'Veuve Clicquot Brut', qtd: 18, zeikomi: 6823 },
-  { nome: 'Veuve Clicquot Rose', qtd: 19, zeikomi: 7873 },
-]
-
-const DUE_DATE = '2026-08-10' // dia 10 do mês seguinte à fatura jul/2026
+const TAX = 1.1
 
 function loadKey() {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) return process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -33,8 +19,8 @@ function loadKey() {
   throw new Error('SUPABASE_SERVICE_ROLE_KEY missing')
 }
 
-function invoiceTotal() {
-  return INVOICE_ITEMS.reduce((a, it) => a + it.qtd * it.zeikomi, 0)
+function toZeikomi(zeibetsu) {
+  return Math.round(+zeibetsu * TAX)
 }
 
 async function matchProduct(sb, nome) {
@@ -45,59 +31,70 @@ async function matchProduct(sb, nome) {
 
 async function main() {
   const sb = createClient(URL, loadKey(), { auth: { autoRefreshToken: false, persistSession: false } })
-  const total = invoiceTotal()
   const today = new Date().toISOString().slice(0, 10)
-  const overdue = today > DUE_DATE
+  const overdue = today > invoice.vencimento
 
-  console.log('\n🔧 Fix Le Vin — 請求書 jul/2026\n')
-  console.log(`   Total itens: ¥${total.toLocaleString('ja-JP')}`)
-  console.log(`   Vencimento: ${DUE_DATE}${overdue ? ' ⚠️ ATRASADO' : ''}\n`)
+  const lines = invoice.produtos.map(p => ({
+    ...p,
+    zeikomi: toZeikomi(p.zeibetsu),
+    subtotalZeibetsu: p.qtd * p.zeibetsu,
+  }))
+  const sumZeibetsu = lines.reduce((a, l) => a + l.subtotalZeibetsu, 0)
+
+  console.log('\n🔧 Fix Le Vin — 請求書 #971\n')
+  console.log(`   Total fatura: ¥${invoice.total_zeikomi.toLocaleString('ja-JP')} 税込`)
+  console.log(`   Soma itens 税抜: ¥${sumZeibetsu.toLocaleString('ja-JP')} (fatura base ¥${invoice.zeibetsu.toLocaleString('ja-JP')})`)
+  console.log(`   Vencimento: ${invoice.vencimento}${overdue ? ' ⚠️ ATRASADO' : ''}\n`)
 
   await sb.from('fornecedores').update({
     pagamento: 'Dia 10',
-    notas: 'Pagamento todo dia 10 do mês (vencimento da fatura anterior)',
+    notas: 'Pagamento todo dia 10 do mês (請求書 Le Vin)',
   }).eq('id', LE_VIN_ID)
-  console.log('✅ Fornecedor → pagamento "Dia 10"')
 
   const { data: compra } = await sb.from('compras').select('id').eq('fornecedor', 'Le Vin').eq('data', '2026-07-15').maybeSingle()
   if (!compra) throw new Error('Compra Le Vin jul/2026 não encontrada')
 
   await sb.from('compras_itens').delete().eq('compra_id', compra.id)
   await sb.from('compras_itens').insert(
-    INVOICE_ITEMS.map(it => ({
+    lines.map(l => ({
       compra_id: compra.id,
-      nome: it.nome,
-      qtd: it.qtd,
-      custo_unitario: it.zeikomi,
+      nome: l.nome,
+      qtd: l.qtd,
+      custo_unitario: l.zeibetsu,
     }))
   )
 
   await sb.from('compras').update({
     pagamento: 'Dia 10',
-    subtotal: total,
-    total_pago: total,
-    total_real: total,
+    subtotal: invoice.total_zeikomi,
+    total_pago: invoice.total_zeikomi,
+    total_real: invoice.total_zeikomi,
     status_pagamento: 'pendente',
-    data_pagamento: DUE_DATE,
-    obs: `Le Vin 請求書 jul/2026 — venc. ${DUE_DATE}${overdue ? ' — ATRASADO' : ''} (¥${total.toLocaleString('ja-JP')})`,
+    data_pagamento: invoice.vencimento,
+    obs: `Le Vin 請求書 #${invoice.numero} — venc. ${invoice.vencimento}${overdue ? ' — ATRASADO' : ''} (¥${invoice.total_zeikomi.toLocaleString('ja-JP')} 税込)`,
   }).eq('id', compra.id)
-  console.log(`✅ Compra jul/15 atualizada — ¥${total.toLocaleString('ja-JP')}`)
+
+  console.log('✅ Compra jul/2026 atualizada\n')
+  console.log('Produto | Qtd | 税抜/un | 税込/un')
+  console.log('---|---|---|---')
 
   let fpCount = 0
-  for (const it of INVOICE_ITEMS) {
-    const prod = await matchProduct(sb, it.nome)
-    if (!prod) { console.log(`⏭  Produto não encontrado: ${it.nome}`); continue }
-    await sb.from('fornecedor_precos').upsert({
-      fornecedor_id: LE_VIN_ID,
-      produto_id: prod.id,
-      preco: it.zeikomi,
-      notas: `Le Vin 請求書 jul/2026 税込`,
-      atualizado_em: new Date().toISOString(),
-    }, { onConflict: 'fornecedor_id,produto_id' })
-    fpCount++
+  for (const l of lines) {
+    console.log(`${l.nome} | ${l.qtd} | ¥${l.zeibetsu.toLocaleString('ja-JP')} | ¥${l.zeikomi.toLocaleString('ja-JP')}`)
+    const prod = await matchProduct(sb, l.nome)
+    if (prod) {
+      await sb.from('produtos').update({ custo: l.zeibetsu }).eq('id', prod.id)
+      await sb.from('fornecedor_precos').upsert({
+        fornecedor_id: LE_VIN_ID,
+        produto_id: prod.id,
+        preco: l.zeikomi,
+        notas: `Le Vin #971 税抜¥${l.zeibetsu}`,
+        atualizado_em: new Date().toISOString(),
+      }, { onConflict: 'fornecedor_id,produto_id' })
+      fpCount++
+    }
   }
-  console.log(`✅ fornecedor_precos Le Vin: ${fpCount} produtos`)
-  console.log('')
+  console.log(`\n✅ fornecedor_precos: ${fpCount} produtos\n`)
 }
 
 main().catch(e => { console.error('❌', e.message); process.exit(1) })
