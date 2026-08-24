@@ -86,6 +86,42 @@ export function allocateInvoiceCost(totalCompras, receita, receitaTotal) {
   return totalCompras * (receita / receitaTotal)
 }
 
+/** Linhas item a item das notas de compra de um mês */
+export function flattenComprasItens(comprasMes) {
+  const rows = []
+  for (const c of [...(comprasMes || [])].sort((a, b) => (a.data || '').localeCompare(b.data || ''))) {
+    for (const it of c.compras_itens || []) {
+      const qtd = +it.qtd || 0
+      const custoUnit = +it.custo_unitario || 0
+      rows.push({
+        compraId: c.id,
+        data: c.data,
+        fornecedor: c.fornecedor,
+        pagamento: c.pagamento,
+        nome: it.nome || '—',
+        qtd,
+        custoUnit,
+        totalLinha: qtd * custoUnit,
+        notaTotal: +c.total_real || 0,
+        desconto: +c.desconto_pontos || 0,
+      })
+    }
+  }
+  return rows
+}
+
+/** Soma qtd/custo por produto nas notas do mês */
+export function aggregateComprasItens(comprasMes) {
+  const map = {}
+  for (const row of flattenComprasItens(comprasMes)) {
+    const key = row.nome
+    if (!map[key]) map[key] = { nome: key, qtd: 0, custoTotal: 0 }
+    map[key].qtd += row.qtd
+    map[key].custoTotal += row.totalLinha
+  }
+  return Object.values(map).sort((a, b) => b.custoTotal - a.custoTotal)
+}
+
 export function marginFromVendaItem(it, vendaDate, index, produtos) {
   const qtd = +it.qtd || 0
   const preco = +it.preco_unitario || 0

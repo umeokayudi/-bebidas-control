@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas, saleMonthKey, compraMonthKey } from './utils'
-import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, allocateInvoiceCost } from '../lib/marginCost'
+import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromPedidoItens, allocateInvoiceCost, aggregateComprasItens } from '../lib/marginCost'
 import { pedidoSaleDate } from '../lib/pedidoVenda'
 import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
 import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
 import { loadAllCompras } from '../lib/loadCompras'
-import ComprasDetailModal from './ComprasDetailModal'
+import ComprasNotasSection from './ComprasNotasSection'
 
 function pedidoMonthKey(p) {
   return monthKey(pedidoSaleDate(p))
@@ -68,7 +68,6 @@ export default function RelatorioTab() {
   const [pedidos,   setPedidos]   = useState([])
   const [loading,   setLoading]   = useState(true)
   const [selMonth,  setSelMonth]  = useState('')
-  const [comprasModal, setComprasModal] = useState(false)
 
   useEffect(() => { loadAll() }, [])
 
@@ -93,7 +92,13 @@ export default function RelatorioTab() {
       ...(vR.data||[]).map(x=>monthKey(x.data)),
       ...(pedR.data||[]).map(x=>pedidoMonthKey(x)),
     ])].filter(Boolean).sort().reverse()
-    if (months[0]) setSelMonth(months[0])
+    let initialMonth = months[0] || ''
+    try {
+      const saved = sessionStorage.getItem('relatorioMonth')
+      if (saved && months.includes(saved)) initialMonth = saved
+      sessionStorage.removeItem('relatorioMonth')
+    } catch {}
+    if (initialMonth) setSelMonth(initialMonth)
     setLoading(false)
   }
 
@@ -165,24 +170,22 @@ export default function RelatorioTab() {
   const margemGeral   = receitaTotal>0 ? Math.round(lucroTotal/receitaTotal*100) : 0
   const margemJbmGeral = receitaTotal>0 ? Math.round(lucroJbmTotal/receitaTotal*100) : 0
 
-  const porProduto = (() => {
-    const prodMap = {}
-    vendasMes.forEach(v => (v.vendas_itens || []).forEach(it => {
-      const pid = it.produto_id
-      const receita = (+it.preco_unitario || 0) * (+it.qtd || 0)
-      if (!prodMap[pid]) {
-        const p = produtos.find(x => x.id === pid) || {}
-        prodMap[pid] = { ...p, nome: it.produtos?.nome || p.nome || '?', vendido: 0, receita: 0, custo: 0, lucro: 0 }
+  const porProdutoComprado = aggregateComprasItens(comprasMes)
+
+  const vendasDetalhe = vendasMes
+    .map(v => {
+      const bar = bars.find(b => b.id === v.bar_id)
+      const receita = +v.total || marginFromSales([v], costIndex, produtos, pedidoMap).receita
+      return {
+        id: v.id,
+        data: v.data,
+        barNome: bar?.nome || '—',
+        barCor: bar?.cor,
+        receita,
+        obs: v.obs,
       }
-      prodMap[pid].vendido += it.qtd
-      prodMap[pid].receita += receita
-    }))
-    Object.values(prodMap).forEach(p => {
-      p.custo = allocateInvoiceCost(custoCompras, p.receita, receitaTotalMes)
-      p.lucro = p.receita - p.custo
     })
-    return Object.values(prodMap).filter(p => p.vendido > 0).sort((a, b) => b.lucro - a.lucro)
-  })()
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)))
 
   if (loading) return <Spinner text="Loading report..." />
 
@@ -198,14 +201,45 @@ export default function RelatorioTab() {
 
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:18 }}>
-        <div onClick={() => setComprasModal(true)} style={{ cursor:'pointer' }}>
-          <MetricCard label="Compras pagas no mês" value={fmtYen(custoCompras)} color="var(--red)" accent="var(--red)"
-            sub={`${comprasMes.length} nota(s) · clique para detalhes`} />
-        </div>
-        <MetricCard label="Receita" value={fmtYen(receitaTotal)} color="var(--navy)" accent="var(--navy)" />
+        <MetricCard label="Compras pagas no mês" value={fmtYen(custoCompras)} color="var(--red)" accent="var(--red)"
+          sub={`${comprasMes.length} nota(s) · valores das notas cadastradas`} />
+        <MetricCard label="Receita" value={fmtYen(receitaTotal)} color="var(--navy)" accent="var(--navy)"
+          sub={`${vendasMes.length} venda(s) registradas`} />
         <MetricCard label="Lucro bruto" value={fmtYen(lucroTotal)} color="var(--green)" accent="var(--green)"
           sub={`margem ${margemGeral}% · receita − compras do mês`} />
       </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <SectionTitle>Resumo financeiro — {monthLabel(selMonth)}</SectionTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div style={{ padding: '14px 16px', background: 'var(--bg3)', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Receita</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--navy)' }}>{fmtYen(receitaTotal)}</div>
+          </div>
+          <div style={{ padding: '14px 16px', background: 'var(--bg3)', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Compras (notas)</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--red)' }}>{fmtYen(custoCompras)}</div>
+          </div>
+          <div style={{ padding: '14px 16px', background: 'var(--bg3)', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Lucro bruto</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>{fmtYen(lucroTotal)}</div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>margem {margemGeral}%</div>
+          </div>
+        </div>
+        {creditoBar > 0 && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(26,107,74,0.08)', fontSize: 12, color: 'var(--text2)' }}>
+            Lucro JBM (c/ crédito bar LM): <strong style={{ color: 'var(--green)' }}>{fmtYen(lucroJbmTotal)}</strong>
+            {' '}(+{fmtYen(creditoBar)} pago pelo bar)
+          </div>
+        )}
+      </div>
+
+      <ComprasNotasSection
+        comprasMes={comprasMes}
+        totalCompras={custoCompras}
+        creditoBar={creditoBar}
+        creditosBar={creditosBar}
+      />
 
       {(creditoBar > 0 || descontoTotal > 0) && (
         <div style={{ display:'grid', gridTemplateColumns: creditoBar > 0 ? '1fr 1fr' : '1fr', gap:12, marginBottom:18 }}>
@@ -354,83 +388,55 @@ export default function RelatorioTab() {
         )}
       </div>
 
-      {/* Per product */}
-      <div className="card" style={{ marginBottom:16 }}>
-        <SectionTitle>Product Performance</SectionTitle>
-        {porProduto.length===0 ? <Empty text="No sales this month" /> : (
+      {/* Vendas do mês */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <SectionTitle>Vendas do mês</SectionTitle>
+        {vendasDetalhe.length === 0 ? <Empty text="Nenhuma venda neste mês" /> : (
           <table>
             <thead>
-              <tr><th>Product</th><th>Qty</th><th>Cost</th><th>Revenue</th><th>Profit</th><th>Margin</th></tr>
+              <tr><th>Data</th><th>Bar</th><th>Obs</th><th style={{ textAlign: 'right' }}>Receita</th></tr>
             </thead>
             <tbody>
-              {porProduto.map(p=>{
-                const m = p.receita>0 ? Math.round(p.lucro/p.receita*100) : 0
-                return (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight:500 }}>{p.nome}</td>
-                    <td>{p.vendido}</td>
-                    <td style={{ color:'var(--red)' }}>{fmtYen(p.custo)}</td>
-                    <td>{fmtYen(p.receita)}</td>
-                    <td style={{ fontWeight:700, color:'var(--green)' }}>{fmtYen(p.lucro)}</td>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                        <div style={{ height:6, width:80, borderRadius:3, background:'var(--border)', overflow:'hidden' }}>
-                          <div style={{ height:'100%', width:Math.min(m,100)+'%', borderRadius:3,
-                            background:m>50?'var(--green)':m>30?'var(--amber)':'var(--red)'
-                          }}/>
-                        </div>
-                        <span style={{ fontSize:12, fontWeight:600 }}>{m}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+              {vendasDetalhe.map(v => (
+                <tr key={v.id}>
+                  <td>{fmtDate(v.data)}</td>
+                  <td style={{ color: v.barCor || 'var(--navy)', fontWeight: 600 }}>{v.barNome}</td>
+                  <td style={{ fontSize: 11, color: 'var(--text2)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.obs || '—'}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtYen(v.receita)}</td>
+                </tr>
+              ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3} style={{ fontWeight: 700 }}>Total ({vendasDetalhe.length} entrega{vendasDetalhe.length === 1 ? '' : 's'})</td>
+                <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--navy)' }}>{fmtYen(receitaTotal)}</td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>
 
-      {/* Purchases */}
-      <div className="card">
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-          <SectionTitle>Compras do mês</SectionTitle>
-          {comprasMes.length > 0 && (
-            <button onClick={() => setComprasModal(true)} className="btn-primary" style={{ padding:'8px 14px', fontSize:12, borderRadius:10 }}>
-              Ver detalhes
-            </button>
-          )}
-        </div>
-        {creditoBar > 0 && (
-          <div style={{ marginBottom:14, padding:'10px 14px', borderRadius:10, background:'rgba(26,107,74,0.08)', fontSize:12, color:'var(--text2)' }}>
-            Créditos pagos pelo bar: {creditosBar.map(c => `${c.fornecedor} ${fmtYen(c.valor)}`).join(' · ')}
-          </div>
-        )}
-        {comprasMes.length===0 ? <Empty text="No purchases this month" /> : (
+      {/* Resumo por produto nas notas */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <SectionTitle>Itens comprados — resumo por produto</SectionTitle>
+        {porProdutoComprado.length === 0 ? <Empty text="Nenhum item nas notas deste mês" /> : (
           <table>
-            <thead><tr><th>Date</th><th>Supplier</th><th>Payment</th><th>Subtotal</th><th>Points disc.</th><th>Real cost</th></tr></thead>
+            <thead>
+              <tr><th>Produto</th><th style={{ textAlign: 'right' }}>Qtd</th><th style={{ textAlign: 'right' }}>Custo total</th><th style={{ textAlign: 'right' }}>Custo médio</th></tr>
+            </thead>
             <tbody>
-              {comprasMes.map(c=>(
-                <tr key={c.id}>
-                  <td>{c.data}</td>
-                  <td>{c.fornecedor}</td>
-                  <td>{c.pagamento}</td>
-                  <td>{fmtYen(c.subtotal)}</td>
-                  <td style={{ color:'var(--green)' }}>{+c.desconto_pontos>0?'-'+fmtYen(c.desconto_pontos):'—'}</td>
-                  <td style={{ fontWeight:700 }}>{fmtYen(c.total_real)}</td>
+              {porProdutoComprado.map(p => (
+                <tr key={p.nome}>
+                  <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                  <td style={{ textAlign: 'right' }}>{p.qtd}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--red)' }}>{fmtYen(p.custoTotal)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{p.qtd ? fmtYen(Math.round(p.custoTotal / p.qtd)) : '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
-
-      <ComprasDetailModal
-        open={comprasModal}
-        onClose={() => setComprasModal(false)}
-        compras={comprasMes}
-        monthLabel={monthLabel(selMonth)}
-        creditoBar={creditoBar}
-      />
     </div>
   )
 }
