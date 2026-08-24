@@ -118,11 +118,12 @@ export default async function handler(req, res) {
       if (data) holding = JSON.parse(await data.text())
     } catch { /* default */ }
 
-    const [bars, produtos, vendas, compras, faturas, pedidos, fornecedores, perfis, barPricing, fpLm, fpFel] = await Promise.all([
+    const [bars, produtos, vendas, comprasRecent, comprasAll, faturas, pedidos, fornecedores, perfis, barPricing, fpLm, fpFel] = await Promise.all([
       sb.from('bars').select('id,nome'),
       sb.from('produtos').select('id', { count: 'exact' }).eq('ativo', true),
       sb.from('vendas').select('total,obs,cast_id,data,bar_id').order('data', { ascending: false }).limit(100),
       sb.from('compras').select('total_real,total_pago,status_pagamento,data,fornecedor,pagamento').order('data', { ascending: false }).limit(50),
+      sb.from('compras').select('total_real,total_pago,status_pagamento,data'),
       sb.from('faturas').select('valor,total,pago,status,data_vencimento,bar_id'),
       sb.from('pedidos').select('status,total_estimado').limit(30),
       sb.from('fornecedores').select('nome,pagamento,pontos_pct'),
@@ -133,13 +134,14 @@ export default async function handler(req, res) {
     ])
 
     const vendasSupplier = (vendas.data || []).filter(isSupplierVenda)
+    const comprasData = comprasAll.data || []
     const mes = new Date().toISOString().slice(0, 7)
     const receitaMes = vendasSupplier.filter(v => v.data?.startsWith(mes)).reduce((a, v) => a + (+v.total || 0), 0)
-    const custoMes = (compras.data || []).filter(c => c.data?.startsWith(mes)).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
+    const custoMes = comprasData.filter(c => c.data?.startsWith(mes)).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
 
     const faturasData = faturas.data || []
     const paidIn = faturasData.filter(f => f.status === 'pago').reduce((a, f) => a + (+f.valor || +f.total || 0), 0)
-    const paidOut = (compras.data || []).filter(c => c.status_pagamento === 'pago' || !c.status_pagamento).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
+    const paidOut = comprasData.filter(c => c.status_pagamento === 'pago' || !c.status_pagamento).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
     const aReceber = faturasData.filter(f => f.status !== 'pago').reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
     const atomicAReceber = faturasData
       .filter(f => f.bar_id === ATOMIC_BAR_ID && f.status !== 'pago')
@@ -158,7 +160,7 @@ export default async function handler(req, res) {
       { ok: (vendas.data || []).filter(v => !isSupplierVenda(v)).length === 0, label: 'POS separado', detail: 'OK' },
       { ok: faturasData.length > 0, label: 'Faturas', detail: String(faturasData.length) },
       { ok: (barPricing.count || 0) >= 10, label: 'Preços POS', detail: String(barPricing.count || 0) },
-      { ok: paidIn - paidOut > -500000, label: 'Caixa', detail: `¥${paidIn - paidOut}` },
+      { ok: paidIn + aReceber >= paidOut, label: 'Caixa', detail: `¥${paidIn - paidOut} (projetado ¥${paidIn + aReceber - paidOut})` },
     ]
 
     const payload = {

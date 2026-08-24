@@ -30,7 +30,7 @@ async function buildLiveSnapshot(sb) {
   const [barsR, vendasR, comprasR, faturasR] = await Promise.all([
     sb.from('bars').select('id,nome'),
     sb.from('vendas').select('bar_id,data,total,obs,cast_id').order('data', { ascending: false }).limit(100),
-    sb.from('compras').select('data,total_real,total_pago,status_pagamento,data_pagamento,fornecedor,pagamento').order('data', { ascending: false }).limit(50),
+    sb.from('compras').select('data,total_real,total_pago,status_pagamento,data_pagamento,fornecedor,pagamento').order('data', { ascending: false }),
     sb.from('faturas').select('bar_id,valor,total,pago,status,data_vencimento').order('data_vencimento', { ascending: false }),
   ])
 
