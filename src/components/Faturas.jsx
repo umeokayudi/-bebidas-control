@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty, filterSupplierVendas } from './utils'
 import { PageHeader, PortalKpi, PortalSurface, PortalPills, PortalAlert } from './ui/PageLayout'
-import { pagamentoStatus, pagamentosPendentes, totalPagamentosPendentes } from '../lib/faturaPagamentos'
+import { pagamentoStatus, pagamentosPendentes, totalPagamentosPendentes, pagamentoEmAnalise } from '../lib/faturaPagamentos'
 
 function getBillingPeriod(date) {
   const d = new Date(date)
@@ -227,7 +227,7 @@ function InvoiceList() {
   async function registerPayment() {
     if (!payForm.valor||!payModal) return; setSaving(true)
     const valor = +payForm.valor
-    const emAnalise = payForm.emAnalise || /cart/i.test(payForm.metodo || '')
+    const emAnalise = payForm.emAnalise || pagamentoEmAnalise({ metodo: payForm.metodo })
     await supabase.from('fatura_pagamentos').insert({
       fatura_id: payModal.id,
       valor,
@@ -377,7 +377,7 @@ function InvoiceList() {
               Total: {fmtYen(payModal.total || payModal.valor)} · Restante: {fmtYen((+payModal.total || +payModal.valor || 0) - (+payModal.pago || 0))}
             </div>
             <div style={{ marginBottom:12 }}><label className="form-label">Valor (¥)</label><input type="number" value={payForm.valor} onChange={e=>setPayForm({...payForm,valor:e.target.value})} autoFocus /></div>
-            <div style={{ marginBottom:12 }}><label className="form-label">Forma</label><select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value, emAnalise:/cart/i.test(e.target.value)?true:payForm.emAnalise})}>{['Dinheiro','Transferência','Cartão'].map(m=><option key={m}>{m}</option>)}</select></div>
+            <div style={{ marginBottom:12 }}><label className="form-label">Forma</label><select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value, emAnalise:pagamentoEmAnalise({ metodo:e.target.value })?true:payForm.emAnalise})}>{['Dinheiro','Transferência','Stripe','Cartão'].map(m=><option key={m}>{m}</option>)}</select></div>
             <div style={{ marginBottom:12 }}>
               <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer' }}>
                 <input type="checkbox" checked={payForm.emAnalise} onChange={e=>setPayForm({...payForm, emAnalise:e.target.checked})} />
@@ -419,7 +419,7 @@ function PaymentList() {
             return (
             <div key={p.id} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'center', gap:14 }}>
               <div style={{ width:40, height:40, borderRadius:10, background: st.tone==='green'?'#f0fdf4':'#fffbeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
-                {/dinheiro|cash/i.test(p.metodo)?'💵':/cart/i.test(p.metodo)?'💳':'🏦'}
+                {/dinheiro|cash/i.test(p.metodo)?'💵':/stripe/i.test(p.metodo)?'💳':/cart/i.test(p.metodo)?'💳':'🏦'}
               </div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:600 }}>{p.faturas?.bars?.nome} <span style={{ fontSize:11, color: st.tone==='green'?'var(--green)':'var(--amber)', marginLeft:6 }}>{st.label}</span></div>

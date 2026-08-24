@@ -1,7 +1,12 @@
+/** Pagamento online (Stripe etc.) em análise enquanto confirmado=false */
+export function pagamentoEmAnalise(p) {
+  return /stripe|cart/i.test(p?.metodo || '')
+}
+
 /** Rótulo de status para pagamentos de fatura (confirmado vs em análise). */
 export function pagamentoStatus(p) {
   if (p?.confirmado) return { label: 'Confirmado', tone: 'green' }
-  if (/cart/i.test(p?.metodo || '')) return { label: 'Em análise', tone: 'amber' }
+  if (pagamentoEmAnalise(p)) return { label: 'Em análise', tone: 'amber' }
   return { label: 'Aguardando confirmação', tone: 'amber' }
 }
 

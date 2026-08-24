@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Registra pagamento por cartão em análise (confirmado=false — não abate fatura até crédito).
+ * Registra pagamento Stripe em análise (confirmado=false — não abate fatura até crédito).
  * Uso: SUPABASE_SERVICE_ROLE_KEY=xxx node scripts/register-card-payment-pending.mjs
  */
 import { createClient } from '@supabase/supabase-js'
@@ -36,12 +36,12 @@ if (existing?.length) {
   process.exit(0)
 }
 
-const notas = `Cartão bloqueado — crédito previsto ${CREDITO.split('-').reverse().join('/')}`
+const notas = `Stripe bloqueado — crédito previsto ${CREDITO.split('-').reverse().join('/')}`
 
 const { data: pay, error } = await sb.from('fatura_pagamentos').insert({
   fatura_id: FATURA_JUL_ID,
   valor: VALOR,
-  metodo: 'Cartão',
+  metodo: 'Stripe',
   data: new Date().toISOString().slice(0, 10),
   notas,
   confirmado: false,
@@ -49,11 +49,11 @@ const { data: pay, error } = await sb.from('fatura_pagamentos').insert({
 
 if (error) throw error
 
-const obs = `${fat.obs || 'Julho/2026'} · Cartão ¥876.910 em análise (crédito 05/dez/2026)`
+const obs = `${fat.obs || 'Julho/2026'} · Stripe ¥876.910 em análise (crédito 05/dez/2026)`
 await sb.from('faturas').update({ obs }).eq('id', FATURA_JUL_ID)
 
 console.log('✅ Pagamento em análise registrado')
-console.log('   Fatura jul/2026 · ¥876.910 · Cartão · crédito 05/dez/2026')
+console.log('   Fatura jul/2026 · ¥876.910 · Stripe · crédito 05/dez/2026')
 console.log('   ID:', pay.id)
 console.log('   Pago confirmado na fatura:', fmt(fat.pago), '(não alterado até confirmar)')
 
