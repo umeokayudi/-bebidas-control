@@ -70,20 +70,7 @@ async function main() {
   const sb = createClient(URL, loadKey(), { auth: { autoRefreshToken: false, persistSession: false } })
   console.log('\n🔧 Fix supplier data\n')
 
-  // Grey Goose Le Vin compra
-  const { data: ggItems } = await sb.from('compras_itens').select('id, nome, qtd, custo_unitario, compras!inner(fornecedor)').eq('nome', 'Grey Goose').eq('compras.fornecedor', 'Le Vin')
-  let ggFixed = 0
-  for (const it of ggItems || []) {
-    if (+it.custo_unitario < 1000) {
-      await sb.from('compras_itens').update({ custo_unitario: GREY_GOOSE_ZEIKOMI }).eq('id', it.id)
-      ggFixed++
-    }
-  }
-  if (ggFixed) {
-    const { data: prod } = await sb.from('produtos').select('id').ilike('nome', 'Grey Goose').maybeSingle()
-    if (prod) await sb.from('produtos').update({ custo: GREY_GOOSE_ZEIBETSU }).eq('id', prod.id)
-    console.log(`✅ Grey Goose Le Vin: ${ggFixed} item(ns) → ¥${GREY_GOOSE_ZEIKOMI}`)
-  }
+  // Grey Goose Le Vin — não alterar aqui; usar scripts/fix-le-vin.mjs com preços da 請求書
 
   // LM fornecedor_precos
   const lm = buildLmLatest()

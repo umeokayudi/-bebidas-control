@@ -7,6 +7,29 @@ export const compraDate = c => {
   return d ? String(d).slice(0, 10) : ''
 }
 export const compraMonthKey = c => monthKey(compraDate(c))
+
+/** Vencimento de compra a prazo — ex.: Le Vin paga dia 10 do mês seguinte */
+export function compraDueDate(c, fornecedorPagamento) {
+  const explicit = c?.data_pagamento ? String(c.data_pagamento).slice(0, 10) : ''
+  if (explicit) return explicit
+  const base = compraDate(c)
+  if (!base) return ''
+  const pag = String(fornecedorPagamento || c?.pagamento || '')
+  const m = pag.match(/dia\s*(\d{1,2})/i) || pag.match(/day\s*(\d{1,2})/i) || pag.match(/(\d{1,2})\s*(?:of|do mês)/i)
+  if (!m) return ''
+  const day = Math.min(28, Math.max(1, +m[1]))
+  const d = new Date(base + 'T12:00:00')
+  d.setMonth(d.getMonth() + 1)
+  d.setDate(day)
+  return d.toISOString().slice(0, 10)
+}
+
+export function isCompraOverdue(c, fornecedorPagamento) {
+  if (c?.status_pagamento === 'pago') return false
+  const due = compraDueDate(c, fornecedorPagamento)
+  if (!due) return false
+  return due < new Date().toISOString().slice(0, 10)
+}
 export const saleDate = v => v?.data || v?.data_venda || ''
 export const saleMonthKey = v => monthKey(saleDate(v))
 export const monthLabel = mk => {

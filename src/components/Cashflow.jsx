@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, fmtDate, Spinner, Empty } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, compraDueDate, isCompraOverdue } from './utils'
 import JbmHoldingPanel from './JbmHoldingPanel'
 import { AdminPage, PortalKpi, PortalSurface, PortalPills } from './ui/PageLayout'
 
@@ -245,15 +245,20 @@ function MoneyOut() {
 
 function PurchasePayments() {
   const [compras, setCompras] = useState([])
+  const [fornecedores, setFornecedores] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState({ data_pagamento:'', metodo:'Card', status_pagamento:'pago' })
   const [saving, setSaving] = useState(false)
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
-    const { data } = await supabase.from('compras').select('*').order('data',{ascending:false}).limit(100)
-    setCompras(data||[]); setLoading(false)
+    const [{ data: c }, { data: f }] = await Promise.all([
+      supabase.from('compras').select('*').order('data',{ascending:false}).limit(100),
+      supabase.from('fornecedores').select('nome,pagamento'),
+    ])
+    setCompras(c||[]); setFornecedores(f||[]); setLoading(false)
   }
+  const pagamentoFor = nome => fornecedores.find(x => x.nome === nome)?.pagamento
   async function save() {
     if (!modal) return; setSaving(true)
     await supabase.from('compras').update({ data_pagamento:form.data_pagamento||null, metodo_pagamento_real:form.metodo, status_pagamento:form.status_pagamento }).eq('id',modal.id)
@@ -262,33 +267,41 @@ function PurchasePayments() {
 
   if (loading) return <Spinner text="Carregando..." />
   const pendingCount = compras.filter(c=>c.status_pagamento==='pendente').length
+  const overdueCount = compras.filter(c=>isCompraOverdue(c, pagamentoFor(c.fornecedor))).length
 
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontSize:16, fontWeight:700 }}>Purchase Payment Dates</div>
-        {pendingCount>0 && <div style={{ fontSize:12, color:'var(--amber)', fontWeight:600 }}>{pendingCount} pending payments</div>}
+        <div style={{ fontSize:16, fontWeight:700 }}>Pagamentos de compras</div>
+        <div style={{ display:'flex', gap:12 }}>
+          {overdueCount>0 && <div style={{ fontSize:12, color:'var(--red)', fontWeight:700 }}>{overdueCount} atrasado(s)</div>}
+          {pendingCount>0 && <div style={{ fontSize:12, color:'var(--amber)', fontWeight:600 }}>{pendingCount} pendente(s)</div>}
+        </div>
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-        {compras.map(c=>(
-          <div key={c.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor:c.status_pagamento==='pendente'?'rgba(255,149,0,0.3)':'var(--border)', borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
+        {compras.map(c=>{
+          const due = compraDueDate(c, pagamentoFor(c.fornecedor))
+          const overdue = isCompraOverdue(c, pagamentoFor(c.fornecedor))
+          return (
+          <div key={c.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor:overdue?'rgba(239,68,68,0.45)':c.status_pagamento==='pendente'?'rgba(255,149,0,0.3)':'var(--border)', borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:600 }}>{c.fornecedor||'Supplier'} — {fmtDate(c.data)}</div>
+              <div style={{ fontSize:13, fontWeight:600 }}>{c.fornecedor||'Fornecedor'} — {fmtDate(c.data)}</div>
               <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>
                 {c.pagamento} · {fmtYen(c.total_pago||0)}
-                {c.data_pagamento&&<span> · Paid {fmtDate(c.data_pagamento)}</span>}
+                {due && c.status_pagamento==='pendente' && <span> · Vence {fmtDate(due)}</span>}
+                {c.status_pagamento==='pago' && c.data_pagamento && <span> · Pago {fmtDate(c.data_pagamento)}</span>}
                 {c.metodo_pagamento_real&&<span> via {c.metodo_pagamento_real}</span>}
               </div>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:c.status_pagamento==='pendente'?'#fffbeb':'#f0fdf4', color:c.status_pagamento==='pendente'?'var(--amber)':'var(--green)' }}>
-                {c.status_pagamento==='pendente'?'Pending':'Paid'}
+              <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:overdue?'#fef2f2':c.status_pagamento==='pendente'?'#fffbeb':'#f0fdf4', color:overdue?'var(--red)':c.status_pagamento==='pendente'?'var(--amber)':'var(--green)' }}>
+                {overdue?'Atrasado':c.status_pagamento==='pendente'?'Pendente':'Pago'}
               </span>
-              <button onClick={()=>{ setModal(c); setForm({ data_pagamento:c.data_pagamento||new Date().toISOString().slice(0,10), metodo:c.metodo_pagamento_real||'Card', status_pagamento:c.status_pagamento||'pago' }) }}
-                style={{ padding:'5px 12px', fontSize:12, borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>✏️ Edit</button>
+              <button onClick={()=>{ setModal(c); setForm({ data_pagamento:c.data_pagamento||due||new Date().toISOString().slice(0,10), metodo:c.metodo_pagamento_real||'Bank Transfer', status_pagamento:c.status_pagamento||'pago' }) }}
+                style={{ padding:'5px 12px', fontSize:12, borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>✏️ Editar</button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       {modal&&(

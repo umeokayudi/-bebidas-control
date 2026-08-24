@@ -144,14 +144,15 @@ async function ensureLeVinCompra(sb) {
   const { data: compra, error: cErr } = await sb.from('compras').insert({
     data: '2026-07-15',
     fornecedor: 'Le Vin',
-    pagamento: 'Invoice 30d',
+    pagamento: 'Dia 10',
     subtotal,
     desconto_pontos: 0,
     total_pago: subtotal,
     total_real: subtotal,
     pontos_ganhos: 0,
     status_pagamento: 'pendente',
-    obs: 'Le Vin 請求書 — jul/2026 (champagne & premium spirits, 税込 custo catálogo)',
+    data_pagamento: '2026-08-10',
+    obs: 'Le Vin 請求書 — jul/2026 (champagne & premium spirits, 税込)',
   }).select().single()
 
   if (cErr) throw new Error(`compra Le Vin: ${cErr.message}`)
