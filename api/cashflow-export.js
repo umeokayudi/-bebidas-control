@@ -35,8 +35,8 @@ async function buildLiveSnapshot(sb) {
   const receitaMes = vendas.filter(v => v.data?.startsWith(mes)).reduce((a, v) => a + (+v.total || 0), 0)
   const custoMes = compras.filter(c => String(c.data || '').slice(0, 7) === mes).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
 
-  const paidIn = faturas.filter(f => f.status === 'pago').reduce((a, f) => a + (+f.valor || +f.total || 0), 0)
-  const paidOut = compras.filter(c => c.status_pagamento === 'pago' || !c.status_pagamento).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
+  const paidIn = faturas.reduce((a, f) => a + (+f.pago || 0), 0)
+  const paidOut = compras.filter(c => c.status_pagamento === 'pago').reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
 
   const faturasPendentes = faturas.filter(f => f.status !== 'pago')
   const aReceber = faturasPendentes.reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)

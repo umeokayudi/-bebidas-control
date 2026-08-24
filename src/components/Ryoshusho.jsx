@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, fmtDate, Spinner, Empty, filterSupplierVendas } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, filterSupplierVendas, RowActions } from './utils'
 import { AdminPage, PortalSurface } from './ui/PageLayout'
 
 const TAX_RATE = 0.10
@@ -11,6 +11,8 @@ export default function RyoshushoTab() {
   const [history,   setHistory]   = useState([])
   const [loading,   setLoading]   = useState(true)
   const [generating,setGenerating]= useState(false)
+  const [editRyo, setEditRyo] = useState(null)
+  const [ryoForm, setRyoForm] = useState({})
 
   const [barId,     setBarId]     = useState('')
   const [numero,    setNumero]    = useState('')
@@ -144,6 +146,21 @@ export default function RyoshushoTab() {
     loadAll()
   }
 
+  async function saveEdit() {
+    if (!editRyo) return
+    await supabase.from('ryoshusho').update({
+      numero: ryoForm.numero,
+      periodo_inicio: ryoForm.periodo_inicio,
+      periodo_fim: ryoForm.periodo_fim,
+      total: +ryoForm.total,
+      subtotal: Math.round(+ryoForm.total / 1.1),
+      consumo_tax: +ryoForm.total - Math.round(+ryoForm.total / 1.1),
+      data_emissao: ryoForm.data_emissao,
+    }).eq('id', editRyo.id)
+    setEditRyo(null)
+    loadAll()
+  }
+
   if (loading) return <Spinner text="Carregando..." />
 
   return (
@@ -232,7 +249,7 @@ export default function RyoshushoTab() {
           : (
             <table>
               <thead>
-                <tr><th>No.</th><th>Bar</th><th>Date</th><th>Period</th><th>Total</th></tr>
+                <tr><th>No.</th><th>Bar</th><th>Date</th><th>Period</th><th>Total</th><th></th></tr>
               </thead>
               <tbody>
                 {history.map(r => (
@@ -247,7 +264,10 @@ export default function RyoshushoTab() {
                     </td>
                     <td style={{ fontWeight:700 }}>{fmtYen(r.total)}</td>
                     <td>
-                      <button onClick={async()=>{ if(!confirm('Excluir este 領収書?'))return; await supabase.from('ryoshusho').delete().eq('id',r.id); setHistory(prev=>prev.filter(x=>x.id!==r.id)) }} style={{padding:'3px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',cursor:'pointer'}}>🗑</button>
+                      <RowActions
+                        onEdit={() => { setEditRyo(r); setRyoForm({ numero: r.numero, periodo_inicio: r.periodo_inicio, periodo_fim: r.periodo_fim, total: r.total, data_emissao: r.data_emissao }) }}
+                        onDelete={async()=>{ if(!confirm('Excluir este 領収書?'))return; await supabase.from('ryoshusho').delete().eq('id',r.id); setHistory(prev=>prev.filter(x=>x.id!==r.id)) }}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -256,6 +276,27 @@ export default function RyoshushoTab() {
           )
         }
       </PortalSurface>
+
+      {editRyo && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'var(--bg2)', borderRadius:16, padding:24, width:'100%', maxWidth:420 }}>
+            <div style={{ fontSize:16, fontWeight:700, marginBottom:16 }}>Editar 領収書</div>
+            <div style={{ display:'grid', gap:10, marginBottom:16 }}>
+              <div><label className="form-label">Número</label><input value={ryoForm.numero||''} onChange={e=>setRyoForm(f=>({...f,numero:e.target.value}))} /></div>
+              <div><label className="form-label">Emissão</label><input type="date" value={ryoForm.data_emissao||''} onChange={e=>setRyoForm(f=>({...f,data_emissao:e.target.value}))} /></div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div><label className="form-label">Início</label><input type="date" value={ryoForm.periodo_inicio||''} onChange={e=>setRyoForm(f=>({...f,periodo_inicio:e.target.value}))} /></div>
+                <div><label className="form-label">Fim</label><input type="date" value={ryoForm.periodo_fim||''} onChange={e=>setRyoForm(f=>({...f,periodo_fim:e.target.value}))} /></div>
+              </div>
+              <div><label className="form-label">Total (¥)</label><input type="number" value={ryoForm.total||''} onChange={e=>setRyoForm(f=>({...f,total:e.target.value}))} /></div>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>setEditRyo(null)} style={{ flex:1, padding:10, borderRadius:10, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancelar</button>
+              <button className="btn-gold" onClick={saveEdit} style={{ flex:2, padding:10, borderRadius:10 }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminPage>
   )
 }

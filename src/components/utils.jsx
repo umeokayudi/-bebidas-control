@@ -144,10 +144,26 @@ export function SectionTitle({ children, sub }) {
 }
 
 // ── Del Button ────────────────────────────────────────────────────────────────
-export function DelBtn({ onClick }) {
+export function DelBtn({ onClick, title = 'Excluir' }) {
   return (
-    <button className="btn-danger" onClick={onClick}
+    <button className="btn-danger" onClick={onClick} title={title}
       style={{ padding:'4px 10px', fontSize:11, borderRadius:6 }}>🗑</button>
+  )
+}
+
+export function EditBtn({ onClick, title = 'Editar' }) {
+  return (
+    <button onClick={onClick} title={title}
+      style={{ padding:'4px 10px', fontSize:11, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg2)', cursor:'pointer' }}>✏️</button>
+  )
+}
+
+export function RowActions({ onEdit, onDelete, editTitle, deleteTitle }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 6 }}>
+      {onEdit && <EditBtn onClick={onEdit} title={editTitle} />}
+      {onDelete && <DelBtn onClick={onDelete} title={deleteTitle} />}
+    </span>
   )
 }
 

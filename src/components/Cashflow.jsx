@@ -36,25 +36,27 @@ function CashflowOverview() {
   const [loading, setLoading] = useState(true)
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
-    const [fR, cR] = await Promise.all([
+    const [fR, cR, pR] = await Promise.all([
       supabase.from('faturas').select('*').order('data_vencimento'),
       supabase.from('compras').select('*').order('data'),
+      supabase.from('fatura_pagamentos').select('valor,confirmado,metodo').eq('confirmado', false),
     ])
-    setData({ faturas: fR.data||[], compras: cR.data||[] })
+    setData({ faturas: fR.data||[], compras: cR.data||[], pagamentosPendentes: pR.data||[] })
     setLoading(false)
   }
   if (loading) return <Spinner text="Carregando..." />
 
-  const { faturas, compras } = data
+  const { faturas, compras, pagamentosPendentes = [] } = data
   const today = new Date().toISOString().slice(0,10)
 
-  // Money in - paid invoices
-  const paidIn = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.valor||0),0)
-  const pendingIn = faturas.filter(f=>f.status!=='pago').reduce((a,f)=>a+((+f.valor||0)-(+f.pago||0)),0)
+  // Entradas = valor já recebido dos bars (parcial ou total), não só fatura "paga"
+  const paidIn = faturas.reduce((a, f) => a + (+f.pago || 0), 0)
+  const pendingIn = faturas.reduce((a, f) => a + Math.max(0, (+f.total || +f.valor || 0) - (+f.pago || 0)), 0)
+  const emAnalise = pagamentosPendentes.reduce((a, p) => a + (+p.valor || 0), 0)
 
-  // Money out - purchases
-  const paidOut = compras.filter(c=>c.status_pagamento==='pago'||!c.status_pagamento).reduce((a,c)=>a+(+c.total_pago||0),0)
-  const pendingOut = compras.filter(c=>c.status_pagamento==='pendente').reduce((a,c)=>a+(+c.total_pago||0),0)
+  // Saídas = só compras marcadas como pagas (Le Vin pendente não entra no caixa)
+  const paidOut = compras.filter(c => c.status_pagamento === 'pago').reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
+  const pendingOut = compras.filter(c => c.status_pagamento === 'pendente').reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
 
   const netCash = paidIn - paidOut
   const projectedNet = (paidIn + pendingIn) - (paidOut + pendingOut)
@@ -84,16 +86,27 @@ function CashflowOverview() {
 
   return (
     <div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12, marginBottom:20 }}>
         {[
-          { label:'Total recebido', value:fmtYen(paidIn), color:'var(--green)' },
-          { label:'Total pago', value:fmtYen(paidOut), color:'var(--red)' },
-          { label:'Caixa líquido', value:fmtYen(netCash), color:netCash>=0?'var(--green)':'var(--red)' },
-          { label:'A receber', value:fmtYen(pendingIn), color:'var(--amber)' },
+          { label:'Recebido (bars)', value:fmtYen(paidIn), color:'var(--green)', sub:'pagamentos confirmados na fatura' },
+          { label:'Pago (fornec.)', value:fmtYen(paidOut), color:'var(--red)', sub:'notas marcadas pagas' },
+          { label:'Caixa líquido', value:fmtYen(netCash), color:netCash>=0?'var(--green)':'var(--red)', sub:'recebido − pago' },
+          { label:'A receber', value:fmtYen(pendingIn), color:'var(--amber)', sub:'saldo faturas em aberto' },
+          ...(emAnalise > 0 ? [{ label:'Em análise', value:fmtYen(emAnalise), color:'var(--amber)', sub:'Stripe etc. — ainda não creditado' }] : []),
+          ...(pendingOut > 0 ? [{ label:'A pagar', value:fmtYen(pendingOut), color:'var(--red)', sub:'compras pendentes (ex. Le Vin)' }] : []),
         ].map(k=>(
-          <PortalKpi key={k.label} label={k.label} value={k.value} color={k.color} />
+          <PortalKpi key={k.label} label={k.label} value={k.value} color={k.color} sub={k.sub} />
         ))}
       </div>
+      {netCash < 0 && pendingIn > Math.abs(netCash) && (
+        <PortalSurface title="Por que o caixa está negativo?" style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0, lineHeight: 1.55 }}>
+            Você já pagou fornecedores ({fmtYen(paidOut)}) mais do que recebeu dos bars ({fmtYen(paidIn)}).
+            Ainda há {fmtYen(pendingIn)} a receber nas faturas{emAnalise > 0 ? `, mais ${fmtYen(emAnalise)} em análise no Stripe` : ''}.
+            O caixa fica negativo até cobrar — isso é normal quando as cobranças atrasam.
+          </p>
+        </PortalSurface>
+      )}
 
       <PortalSurface title="Fluxo semanal — últimas 8 semanas" style={{ marginBottom:16 }}>
         <div style={{ display:'flex', gap:16, marginBottom:12 }}>

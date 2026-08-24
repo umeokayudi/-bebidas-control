@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, filterSupplierVendas, saleMonthKey, compraMonthKey } from './utils'
+import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, filterSupplierVendas, saleMonthKey, compraMonthKey, RowActions } from './utils'
 import { aggregateComprasItens } from '../lib/marginCost'
 import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
 import { aReceberForMonth, faturasAbertasMes } from '../lib/faturasMonth'
@@ -20,6 +20,8 @@ export default function RelatorioTab() {
   const [dashMonths, setDashMonths] = useState([])
   const [loading, setLoading] = useState(true)
   const [selMonth, setSelMonth] = useState('')
+  const [editRyo, setEditRyo] = useState(null)
+  const [ryoForm, setRyoForm] = useState({ numero: '', periodo_inicio: '', periodo_fim: '', total: '' })
 
   useEffect(() => { loadAll() }, [])
 
@@ -99,6 +101,26 @@ export default function RelatorioTab() {
 
   if (loading) return <Spinner text="Carregando relatório..." />
 
+  async function saveRyoshusho() {
+    if (!editRyo) return
+    await supabase.from('ryoshusho').update({
+      numero: ryoForm.numero,
+      periodo_inicio: ryoForm.periodo_inicio,
+      periodo_fim: ryoForm.periodo_fim,
+      total: +ryoForm.total,
+      subtotal: Math.round(+ryoForm.total / 1.1),
+      consumo_tax: +ryoForm.total - Math.round(+ryoForm.total / 1.1),
+    }).eq('id', editRyo.id)
+    setEditRyo(null)
+    loadAll()
+  }
+
+  async function deleteRyoshusho(r) {
+    if (!confirm(`Excluir 領収書 ${r.numero}?`)) return
+    await supabase.from('ryoshusho').delete().eq('id', r.id)
+    loadAll()
+  }
+
   return (
     <AdminPage
       title="Relatório"
@@ -141,6 +163,7 @@ export default function RelatorioTab() {
         totalCompras={custoCompras}
         creditoBar={creditoBar}
         creditosBar={creditosBar}
+        onChanged={loadAll}
       />
 
       <PortalSurface title="Vendas do mês">
@@ -191,25 +214,30 @@ export default function RelatorioTab() {
 
       <PortalSurface title={`領収書 — ${monthLabel(selMonth)}`}>
         {ryoMes.length === 0 ? (
-          <Empty text="Nenhum 領収書 neste mês" />
+          <Empty text={`Nenhum 領収書 com período em ${monthLabel(selMonth)}`} />
         ) : (
           <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 12, fontSize: 13 }}>
-              <span>Parte do mês: <strong style={{ color: 'var(--gold)' }}>{fmtYen(ryoTotal)}</strong></span>
+              <span>Total recibos: <strong style={{ color: 'var(--gold)' }}>{fmtYen(ryoTotal)}</strong></span>
               <span>Faturamento: <strong>{fmtYen(faturamento)}</strong></span>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px', lineHeight: 1.55 }}>
-              領収書 é o recibo de recebimento (entregas). Faturamento vem da fatura do mês — são documentos diferentes.
-              Se o recibo cobre mais de um mês, a coluna abaixo mostra só a fatia proporcional deste mês.
+              領収書 = recibo de entregas recebidas. Faturamento = valor da fatura de cobrança do mês. Podem diferir se o recibo e a fatura forem de meses distintos.
             </p>
             {ryoMes.map(r => {
               const split = ryoshushoPeriodSplit(r, selMonth)
               const bar = bars.find(b => b.id === r.bar_id)
               return (
                 <div key={r.id} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 6, fontSize: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, fontWeight: 700 }}>
                     <span>{bar?.nome || '—'} · {r.numero || '—'}</span>
-                    <span style={{ color: 'var(--gold)' }}>{fmtYen(split.share)}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: 'var(--gold)' }}>{fmtYen(split.share)}</span>
+                      <RowActions
+                        onEdit={() => { setEditRyo(r); setRyoForm({ numero: r.numero || '', periodo_inicio: r.periodo_inicio || '', periodo_fim: r.periodo_fim || '', total: r.total || '' }) }}
+                        onDelete={() => deleteRyoshusho(r)}
+                      />
+                    </span>
                   </div>
                   <div style={{ color: 'var(--text2)', marginTop: 2 }}>
                     {fmtDate(r.periodo_inicio)} – {fmtDate(r.periodo_fim)}
@@ -223,6 +251,26 @@ export default function RelatorioTab() {
           </>
         )}
       </PortalSurface>
+
+      {editRyo && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Editar 領収書</div>
+            <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+              <div><label className="form-label">Número</label><input value={ryoForm.numero} onChange={e => setRyoForm(f => ({ ...f, numero: e.target.value }))} /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div><label className="form-label">Início</label><input type="date" value={ryoForm.periodo_inicio} onChange={e => setRyoForm(f => ({ ...f, periodo_inicio: e.target.value }))} /></div>
+                <div><label className="form-label">Fim</label><input type="date" value={ryoForm.periodo_fim} onChange={e => setRyoForm(f => ({ ...f, periodo_fim: e.target.value }))} /></div>
+              </div>
+              <div><label className="form-label">Total (¥)</label><input type="number" value={ryoForm.total} onChange={e => setRyoForm(f => ({ ...f, total: e.target.value }))} /></div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setEditRyo(null)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>Cancelar</button>
+              <button className="btn-primary" onClick={saveRyoshusho} style={{ flex: 2, padding: 10, borderRadius: 10 }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminPage>
   )
 }
