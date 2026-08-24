@@ -21,6 +21,7 @@ import {
   projectItemRevenue,
 } from '../lib/clientAnalytics'
 import ClientAnalyticsTab from './ClientAnalyticsTab'
+import AtomicPosPanel from './AtomicPos'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -2198,7 +2199,8 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
     { id:'entregas',  label:'Entregas',         icon:'📦' },
     { id:'estoque',   label:'Estoque',          icon:'📊' },
     { id:'precos',    label:'Preços & Cardápio', icon:'💰' },
-    { id:'faturas',   label:'Faturas JBM',      icon:'🧾' },
+    { id:'pos',       label:'POS Balcão',       icon:'🧾' },
+    { id:'faturas',   label:'Faturas JBM',      icon:'💳' },
   ]
 
   return (
@@ -2249,6 +2251,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='entregas'  && <DeliveriesTab bar={bar} />}
         {tab==='estoque'   && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}
         {tab==='precos'    && <PrecosCardapioTab bar={bar} />}
+        {tab==='pos'       && <AtomicPosPanel bar={bar} />}
         {tab==='faturas'   && <FaturasTab bar={bar} />}
       </main>
     </div>
