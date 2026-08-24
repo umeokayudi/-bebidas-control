@@ -144,49 +144,85 @@ function mapPedidoEntrega(p, barMap) {
     barNome: barMap[p.bar_id]?.nome || '—',
     barCor: barMap[p.bar_id]?.cor,
     receita: +p.total_estimado || 0,
-    obs: `Pedido · ${p.status || 'entregue'}`,
+    obs: p.obs || `Pedido · ${p.status || 'entregue'}`,
   }
 }
 
-/** Entregas do mês — vendas no período das faturas ou pedidos (jun/2026) */
+function pedidoInPeriod(p, start, end) {
+  const d = (p.data_entrega_prevista || p.data_pedido || String(p.criado_em || '')).slice(0, 10)
+  if (!d) return false
+  if (start && d < start) return false
+  if (end && d > end) return false
+  return true
+}
+
+function vendaLinkedPedidoKey(v) {
+  const m = String(v?.obs || '').match(/order\s+([a-f0-9]{8})/i)
+  return m ? m[1] : null
+}
+
+/** Entregas do mês — pedidos entregues + vendas no período das faturas */
 export function entregasDetalheForMonth(m, { vendas = [], pedidos = [], faturas = [], bars = [] }) {
   const barMap = Object.fromEntries(bars.map(b => [b.id, b]))
-
-  if (m === JUNE_MONTH) {
-    return pedidos
-      .filter(p => pedidoMonthKey(p) === m && ['entregue', 'confirmado'].includes(p.status))
-      .map(p => mapPedidoEntrega(p, barMap))
-      .sort((a, b) => String(a.data).localeCompare(String(b.data)))
-  }
-
   const faturasMes = faturas.filter(f => faturaCoversMonth(f, m))
   const seen = new Set()
+  const linkedPedidos = new Set()
   const entregas = []
+
+  function addEntrega(e) {
+    const key = e.kind === 'pedido' ? `p:${e.id}` : `v:${e.id}`
+    if (!e.id || seen.has(key)) return
+    seen.add(key)
+    entregas.push(e)
+  }
+
+  function collectForPeriod(start, end, barId) {
+    for (const p of pedidos) {
+      if (!['entregue', 'confirmado'].includes(p.status)) continue
+      if (barId && p.bar_id !== barId) continue
+      if (!pedidoInPeriod(p, start, end)) continue
+      linkedPedidos.add(String(p.id).slice(0, 8))
+      addEntrega({ ...mapPedidoEntrega(p, barMap), kind: 'pedido' })
+    }
+    for (const v of vendas) {
+      if (!v.id) continue
+      if (barId && v.bar_id !== barId) continue
+      const link = vendaLinkedPedidoKey(v)
+      if (link && linkedPedidos.has(link)) continue
+      const vDate = (v.data || v.data_venda || '').slice(0, 10)
+      if (start && vDate < start) continue
+      if (end && vDate > end) continue
+      addEntrega({ ...mapVendaEntrega(v, barMap), kind: 'venda' })
+    }
+  }
 
   if (faturasMes.length > 0) {
     for (const f of faturasMes) {
       const start = (f.periodo_inicio || f.data_emissao || '').slice(0, 10)
       const end = (f.periodo_fim || f.data_vencimento || start).slice(0, 10)
-      for (const v of vendas) {
-        if (!v.id || seen.has(v.id)) continue
-        const vDate = (v.data || v.data_venda || '').slice(0, 10)
-        if (f.bar_id && v.bar_id !== f.bar_id) continue
-        if (start && vDate < start) continue
-        if (end && vDate > end) continue
-        seen.add(v.id)
-        entregas.push(mapVendaEntrega(v, barMap))
-      }
+      collectForPeriod(start, end, f.bar_id)
     }
   }
 
   if (entregas.length === 0) {
+    linkedPedidos.clear()
+    for (const p of pedidos) {
+      if (!['entregue', 'confirmado'].includes(p.status)) continue
+      if (pedidoMonthKey(p) !== m) continue
+      linkedPedidos.add(String(p.id).slice(0, 8))
+      addEntrega({ ...mapPedidoEntrega(p, barMap), kind: 'pedido' })
+    }
     for (const v of vendas) {
+      const link = vendaLinkedPedidoKey(v)
+      if (link && linkedPedidos.has(link)) continue
       if (saleMonthKey(v) !== m) continue
-      entregas.push(mapVendaEntrega(v, barMap))
+      addEntrega({ ...mapVendaEntrega(v, barMap), kind: 'venda' })
     }
   }
 
-  return entregas.sort((a, b) => String(a.data).localeCompare(String(b.data)))
+  return entregas
+    .map(({ kind, ...row }) => row)
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)))
 }
 
 /** Faturas e compras vencidas para alertas no dashboard */
