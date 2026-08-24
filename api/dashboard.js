@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { isSupplierVenda } from './_supplierVenda.js'
-import { aReceberForMonth, faturamentoForMonth } from './_faturasMonth.js'
-import { juneStatsFromJulyPrices } from './_juneFromJuly.js'
-
-const JUNE_MONTH = '2026-06'
+import {
+  monthDashboardStats,
+  faturaMonthKeys,
+  compraMonthKey,
+  saleMonthKey,
+  pedidoMonthKey,
+} from './_dashboardMonth.js'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -22,14 +25,6 @@ async function requireStaff(req, admin) {
   return { user, perfil }
 }
 
-function monthKey(d) {
-  return String(d || '').slice(0, 7)
-}
-
-function saleMonthKey(v) {
-  return monthKey(v?.data || v?.data_venda || '')
-}
-
 function lastMonths(n = 6) {
   const out = []
   const now = new Date()
@@ -38,67 +33,6 @@ function lastMonths(n = 6) {
     out.push(d.toISOString().slice(0, 7))
   }
   return out
-}
-
-function faturaMonthKeys(faturas) {
-  const keys = []
-  for (const f of faturas || []) {
-    const start = monthKey(f.periodo_inicio || f.data_emissao)
-    const end = monthKey(f.periodo_fim || f.data_vencimento || start)
-    if (start) keys.push(start)
-    if (end && end !== start) keys.push(end)
-  }
-  return keys
-}
-
-function compraMonthKey(c) {
-  const d = c?.data || c?.data_compra || c?.data_pagamento || ''
-  return monthKey(d)
-}
-
-function pedidoMonthKey(p) {
-  return monthKey(p?.data_pedido || p?.data_entrega_prevista || p?.criado_em || '')
-}
-
-function pedidosFaturamentoForMonth(pedidos, m) {
-  return (pedidos || [])
-    .filter(p => pedidoMonthKey(p) === m && ['entregue', 'confirmado'].includes(p.status))
-    .reduce((a, p) => a + (+p.total_estimado || 0), 0)
-}
-
-function monthStats(m, vendas, compras, faturas, pedidos, produtos) {
-  const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
-  const comprasMes = (compras || []).filter(c => compraMonthKey(c) === m)
-  const comprasTotal = comprasMes.reduce((a, c) => a + (+c.total_real || 0), 0)
-  const faturamentoFaturas = faturamentoForMonth(faturas, m)
-  const faturamentoPedidos = pedidosFaturamentoForMonth(pedidos, m)
-  const aReceber = aReceberForMonth(faturas, m)
-
-  if (m === JUNE_MONTH) {
-    return juneStatsFromJulyPrices({
-      compras,
-      pedidos,
-      produtos,
-      faturas,
-      faturamentoFaturas,
-      faturamentoPedidos,
-      aReceber,
-    })
-  }
-
-  const faturamento = receita || faturamentoFaturas || faturamentoPedidos
-  const lucroProjetado = faturamento - comprasTotal
-  return {
-    receita,
-    faturamento,
-    compras: comprasTotal,
-    lucro: receita - comprasTotal,
-    lucroProjetado,
-    margem: faturamento > 0 ? Math.round(lucroProjetado / faturamento * 100) : 0,
-    vendasCount: vendas.filter(v => saleMonthKey(v) === m).length,
-    comprasCount: comprasMes.length,
-    aReceber,
-  }
 }
 
 export default async function handler(req, res) {
@@ -112,7 +46,7 @@ export default async function handler(req, res) {
     const chartMonths = lastMonths(6)
 
     const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { data: produtos }, { count: pedidosPendentes }] = await Promise.all([
-      admin.from('compras').select('data, data_compra, data_pagamento, total_real, compras_itens(produto_id, nome, custo_unitario)').order('data'),
+      admin.from('compras').select('data, data_compra, data_pagamento, total_real, total_pago, compras_itens(produto_id, nome, qtd, custo_unitario)').order('data'),
       admin.from('vendas').select('data, data_venda, total, obs, origem, cast_id').order('data'),
       admin.from('faturas').select('total, valor, pago, status, periodo_inicio, periodo_fim, data_emissao, data_vencimento, obs'),
       admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status, pedidos_itens(produto_id, nome, qtd, preco_unitario)'),
@@ -121,23 +55,24 @@ export default async function handler(req, res) {
     ])
 
     const vendas = (vendasRaw || []).filter(isSupplierVenda)
+    const ctx = { vendas, compras, faturas, pedidos, produtos }
 
     const months = [...new Set([
       ...(compras || []).map(compraMonthKey),
+      ...(compras || []).flatMap(c => [c.data, c.data_compra, c.data_pagamento].map(d => String(d || '').slice(0, 7))),
       ...vendas.map(saleMonthKey),
       ...(pedidos || []).map(pedidoMonthKey),
       ...faturaMonthKeys(faturas),
     ])].filter(Boolean).sort().reverse()
 
     const chart = chartMonths.map(m => {
-      const s = monthStats(m, vendas, compras, faturas, pedidos, produtos)
+      const s = monthDashboardStats(m, ctx)
       return { month: m, receita: s.receita, faturamento: s.faturamento, compras: s.compras, lucro: s.lucroProjetado }
     })
 
     const byMonth = {}
-    const allMonths = [...new Set([...months, ...chartMonths])]
-    for (const m of allMonths) {
-      byMonth[m] = monthStats(m, vendas, compras, faturas, pedidos, produtos)
+    for (const m of [...new Set([...months, ...chartMonths])]) {
+      byMonth[m] = monthDashboardStats(m, ctx)
     }
 
     return res.status(200).json({ months, chart, byMonth, pedidosPendentes: pedidosPendentes || 0 })

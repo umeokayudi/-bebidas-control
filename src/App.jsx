@@ -177,7 +177,7 @@ function Dashboard({ onNav }) {
           label={`Lucro projetado · ${monthLabel(selMonth)}`}
           value={fmtYen(m.lucroProjetado ?? m.lucro)}
           sub={m.comprasEstimadas
-            ? `Margem ${m.margem}% · custo estimado (preços jul/2026) · fat. ${fmtYen(m.faturamento ?? m.receita)}`
+            ? `Margem ${m.margem}% · fat. ${fmtYen(m.faturamento)} − custo ${fmtYen(m.compras)} (preços jul/2026)`
             : `Margem ${m.margem}% · faturamento ${fmtYen(m.faturamento ?? m.receita)} − compras ${fmtYen(m.compras)}`}
           onClick={() => goToReport(onNav, selMonth)}
         />
@@ -203,7 +203,7 @@ function Dashboard({ onNav }) {
           label="Margem projetada"
           value={`${m.margem}%`}
           sub={m.comprasEstimadas
-            ? `Compras est. ${fmtYen(m.compras)} · preços jul/2026`
+            ? `Custo ${fmtYen(m.compras)} · preços jul/2026`
             : `Compras ${fmtYen(m.compras)} · ${m.comprasCount} nota(s)`}
           color={m.margem >= 20 ? 'var(--green)' : m.margem > 0 ? 'var(--amber)' : 'var(--red)'}
           onClick={() => goToReport(onNav, selMonth)}
