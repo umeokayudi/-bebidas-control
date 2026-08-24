@@ -15,4 +15,28 @@ function resolveAnonKey(raw) {
 const supabaseUrl = resolveSupabaseUrl(import.meta.env.VITE_SUPABASE_URL)
 const supabaseKey = resolveAnonKey(import.meta.env.VITE_SUPABASE_ANON_KEY)
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+const TAB_ID_KEY = 'bebidas_tab_id'
+
+/** ID único por aba — evita compartilhar login entre abas */
+function getTabId() {
+  if (typeof sessionStorage === 'undefined') return 'ssr'
+  let id = sessionStorage.getItem(TAB_ID_KEY)
+  if (!id) {
+    id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    sessionStorage.setItem(TAB_ID_KEY, id)
+  }
+  return id
+}
+
+const projectRef = supabaseUrl.match(/https:\/\/([^.]+)/)?.[1] || 'supabase'
+
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    // sessionStorage = isolado por aba (localStorage é compartilhado)
+    storage: typeof sessionStorage !== 'undefined' ? sessionStorage : undefined,
+    // storageKey único por aba = BroadcastChannel não sincroniza entre abas
+    storageKey: `sb-${projectRef}-auth-${getTabId()}`,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
