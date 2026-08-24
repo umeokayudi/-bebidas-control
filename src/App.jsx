@@ -30,6 +30,7 @@ import UiPrefsPanel from './components/UiPrefsPanel'
 import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
 import { loadDashboard } from './lib/loadDashboard'
 import { PageHeader, PortalHero, PortalKpi, PortalSurface, PortalAlert } from './components/ui/PageLayout'
+import DashboardMetricModal from './components/DashboardMetricModal'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -119,6 +120,7 @@ function Dashboard({ onNav }) {
   const [selMonth, setSelMonth] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadErr, setLoadErr] = useState('')
+  const [detailModal, setDetailModal] = useState(null)
 
   useEffect(() => { if (user) loadStats() }, [user])
 
@@ -168,6 +170,14 @@ function Dashboard({ onNav }) {
 
   const mesAtual = new Date().toISOString().slice(0, 7)
   const isCurrentMonth = selMonth === mesAtual
+  const entregasCount = m.entregasDetalhe?.length ?? m.vendasCount ?? 0
+  const modalStats = {
+    faturamento: m.faturamento ?? m.receita,
+    receitaMes: m.receita,
+    totalVendas: entregasCount,
+    vendasDetalhe: m.entregasDetalhe || [],
+    entregasDetalhe: m.entregasDetalhe || [],
+  }
 
   return (
     <div className="fade-in" style={{ maxWidth: 1000 }}>
@@ -247,13 +257,13 @@ function Dashboard({ onNav }) {
           label="Faturamento"
           value={fmtYen(m.faturamento ?? m.receita)}
           sub={m.comprasEstimadas
-            ? `${m.vendasCount} pedido(s) · notas emitidas`
+            ? `${entregasCount} pedido(s) · notas emitidas`
             : m.receita > 0 && m.faturamento !== m.receita
-              ? `${fmtYen(m.receita)} já recebido`
-              : `${m.vendasCount} entrega(s) · cobrança do mês`}
+              ? `${fmtYen(m.receita)} já recebido · ${entregasCount} entrega(s)`
+              : `${entregasCount} entrega(s) · cobrança do mês`}
           color="var(--navy)"
-          onClick={() => onNav('faturas')}
-          hint="Ver faturas →"
+          onClick={() => setDetailModal('receita')}
+          hint="Clique para ver entregas →"
         />
         <PortalKpi
           label="A receber"
@@ -292,6 +302,14 @@ function Dashboard({ onNav }) {
           ))}
         </div>
       </PortalSurface>
+
+      <DashboardMetricModal
+        open={detailModal === 'receita'}
+        onClose={() => setDetailModal(null)}
+        type="receita"
+        monthLabel={monthLabel(selMonth)}
+        stats={modalStats}
+      />
     </div>
   )
 }

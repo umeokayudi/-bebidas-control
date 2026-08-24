@@ -8,6 +8,7 @@ import {
   saleMonthKey,
   pedidoMonthKey,
   buildDashboardAlertas,
+  entregasDetalheForMonth,
 } from './_dashboardMonth.js'
 
 function lastMonths(n = 6) {
@@ -30,19 +31,20 @@ export default async function handler(req, res) {
 
     const chartMonths = lastMonths(6)
 
-    const [{ data: compras, error: comprasErr }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { count: pedidosPendentes }, { data: fornecedores }] = await Promise.all([
+    const [{ data: compras, error: comprasErr }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { count: pedidosPendentes }, { data: fornecedores }, { data: bars }] = await Promise.all([
       admin.from('compras').select('data, data_compra, data_pagamento, total_real, total_pago, status_pagamento, fornecedor, pagamento, compras_itens(nome, qtd, custo_unitario)').order('data'),
-      admin.from('vendas').select('data, data_venda, total, obs, origem, cast_id').order('data'),
+      admin.from('vendas').select('id, bar_id, data, data_venda, total, obs, origem, cast_id').order('data'),
       admin.from('faturas').select('id, total, valor, pago, status, periodo_inicio, periodo_fim, data_emissao, data_vencimento, obs, bar_id, bars(nome)'),
-      admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status'),
+      admin.from('pedidos').select('id, bar_id, data_pedido, data_entrega_prevista, criado_em, total_estimado, status'),
       admin.from('pedidos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
       admin.from('fornecedores').select('nome, pagamento'),
+      admin.from('bars').select('id, nome, cor'),
     ])
 
     if (comprasErr) throw new Error('compras: ' + comprasErr.message)
 
     const vendas = (vendasRaw || []).filter(isSupplierVenda)
-    const ctx = { vendas, compras, faturas, pedidos }
+    const ctx = { vendas, compras, faturas, pedidos, bars: bars || [] }
 
     const months = [...new Set([
       ...(compras || []).map(compraMonthKey),
@@ -59,7 +61,13 @@ export default async function handler(req, res) {
 
     const byMonth = {}
     for (const m of [...new Set([...months, ...chartMonths])]) {
-      byMonth[m] = monthDashboardStats(m, ctx)
+      const stats = monthDashboardStats(m, ctx)
+      const entregasDetalhe = entregasDetalheForMonth(m, ctx)
+      byMonth[m] = {
+        ...stats,
+        entregasDetalhe,
+        vendasCount: entregasDetalhe.length || stats.vendasCount,
+      }
     }
 
     return res.status(200).json({

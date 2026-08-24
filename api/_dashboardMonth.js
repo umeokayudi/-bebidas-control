@@ -1,4 +1,4 @@
-import { aReceberForMonth, faturamentoForMonth } from './_faturasMonth.js'
+import { aReceberForMonth, faturamentoForMonth, faturaCoversMonth } from './_faturasMonth.js'
 
 export const JUNE_MONTH = '2026-06'
 export const JULY_MONTH = '2026-07'
@@ -124,6 +124,69 @@ function compraDueDateServer(c, fornecedorPagamento) {
   d.setMonth(d.getMonth() + 1)
   d.setDate(day)
   return d.toISOString().slice(0, 10)
+}
+
+function mapVendaEntrega(v, barMap) {
+  return {
+    id: v.id,
+    data: v.data || v.data_venda,
+    barNome: barMap[v.bar_id]?.nome || '—',
+    barCor: barMap[v.bar_id]?.cor,
+    receita: +v.total || 0,
+    obs: v.obs || '',
+  }
+}
+
+function mapPedidoEntrega(p, barMap) {
+  return {
+    id: p.id,
+    data: p.data_entrega_prevista || p.data_pedido || String(p.criado_em || '').slice(0, 10),
+    barNome: barMap[p.bar_id]?.nome || '—',
+    barCor: barMap[p.bar_id]?.cor,
+    receita: +p.total_estimado || 0,
+    obs: `Pedido · ${p.status || 'entregue'}`,
+  }
+}
+
+/** Entregas do mês — vendas no período das faturas ou pedidos (jun/2026) */
+export function entregasDetalheForMonth(m, { vendas = [], pedidos = [], faturas = [], bars = [] }) {
+  const barMap = Object.fromEntries(bars.map(b => [b.id, b]))
+
+  if (m === JUNE_MONTH) {
+    return pedidos
+      .filter(p => pedidoMonthKey(p) === m && ['entregue', 'confirmado'].includes(p.status))
+      .map(p => mapPedidoEntrega(p, barMap))
+      .sort((a, b) => String(a.data).localeCompare(String(b.data)))
+  }
+
+  const faturasMes = faturas.filter(f => faturaCoversMonth(f, m))
+  const seen = new Set()
+  const entregas = []
+
+  if (faturasMes.length > 0) {
+    for (const f of faturasMes) {
+      const start = (f.periodo_inicio || f.data_emissao || '').slice(0, 10)
+      const end = (f.periodo_fim || f.data_vencimento || start).slice(0, 10)
+      for (const v of vendas) {
+        if (!v.id || seen.has(v.id)) continue
+        const vDate = (v.data || v.data_venda || '').slice(0, 10)
+        if (f.bar_id && v.bar_id !== f.bar_id) continue
+        if (start && vDate < start) continue
+        if (end && vDate > end) continue
+        seen.add(v.id)
+        entregas.push(mapVendaEntrega(v, barMap))
+      }
+    }
+  }
+
+  if (entregas.length === 0) {
+    for (const v of vendas) {
+      if (saleMonthKey(v) !== m) continue
+      entregas.push(mapVendaEntrega(v, barMap))
+    }
+  }
+
+  return entregas.sort((a, b) => String(a.data).localeCompare(String(b.data)))
 }
 
 /** Faturas e compras vencidas para alertas no dashboard */

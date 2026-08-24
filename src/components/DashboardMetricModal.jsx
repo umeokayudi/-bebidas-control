@@ -36,16 +36,19 @@ function VendaRow({ v }) {
 export default function DashboardMetricModal({ open, onClose, type, monthLabel: monthLbl, stats }) {
   if (!open || !stats || type !== 'receita') return null
 
+  const entregas = stats.entregasDetalhe || stats.vendasDetalhe || []
+  const total = stats.faturamento ?? stats.receitaMes ?? entregas.reduce((a, v) => a + (+v.receita || 0), 0)
+
   return (
     <ModalShell
       open={open}
       onClose={onClose}
-      title={`Receita — ${monthLbl}`}
-      subtitle={`${stats.totalVendas} venda(s) · Total ${fmtYen(stats.receitaMes)}`}
+      title={`Entregas — ${monthLbl}`}
+      subtitle={`${entregas.length} entrega(s) · Faturamento ${fmtYen(total)}`}
     >
-      {stats.vendasDetalhe?.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 13 }}>Nenhuma venda neste mês</div>
-      ) : stats.vendasDetalhe.map(v => (
+      {entregas.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 13 }}>Nenhuma entrega neste mês</div>
+      ) : entregas.map(v => (
         <VendaRow key={v.id} v={v} />
       ))}
     </ModalShell>
