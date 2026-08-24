@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { ensureVendaFromPedido, findVendaForPedido, findVendaKeysForPedidos, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
 import { useAuth } from './Auth'
-import { fmtYen, Badge, Spinner, Empty, SectionTitle, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
+import { fmtYen, Badge, Spinner, Empty, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
 import { SupplierCostHint } from './SupplierPriceCheck'
+import { AdminPage, PortalSurface } from './ui/PageLayout'
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────────
 export function ProductsTab() {
@@ -38,7 +39,7 @@ export function ProductsTab() {
   }
 
   async function del(id) {
-    if (!confirm('Remove product?')) return
+    if (!confirm('Remover produto?')) return
     await supabase.from('produtos').update({ ativo: false }).eq('id', id)
     load()
   }
@@ -49,41 +50,40 @@ export function ProductsTab() {
   }
 
   return (
-    <div className="fade-in">
-      <div className="card">
-        <SectionTitle>{editId ? 'Edit product' : 'New product'}</SectionTitle>
+    <AdminPage title="Produtos" subtitle="Catálogo JBM — custo e preço ao bar">
+      <PortalSurface title={editId ? 'Editar produto' : 'Novo produto'} style={{ marginBottom: 16 }}>
         <div className="grid4" style={{ marginBottom:12, alignItems:'end' }}>
           <div style={{ gridColumn:'span 1' }}>
-            <label className="form-label">Name</label>
+            <label className="form-label">Nome</label>
             <input type="text" value={form.nome} onChange={e=>setF('nome',e.target.value)} placeholder="Ex: Asahi 500ml" />
           </div>
           <div>
-            <label className="form-label">Category</label>
+            <label className="form-label">Categoria</label>
             <select value={form.categoria} onChange={e=>setF('categoria',e.target.value)}>
               {CATEGORIAS.map(c=><option key={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="form-label">Cost (¥)</label>
+            <label className="form-label">Custo (¥)</label>
             <input type="number" value={form.custo} onChange={e=>setF('custo',+e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Sale price (¥)</label>
+            <label className="form-label">Preço de venda (¥)</label>
             <input type="number" value={form.preco_venda} onChange={e=>setF('preco_venda',+e.target.value)} />
           </div>
         </div>
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-          {editId && <button onClick={()=>{setEditId(null);setForm({nome:'',categoria:'Cerveja',custo:0,preco_venda:0})}}>Cancel</button>}
+          {editId && <button onClick={()=>{setEditId(null);setForm({nome:'',categoria:'Cerveja',custo:0,preco_venda:0})}}>Cancelar</button>}
           <button className="btn-primary" onClick={save} disabled={saving}>
-            {saving ? <><span className="spinner"/>Saving...</> : editId?'Save edit':'Add product'}
+            {saving ? <><span className="spinner"/>Salvando...</> : editId?'Salvar edição':'Adicionar produto'}
           </button>
         </div>
-      </div>
+      </PortalSurface>
 
-      <div className="card">
-        {loading ? <Spinner /> : produtos.length===0 ? <Empty text="No products" /> : (
+      <PortalSurface>
+        {loading ? <Spinner /> : produtos.length===0 ? <Empty text="Nenhum produto" /> : (
           <table>
-            <thead><tr><th>Product</th><th>Category</th><th>Custo</th><th>Venda</th><th>Margin</th><th></th></tr></thead>
+            <thead><tr><th>Produto</th><th>Categoria</th><th>Custo</th><th>Venda</th><th>Margem</th><th></th></tr></thead>
             <tbody>
               {produtos.filter(p=>p.ativo!==false).map(p=>{
                 const m = p.preco_venda>0 ? Math.round((p.preco_venda-p.custo)/p.preco_venda*100) : 0
@@ -106,8 +106,8 @@ export function ProductsTab() {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
+      </PortalSurface>
+    </AdminPage>
   )
 }
 
@@ -137,27 +137,26 @@ export function BarsTab() {
   }
 
   async function del(id) {
-    if (!confirm('Remove bar?')) return
+    if (!confirm('Remover bar?')) return
     await supabase.from('bars').delete().eq('id', id)
     load()
   }
 
   return (
-    <div className="fade-in">
-      <div className="card">
-        <SectionTitle>Add bar / client</SectionTitle>
+    <AdminPage title="Bares" subtitle="Clientes e receita por bar">
+      <PortalSurface title="Adicionar bar / cliente" style={{ marginBottom: 16 }}>
         <div style={{ display:'grid', gridTemplateColumns:'2fr 60px auto', gap:10, alignItems:'end' }}>
-          <div><label className="form-label">Name</label>
-            <input type="text" value={nome} onChange={e=>setName(e.target.value)} placeholder="Name do bar" /></div>
-          <div><label className="form-label">Color</label>
+          <div><label className="form-label">Nome</label>
+            <input type="text" value={nome} onChange={e=>setName(e.target.value)} placeholder="Nome do bar" /></div>
+          <div><label className="form-label">Cor</label>
             <input type="color" value={cor} onChange={e=>setColor(e.target.value)} style={{ height:38, padding:'2px 4px' }} /></div>
-          <button className="btn-primary" onClick={add}>Add</button>
+          <button className="btn-primary" onClick={add}>Adicionar</button>
         </div>
-      </div>
-      <div className="card">
-        {loading ? <Spinner /> : bars.length===0 ? <Empty text="No bars registered" /> : (
+      </PortalSurface>
+      <PortalSurface>
+        {loading ? <Spinner /> : bars.length===0 ? <Empty text="Nenhum bar cadastrado" /> : (
           <table>
-            <thead><tr><th>Bar</th><th>Color</th><th>Sales</th><th>Total revenue</th><th></th></tr></thead>
+            <thead><tr><th>Bar</th><th>Cor</th><th>Vendas</th><th>Receita total</th><th></th></tr></thead>
             <tbody>
               {bars.map(b=>{
                 const v = vendas.filter(x=>x.bar_id===b.id)
@@ -175,8 +174,8 @@ export function BarsTab() {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
+      </PortalSurface>
+    </AdminPage>
   )
 }
 
@@ -275,45 +274,42 @@ export function UsuariosTab() {
   }
 
   const roleColor = { admin:'var(--gold)', staff:'var(--navy)', funcionario:'var(--navy)', cliente:'var(--green)' }
-  const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Client' }[r] || r)
+  const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Cliente' }[r] || r)
 
-  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>Loading...</div>
+  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>Carregando...</div>
 
   return (
-    <div className="fade-in">
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-        <div>
-          <div style={{fontSize:18,fontWeight:800,color:'var(--navy)'}}>Users <span style={{fontSize:13,fontWeight:400,color:'var(--text3)'}}>({users.length})</span></div>
-          <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>Create bar logins, change email, reset password, link bar</div>
-        </div>
-        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>{ setShowNew(v=>!v); setErr('') }}>+ New user</button>
-      </div>
+    <AdminPage
+      title="Usuários"
+      subtitle="Acesso admin, staff e portal do cliente"
+      actions={
+        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>{ setShowNew(v=>!v); setErr('') }}>+ Novo usuário</button>
+      }
+    >
 
       {err && <div style={{background:'#fef2f2',color:'#b91c1c',border:'1px solid #fecaca',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:13}}>{err}</div>}
       {msg && <div style={{background:'var(--green-bg)',color:'var(--green)',borderRadius:8,padding:'10px 16px',marginBottom:16,fontSize:13}}>{msg}</div>}
 
       {bars.length === 0 && (
         <div style={{background:'#FDF3E0',border:'1px solid #f0d080',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#8A5A00'}}>
-          No bars registered yet. Go to <strong>Bars</strong> and add Atomic Bar before creating client logins.
+          Nenhum bar cadastrado. Vá em <strong>Bares</strong> e adicione um bar antes de criar logins de cliente.
         </div>
       )}
 
       {showNew && (
-        <div className="card" style={{marginBottom:20,background:'var(--bg2)',border:'1px solid rgba(193,156,86,0.2)'}}>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:'var(--navy)'}}>Create portal login</div>
-          <div style={{fontSize:11,color:'var(--text2)',marginBottom:12}}>For Atomic or any bar — role Client + select the bar</div>
+        <PortalSurface title="Criar login do portal" sub="Para Atomic ou qualquer bar — função Cliente + selecione o bar" style={{marginBottom:20,background:'var(--bg2)',border:'1px solid rgba(193,156,86,0.2)'}}>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <input className="input" placeholder="Full name" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/>
+            <input className="input" placeholder="Nome completo" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/>
             <input className="input" placeholder="Email" type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
-            <input className="input" placeholder="Password (min 6)" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
+            <input className="input" placeholder="Senha (mín. 6)" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
             <select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
-              <option value="cliente">Client (bar portal)</option>
+              <option value="cliente">Cliente (portal do bar)</option>
             </select>
             {form.role === 'cliente' && (
               <select className="input" value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} style={{ gridColumn:'span 2' }}>
-                <option value="">— Select bar (required) —</option>
+                <option value="">— Selecione o bar (obrigatório) —</option>
                 {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
               </select>
             )}
@@ -331,7 +327,7 @@ export function UsuariosTab() {
                   })
                   const json = await res.json()
                   if (!res.ok) throw new Error(json.error || 'Create failed')
-                  setMsg('User created: ' + newEmail)
+                  setMsg('Usuário criado: ' + newEmail)
                   setShowNew(false); setNewEmail(''); setNewPw('')
                   setForm({ nome:'', email:'', role:'cliente', bar_id:'' })
                   load()
@@ -339,18 +335,18 @@ export function UsuariosTab() {
                 } catch(e) { setErr(e.message) }
                 setCreating(false)
               }}>
-              {creating ? 'Creating...' : 'Create login'}
+              {creating ? 'Criando...' : 'Criar login'}
             </button>
-            <button onClick={()=>setShowNew(false)} style={{fontSize:12,padding:'8px 16px',background:'var(--bg3)',border:'none',borderRadius:8,cursor:'pointer',color:'var(--text2)'}}>Cancel</button>
+            <button onClick={()=>setShowNew(false)} style={{fontSize:12,padding:'8px 16px',background:'var(--bg3)',border:'none',borderRadius:8,cursor:'pointer',color:'var(--text2)'}}>Cancelar</button>
           </div>
-        </div>
+        </PortalSurface>
       )}
 
-      <div className="card" style={{padding:0,overflow:'hidden'}}>
+      <PortalSurface style={{padding:0,overflow:'hidden'}}>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead>
             <tr style={{background:'var(--bg2)',borderBottom:'1px solid var(--border)'}}>
-              {['Name','Email','Role','Bar','Status','Actions'].map(h=>(
+              {['Nome','Email','Função','Bar','Status','Ações'].map(h=>(
                 <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.05em'}}>{h}</th>
               ))}
             </tr>
@@ -366,7 +362,7 @@ export function UsuariosTab() {
                       <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
                         <option value="admin">Admin</option>
                         <option value="staff">Staff</option>
-                        <option value="cliente">Client</option>
+                        <option value="cliente">Cliente</option>
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>
@@ -376,12 +372,12 @@ export function UsuariosTab() {
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>
-                      <input className="input" type="password" style={{padding:'4px 8px',fontSize:11,width:'100%'}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="New password (optional)"/>
+                      <input className="input" type="password" style={{padding:'4px 8px',fontSize:11,width:'100%'}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="Nova senha (opcional)"/>
                     </td>
                     <td style={{padding:'8px 14px'}}>
                       <div style={{display:'flex',gap:6}}>
-                        <button className="btn-primary" style={{fontSize:11,padding:'4px 10px'}} disabled={saving} onClick={()=>saveEdit(u.id)}>{saving?'...':'Save'}</button>
-                        <button onClick={()=>{setEditId(null);setEditPw('')}} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>Cancel</button>
+                        <button className="btn-primary" style={{fontSize:11,padding:'4px 10px'}} disabled={saving} onClick={()=>saveEdit(u.id)}>{saving?'...':'Salvar'}</button>
+                        <button onClick={()=>{setEditId(null);setEditPw('')}} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>Cancelar</button>
                       </div>
                     </td>
                   </>
@@ -395,13 +391,13 @@ export function UsuariosTab() {
                     <td style={{padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>{bars.find(b=>b.id===u.bar_id)?.nome||'—'}</td>
                     <td style={{padding:'10px 14px',fontSize:11}}>
                       {u.role === 'cliente' && !u.bar_id
-                        ? <span style={{color:'var(--red)',fontWeight:600}}>No bar linked</span>
+                        ? <span style={{color:'var(--red)',fontWeight:600}}>Sem bar vinculado</span>
                         : <span style={{color:'var(--green)'}}>OK</span>}
                     </td>
                     <td style={{padding:'10px 14px'}}>
                       <div style={{display:'flex',gap:6}}>
-                        <button onClick={()=>startEdit(u)} style={{fontSize:11,padding:'4px 10px',background:'var(--navy)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Edit</button>
-                        <button onClick={()=>deleteUser(u.id)} style={{fontSize:11,padding:'4px 10px',background:'var(--red)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Del</button>
+                        <button onClick={()=>startEdit(u)} style={{fontSize:11,padding:'4px 10px',background:'var(--navy)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Editar</button>
+                        <button onClick={()=>deleteUser(u.id)} style={{fontSize:11,padding:'4px 10px',background:'var(--red)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Excluir</button>
                       </div>
                     </td>
                   </>
@@ -410,14 +406,14 @@ export function UsuariosTab() {
             ))}
           </tbody>
         </table>
-        {users.length===0 && <div style={{padding:32,textAlign:'center',color:'var(--text3)',fontSize:13}}>No users found</div>}
-      </div>
+        {users.length===0 && <div style={{padding:32,textAlign:'center',color:'var(--text3)',fontSize:13}}>Nenhum usuário encontrado</div>}
+      </PortalSurface>
 
       <div style={{marginTop:16,fontSize:12,color:'var(--text2)',lineHeight:1.6}}>
-        <strong>Setup:</strong> add <code>SUPABASE_SERVICE_ROLE_KEY</code> in Vercel env vars (Supabase → Settings → API → service_role).
-        Run <code>USUARIOS_SQL.sql</code> once in Supabase if email column is missing.
+        <strong>Configuração:</strong> adicione <code>SUPABASE_SERVICE_ROLE_KEY</code> nas variáveis de ambiente da Vercel (Supabase → Settings → API → service_role).
+        Execute <code>USUARIOS_SQL.sql</code> uma vez no Supabase se a coluna email estiver faltando.
       </div>
-    </div>
+    </AdminPage>
   )
 }
 
@@ -603,57 +599,61 @@ export function PedidosAdminTab() {
   }
 
   const STATUS_MAP={
-    pendente:{label:'Pending',color:'#8A5A00',bg:'#FDF3E0'},
-    confirmado:{label:'Confirmed',color:'#1A4E8A',bg:'#EAF0FA'},
-    entregue:{label:'Delivered',color:'#1A7A5E',bg:'#EAF5F0'},
-    cancelado:{label:'Cancelled',color:'#C0392B',bg:'#FBEAEA'},
+    pendente:{label:'Pendente',color:'#8A5A00',bg:'#FDF3E0'},
+    confirmado:{label:'Confirmado',color:'#1A4E8A',bg:'#EAF0FA'},
+    entregue:{label:'Entregue',color:'#1A7A5E',bg:'#EAF5F0'},
+    cancelado:{label:'Cancelado',color:'#C0392B',bg:'#FBEAEA'},
   }
   const filtered=filterStatus?pedidos.filter(p=>p.status===filterStatus):pedidos
   const pendentes=pedidos.filter(p=>p.status==='pendente').length
   const missingCount=Object.keys(missingVenda).length
 
   return(
-    <div className="fade-in">
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-        <div>
-          <div style={{fontSize:16,fontWeight:700}}>Client orders</div>
-          {pendentes>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2}}>{pendentes} order(s) awaiting confirmation</div>}
-          {missingCount>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2,fontWeight:600}}>{missingCount} delivered order(s) without a registered sale</div>}
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+    <AdminPage
+      title="Pedidos"
+      subtitle="Pedidos dos bars — confirmação e entrega"
+      actions={
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           {missingCount>0&&(
             <button onClick={async()=>{
-              if(!confirm(`Register sales for ${missingCount} delivered order(s)?`)) return
+              if(!confirm(`Registrar vendas para ${missingCount} pedido(s) entregue(s)?`)) return
               for(const p of pedidos.filter(x=>missingVenda[x.id])) await repairVenda(p)
             }} style={{padding:'8px 14px',fontSize:11,borderRadius:8,background:'var(--red)',color:'white',border:'none',fontWeight:700,cursor:'pointer'}}>
-              Sync missing sales
+              Sincronizar vendas faltantes
             </button>
           )}
           <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{width:'auto'}}>
-          <option value="">All</option>
-          <option value="pendente">Pending</option>
-          <option value="confirmado">Confirmed</option>
-          <option value="entregue">Delivered</option>
-          <option value="cancelado">Cancelled</option>
-        </select>
+            <option value="">Todos</option>
+            <option value="pendente">Pendente</option>
+            <option value="confirmado">Confirmado</option>
+            <option value="entregue">Entregue</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
         </div>
-      </div>
+      }
+    >
+      {(pendentes>0||missingCount>0)&&(
+        <div style={{marginBottom:16}}>
+          {pendentes>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2}}>{pendentes} pedido(s) aguardando confirmação</div>}
+          {missingCount>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2,fontWeight:600}}>{missingCount} pedido(s) entregue(s) sem venda registrada</div>}
+        </div>
+      )}
 
       {loading
-        ? <div style={{color:'var(--text2)',fontSize:13}}>Loading...</div>
+        ? <div style={{color:'var(--text2)',fontSize:13}}>Carregando...</div>
         : filtered.length===0
-          ? <div style={{color:'var(--text3)',textAlign:'center',padding:'40px 0'}}>No orders</div>
+          ? <div style={{color:'var(--text3)',textAlign:'center',padding:'40px 0'}}>Nenhum pedido</div>
           : filtered.map(p=>{
             const s=STATUS_MAP[p.status]||STATUS_MAP.pendente
             return(
-              <div key={p.id} className="card" style={{marginBottom:12,borderLeft:p.status==='pendente'?'3px solid var(--gold)':'3px solid var(--border)'}}>
+              <PortalSurface key={p.id} style={{marginBottom:12,borderLeft:p.status==='pendente'?'3px solid var(--gold)':'3px solid var(--border)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:14}}>{p.bars?.nome} &mdash; {pedidoSaleDate(p)}</div>
                     {p.data_entrega_prevista && p.data_pedido && p.data_entrega_prevista !== p.data_pedido && (
                       <div style={{fontSize:11,color:'var(--text3)'}}>Pedido registrado: {p.data_pedido}</div>
                     )}
-                    {p.data_entrega_prevista&&<div style={{fontSize:12,color:'var(--text3)'}}>Delivery: {p.data_entrega_prevista}</div>}
+                    {p.data_entrega_prevista&&<div style={{fontSize:12,color:'var(--text3)'}}>Entrega: {p.data_entrega_prevista}</div>}
                     {p.obs&&<div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{p.obs}</div>}
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -674,24 +674,24 @@ export function PedidosAdminTab() {
                 </div>
                 {missingVenda[p.id]&&(
                   <div style={{marginBottom:12,padding:'10px 14px',borderRadius:10,background:'#FBEAEA',border:'1px solid #f5c6c6',fontSize:12,color:'#7f1d1d'}}>
-                    ⚠️ Sale not registered in Sales / Dashboard.
+                    ⚠️ Venda não registrada em Vendas / Dashboard.
                     <button onClick={()=>repairVenda(p)} disabled={repairing===p.id}
                       style={{marginLeft:10,padding:'4px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',fontWeight:700,cursor:'pointer'}}>
-                      {repairing===p.id?'Registering...':'Register sale now'}
+                      {repairing===p.id?'Registrando...':'Registrar venda agora'}
                     </button>
                   </div>
                 )}
                 <div style={{display:'flex',gap:8}}>
                   {p.status==='pendente'&&<>
-                    <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>Confirm</button>
-                    <button onClick={()=>updateStatus(p.id,'cancelado')} className="btn-danger" style={{padding:'6px 14px',fontSize:11,borderRadius:8}}>Cancel</button>
+                    <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>Confirmar</button>
+                    <button onClick={()=>updateStatus(p.id,'cancelado')} className="btn-danger" style={{padding:'6px 14px',fontSize:11,borderRadius:8}}>Cancelar</button>
                   </>}
-                  <button onClick={async()=>{ if(!confirm('Delete this order?'))return; setPedidos(prev=>prev.filter(x=>x.id!==p.id)); await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); const {data:v}=await supabase.from('vendas').select('id').eq('obs','Auto: order '+p.id.slice(0,8)).maybeSingle(); if(v){await supabase.from('vendas_itens').delete().eq('venda_id',v.id); await supabase.from('vendas').delete().eq('id',v.id);} await supabase.from('faturas').delete().eq('venda_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600,cursor:'pointer'}}>🗑</button>
+                  <button onClick={async()=>{ if(!confirm('Excluir este pedido?'))return; setPedidos(prev=>prev.filter(x=>x.id!==p.id)); await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); const {data:v}=await supabase.from('vendas').select('id').eq('obs','Auto: order '+p.id.slice(0,8)).maybeSingle(); if(v){await supabase.from('vendas_itens').delete().eq('venda_id',v.id); await supabase.from('vendas').delete().eq('id',v.id);} await supabase.from('faturas').delete().eq('venda_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600,cursor:'pointer'}}>🗑</button>
                   {p.status==='confirmado'&&(
-                    <button onClick={()=>openChecklist(p)} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--green)',color:'white',border:'none',fontWeight:600}}>&#10003; Mark delivered</button>
+                    <button onClick={()=>openChecklist(p)} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--green)',color:'white',border:'none',fontWeight:600}}>&#10003; Marcar entregue</button>
                   )}
                 </div>
-              </div>
+              </PortalSurface>
             )
           })
       }
@@ -699,8 +699,8 @@ export function PedidosAdminTab() {
       {checklistPedido&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div style={{background:'var(--bg2)',borderRadius:16,padding:'28px 28px 24px',width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-            <div style={{fontSize:16,fontWeight:800,color:'var(--navy)',marginBottom:4}}>Delivery checklist</div>
-            <div style={{fontSize:12,color:'var(--text3)',marginBottom:20}}>{checklistPedido.bars?.nome} &mdash; check each item before confirming</div>
+            <div style={{fontSize:16,fontWeight:800,color:'var(--navy)',marginBottom:4}}>Checklist de entrega</div>
+            <div style={{fontSize:12,color:'var(--text3)',marginBottom:20}}>{checklistPedido.bars?.nome} &mdash; marque cada item antes de confirmar</div>
             {(checklistPedido.pedidos_itens||[]).map(it=>(
               <div key={it.id} onClick={()=>setCheckedItems(prev=>({...prev,[it.id]:!prev[it.id]}))}
                 style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:10,marginBottom:8,cursor:'pointer',
@@ -714,7 +714,7 @@ export function PedidosAdminTab() {
                 </div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:600}}>{it.produtos?.nome}</div>
-                  <div style={{fontSize:11,color:'var(--text3)'}}>Qty: {it.qtd} &times; &yen;{(it.preco_unitario||0).toLocaleString()}</div>
+                  <div style={{fontSize:11,color:'var(--text3)'}}>Qtd: {it.qtd} &times; &yen;{(it.preco_unitario||0).toLocaleString()}</div>
                   <SupplierCostHint
                     produtoId={it.produto_id}
                     produtoNome={it.produtos?.nome}
@@ -730,17 +730,17 @@ export function PedidosAdminTab() {
               <span style={{color:'var(--gold)',fontWeight:800,fontSize:15}}>&yen;{Math.round(checklistPedido.total_estimado).toLocaleString()}</span>
             </div>
             <div style={{display:'flex',gap:10}}>
-              <button onClick={()=>{setChecklistPedido(null);setCheckedItems({})}} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border)',background:'transparent',fontSize:13,cursor:'pointer'}}>Cancel</button>
+              <button onClick={()=>{setChecklistPedido(null);setCheckedItems({})}} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border)',background:'transparent',fontSize:13,cursor:'pointer'}}>Cancelar</button>
               <button onClick={confirmDelivery} style={{flex:2,padding:'11px',borderRadius:10,border:'none',
                 background:Object.values(checkedItems).every(v=>v)?'var(--green)':'var(--border)',
                 color:Object.values(checkedItems).every(v=>v)?'white':'var(--text3)',
                 fontSize:13,fontWeight:700,cursor:'pointer'}}>
-                {Object.values(checkedItems).filter(v=>v).length}/{Object.values(checkedItems).length} checked &mdash; Confirm delivery
+                {Object.values(checkedItems).filter(v=>v).length}/{Object.values(checkedItems).length} marcados &mdash; Confirmar entrega
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </AdminPage>
   )
 }

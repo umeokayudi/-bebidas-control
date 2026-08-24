@@ -11,7 +11,7 @@ class ErrorBoundary extends Component {
 import { LogoSidebar } from './components/Logo'
 import { MobileTopBar, ShellOverlay, useMobileMenuLock } from './components/MobileShell'
 import { useNotifications, NotificationBell } from './components/Notifications'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth, LoginPage } from './components/Auth'
 import { supabase } from './lib/supabase'
 import ComprasTab   from './components/Compras'
@@ -19,51 +19,41 @@ import VendasTab    from './components/Vendas'
 import RelatorioTab from './components/Relatorio'
 import RyoshushoTab from './components/Ryoshusho'
 import SeikyushoTab from './components/Seikyusho'
-import EstoqueTab from './components/Estoque'
 import PortalCliente from './components/PortalCliente'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
-import AIAssistant from './components/AIAssistant'
-import BusinessIntel from './components/BusinessIntel'
-import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, monthLabel, monthKey, saleMonthKey, saleDate, compraMonthKey, filterSupplierVendas, roleLabel } from './components/utils'
-import ComprasDetailModal from './components/ComprasDetailModal'
-import DashboardMetricModal from './components/DashboardMetricModal'
+import { fmtYen, monthLabel, roleLabel } from './components/utils'
 import UiPrefsPanel from './components/UiPrefsPanel'
 import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
-import { barCreditsForMonth } from './lib/barCredits'
-import { loadAllCompras } from './lib/loadCompras'
-import { buildPurchaseCostIndex, buildPedidoByVendaPrefix, marginFromSales, marginFromVendaItem, marginFromVenda } from './lib/marginCost'
+import { loadDashboard } from './lib/loadDashboard'
+import { PageHeader, PortalHero, PortalKpi, PortalSurface, PortalAlert } from './components/ui/PageLayout'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
-  { id:'dashboard', label:'Dashboard'  },
-  { id:'purchases',   label:'Purchases'  },
-  { id:'sales',    label:'Sales'      },
-  { id:'pedidos',   label:'Orders'     },
-  { id:'relatorio', label:'Report'     },
-  { id:'ryoshusho', label:'領収書'      },
-  { id:'seikyusho', label:'請求書 IA'   },
-  { id:'products',  label:'Products'   },
-  { id:'bars',      label:'Bars'       },
-  { id:'usuarios',  label:'Users'      },
-  { id:'faturas',    label:'💰 Invoices '  },
-  { id:'bi',         label:'📊 Reports'   },
-  { id:'ai',         label:'🤖 AI'       },
-  { id:'suppliers',  label:'Suppliers'  },
-  { id:'cashflow',   label:'💸 Cash Flow' },
-  { id:'barfinance', label:'🏛 Bar Finance' },
+  { id:'dashboard', label:'Dashboard', icon:'📊' },
+  { id:'purchases', label:'Compras', icon:'🛒' },
+  { id:'sales',    label:'Vendas', icon:'💴' },
+  { id:'pedidos',   label:'Pedidos', icon:'📋' },
+  { id:'relatorio', label:'Relatório', icon:'📈' },
+  { id:'ryoshusho', label:'領収書', icon:'🧾' },
+  { id:'seikyusho', label:'Leitor de cobrança', icon:'📄' },
+  { id:'products',  label:'Produtos', icon:'🍾' },
+  { id:'bars',      label:'Bares', icon:'🏪' },
+  { id:'usuarios',  label:'Usuários', icon:'👥' },
+  { id:'faturas',    label:'Faturas', icon:'💰' },
+  { id:'suppliers',  label:'Fornecedores', icon:'🏭' },
+  { id:'cashflow',   label:'Fluxo de caixa', icon:'💸' },
 ]
 
 const STAFF_TABS = [
-  { id:'purchases',   label:'Purchases'  },
-  { id:'sales',    label:'Sales'      },
-  { id:'relatorio', label:'Report'     },
-  { id:'ryoshusho', label:'領収書'      },
-  { id:'products',  label:'Products'   },
+  { id:'purchases', label:'Compras', icon:'🛒' },
+  { id:'sales',    label:'Vendas', icon:'💴' },
+  { id:'relatorio', label:'Relatório', icon:'📈' },
+  { id:'ryoshusho', label:'領収書', icon:'🧾' },
+  { id:'products',  label:'Produtos', icon:'🍾' },
 ]
 
 // ── MINI BAR CHART ────────────────────────────────────────────────────────────
@@ -104,353 +94,144 @@ function BarChart({ data, color='#c19c56', height=80, valueLabel=fmtYen }) {
   )
 }
 
-function DataHoverRow({ tip, children, style }) {
+function MetricCard({ label, value, sub, color, onClick, hint }) {
   return (
-    <div className="data-hover-row" style={style}>
-      <div className="data-hover-tip">{tip}</div>
-      {children}
-    </div>
-  )
-}
-
-function MetricCardHover({ tip, className, children, onClick, tipPosition = 'bottom' }) {
-  return (
-    <div
-      className={`metric-card metric-card-hover ${className || ''}${onClick ? ' is-clickable' : ''}`}
+    <PortalKpi
+      label={label}
+      value={value}
+      sub={sub}
+      color={color}
       onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e) } } : undefined}
-    >
-      <div className={`metric-hover-tip${tipPosition === 'top' ? ' tip-top' : ''}`}>{tip}</div>
-      {children}
-    </div>
+      hint={hint}
+    />
   )
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function goToReport(onNav, month) {
+  try { sessionStorage.setItem('relatorioMonth', month) } catch {}
+  onNav('relatorio')
+}
+
 function Dashboard({ onNav }) {
   const { user } = useAuth()
-  const [raw, setRaw] = useState(null)
+  const [data, setData] = useState(null)
   const [selMonth, setSelMonth] = useState('')
   const [loading, setLoading] = useState(true)
-  const [detailModal, setDetailModal] = useState(null) // 'compras' | 'receita' | 'lucro' | 'markup'
 
   useEffect(() => { if (user) loadStats() }, [user])
 
   async function loadStats() {
     try {
-      const now = new Date()
-      const mesAtual = now.toISOString().slice(0, 7)
-      const [{ data: salesRaw }, { data: products }, { data: bars }, { data: pedidos }, { data: pedidosEntregues }] = await Promise.all([
-        supabase.from('vendas').select('*, vendas_itens(*, produtos(*))').order('data'),
-        supabase.from('produtos').select('*').eq('ativo', true),
-        supabase.from('bars').select('*'),
-        supabase.from('pedidos').select('*').eq('status', 'pendente'),
-        supabase.from('pedidos').select('id, pedidos_itens(produto_id, qtd, preco_unitario, produtos(custo))').eq('status', 'entregue'),
-      ])
-      const purchases = await loadAllCompras()
-      const sales = filterSupplierVendas(salesRaw)
-      const salesMonths = [...new Set((sales || []).map(saleMonthKey))].filter(Boolean).sort().reverse()
-      const months = [...new Set([
-        ...salesMonths,
-        ...(purchases || []).map(c => compraMonthKey(c)),
-      ])].filter(Boolean).sort().reverse()
-      const defaultMonth = salesMonths.includes(mesAtual) ? mesAtual : (salesMonths[0] || mesAtual)
-      setRaw({ purchases, sales, products, bars, pedidos, pedidosEntregues, months })
-      setSelMonth(prev => prev || defaultMonth)
-      setLoading(false)
+      const payload = await loadDashboard()
+      const mesAtual = new Date().toISOString().slice(0, 7)
+      setData(payload)
+      setSelMonth(prev => prev || (payload.months?.includes(mesAtual) ? mesAtual : payload.months?.[0]) || mesAtual)
     } catch (e) {
       console.error('loadStats error', e)
+    } finally {
       setLoading(false)
     }
   }
 
-  const stats = useMemo(() => {
-    if (!raw || !selMonth) return null
-    const { purchases, sales, products, bars, pedidos, pedidosEntregues } = raw
-    const costIndex = buildPurchaseCostIndex(purchases || [], products || [])
-    const pedidoMap = buildPedidoByVendaPrefix(pedidosEntregues || [])
-    const now = new Date()
-    const meses = []
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      meses.push(d.toISOString().slice(0, 7))
-    }
-
-    const receitaPorMes = meses.map(m => {
-      const sMes = (sales || []).filter(v => saleMonthKey(v) === m)
-      const receita = marginFromSales(sMes, costIndex, products, pedidoMap).receita
-      return {
-        label: monthLabel(m).split('/')[0],
-        month: monthLabel(m),
-        value: receita,
-        tip: `${monthLabel(m)} · Receita ${fmtYen(receita)}`,
-      }
-    })
-
-    const custoPorMes = meses.map(m => {
-      const sMes = (sales || []).filter(v => saleMonthKey(v) === m)
-      return {
-        label: monthLabel(m).split('/')[0],
-        month: monthLabel(m),
-        value: marginFromSales(sMes, costIndex, products, pedidoMap).custo,
-      }
-    })
-
-    const lucroPorMes = meses.map((m, i) => ({
-      label: monthLabel(m).split('/')[0],
-      month: monthLabel(m),
-      value: receitaPorMes[i].value - custoPorMes[i].value,
-      tip: `${monthLabel(m)} · Lucro ${fmtYen(receitaPorMes[i].value - custoPorMes[i].value)} · Receita ${fmtYen(receitaPorMes[i].value)} · Custo ${fmtYen(custoPorMes[i].value)}`,
-    }))
-
-    const purchasesMes = (purchases || []).filter(c => compraMonthKey(c) === selMonth)
-    const totalComprasValor = purchasesMes.reduce((a, c) => a + (+c.total_real || 0), 0)
-    const creditoBar = barCreditsForMonth(selMonth)
-    const salesMes = (sales || []).filter(v => saleMonthKey(v) === selMonth)
-    const mesMargin = marginFromSales(salesMes, costIndex, products, pedidoMap)
-    const receitaMes = mesMargin.receita
-    const custoMes = mesMargin.custo
-    const lucroMes = mesMargin.lucro
-    const margem = mesMargin.margemPct
-    const markup = custoMes > 0 ? Math.round((receitaMes / custoMes - 1) * 100) : 0
-
-    const porBar = (bars || [])
-      .map(bar => {
-        const vBar = salesMes.filter(v => v.bar_id === bar.id)
-        const m = marginFromSales(vBar, costIndex, products, pedidoMap)
-        return { ...bar, receita: m.receita, custo: m.custo, lucro: m.lucro, sales: vBar.length }
-      })
-      .filter(b => b.sales > 0 || b.receita > 0)
-      .sort((a, b) => b.receita - a.receita)
-
-    const prodMap = {}
-    salesMes.forEach(v => (v.vendas_itens || []).forEach(it => {
-      const pid = it.produto_id
-      const m = marginFromVendaItem(it, v.data, costIndex, products)
-      if (!prodMap[pid]) prodMap[pid] = { nome: it.produtos?.nome || '?', qtd: 0, receita: 0, custo: 0, lucro: 0 }
-      prodMap[pid].qtd += it.qtd
-      prodMap[pid].receita += m.receita
-      prodMap[pid].custo += m.custo
-      prodMap[pid].lucro += m.lucro
-    }))
-
-    const topProdutos = Object.values(prodMap).sort((a, b) => b.receita - a.receita).slice(0, 5)
-    const topLucro = Object.values(prodMap).sort((a, b) => b.lucro - a.lucro).slice(0, 5)
-    const ultimasCompras = (purchases || []).slice(-4).reverse()
-
-    const barById = Object.fromEntries((bars || []).map(b => [b.id, b]))
-
-    const vendasDetalhe = salesMes.map(v => {
-      const m = marginFromVenda(v, costIndex, products, pedidoMap)
-      const bar = barById[v.bar_id]
-      return {
-        id: v.id,
-        data: saleDate(v),
-        barNome: bar?.nome || '—',
-        barCor: bar?.cor,
-        receita: m.receita,
-        custo: m.custo,
-        lucro: m.lucro,
-        margem: m.receita > 0 ? Math.round(m.lucro / m.receita * 100) : 0,
-        obs: v.obs,
-      }
-    }).sort((a, b) => a.data.localeCompare(b.data))
-
-    const produtosDetalhe = Object.values(prodMap)
-      .map(p => ({
-        ...p,
-        margem: p.receita > 0 ? Math.round(p.lucro / p.receita * 100) : 0,
-        markup: p.custo > 0 ? Math.round((p.receita / p.custo - 1) * 100) : 0,
-      }))
-      .sort((a, b) => b.lucro - a.lucro)
-
-    return {
-      custoMes, receitaMes, lucroMes, margem, markup, porBar, topProdutos, ultimasCompras,
-      receitaPorMes, lucroPorMes, topLucro, totalProdutos: (products || []).length,
-      totalVendas: salesMes.length, totalCompras: purchasesMes.length, totalComprasValor,
-      purchasesMes, creditoBar, lucroJbm: lucroMes + creditoBar,
-      vendasDetalhe, produtosDetalhe,
-      pedidosPendentes: (pedidos || []).length,
-      selMonth,
-    }
-  }, [raw, selMonth])
+  const m = data?.byMonth?.[selMonth]
+  const lucroChart = (data?.chart || []).map(row => ({
+    label: monthLabel(row.month).split('/')[0],
+    month: monthLabel(row.month),
+    value: row.lucro,
+    tip: `${monthLabel(row.month)} · Lucro ${fmtYen(row.lucro)} · Rec. ${fmtYen(row.receita)} · Compras ${fmtYen(row.compras)}`,
+  }))
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text2)' }}><span className="spinner" />Carregando...</div>
-  if (!stats) return null
+  if (!m) return null
 
   const mesAtual = new Date().toISOString().slice(0, 7)
   const isCurrentMonth = selMonth === mesAtual
 
   return (
-    <div className="fade-in">
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--navy)', letterSpacing: -0.5 }}>Dashboard</div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-            {isCurrentMonth ? 'Mês atual' : 'Histórico'} · {monthLabel(selMonth)}
-            {!isCurrentMonth && stats.receitaMes === 0 && (
-              <span style={{ marginLeft: 8, color: 'var(--amber)' }}>sem vendas neste mês</span>
-            )}
+    <div className="fade-in" style={{ maxWidth: 1000 }}>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${isCurrentMonth ? 'Mês atual' : 'Histórico'} · ${monthLabel(selMonth)}`}
+        actions={(
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Mês</span>
+            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ width: 'auto', minWidth: 120 }}>
+              {(data?.months || []).map(mon => <option key={mon} value={mon}>{monthLabel(mon)}</option>)}
+            </select>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Mês:</span>
-          <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ width: 'auto', minWidth: 120 }}>
-            {(raw?.months || []).map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
-          </select>
-        </div>
-      </div>
+        )}
+      />
 
-      {stats.pedidosPendentes > 0 && (
-        <div onClick={()=>onNav('pedidos')} style={{
-          background:'linear-gradient(135deg,var(--navy),var(--navy2))',
-          borderRadius:12, padding:'14px 20px', marginBottom:16, cursor:'pointer',
-          display:'flex', justifyContent:'space-between', alignItems:'center',
-          border:'1px solid rgba(193,156,86,0.3)'
-        }}>
-          <div style={{color:'white',fontSize:13,fontWeight:600}}>
-            ⚠️ {stats.pedidosPendentes} order(s) awaiting your confirmation
+      {data.pedidosPendentes > 0 && (
+        <PortalAlert variant="navy" onClick={() => onNav('pedidos')}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{data.pedidosPendentes} pedido(s) aguardando confirmação</span>
+            <span style={{ color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>Ver →</span>
           </div>
-          <span style={{color:'var(--gold)',fontSize:12,fontWeight:700}}>View orders →</span>
-        </div>
+        </PortalAlert>
       )}
 
-      <div className="grid4" style={{marginBottom:20}}>
-        <MetricCardHover
-          className="red"
-          onClick={() => setDetailModal('compras')}
-          tip={`Compras pagas no mês: ${fmtYen(stats.totalComprasValor)} (${stats.totalCompras})\nCusto dos itens vendidos: ${fmtYen(stats.custoMes)} — usado no cálculo de lucro\nDiferença = estoque / custo catálogo vs nota\nClique para ver cada compra`}
-        >
-          <div className="metric-label">Compras do mês</div>
-          <div className="metric-value" style={{color:'var(--red)',fontSize:22}}>{fmtYen(stats.totalComprasValor)}</div>
-          <div className="metric-sub">
-            {stats.totalCompras} compras pagas
-          </div>
-          <div className="metric-sub" style={{ marginTop: 4, fontSize: 10, color: 'var(--text3)' }}>
-            Custo itens vendidos {fmtYen(stats.custoMes)} · lucro
-          </div>
-          <div className="metric-open-hint">Clique para ver cada compra →</div>
-        </MetricCardHover>
-        <MetricCardHover
-          className="navy"
-          onClick={() => setDetailModal('receita')}
-          tip={`${stats.totalVendas} venda(s)\nReceita total ${fmtYen(stats.receitaMes)}\nClique para ver cada entrega`}
-        >
-          <div className="metric-label">Monthly revenue</div>
-          <div className="metric-value" style={{color:'var(--navy)',fontSize:22}}>{fmtYen(stats.receitaMes)}</div>
-          <div className="metric-sub">{stats.totalVendas} sales</div>
-          <div className="metric-open-hint">Clique para ver detalhes →</div>
-        </MetricCardHover>
-        <MetricCardHover
-          className="green"
-          onClick={() => setDetailModal('lucro')}
-          tip={`Lucro bruto: ${fmtYen(stats.lucroMes)} (${stats.margem}%)\nReceita ${fmtYen(stats.receitaMes)} − Custo ${fmtYen(stats.custoMes)}${stats.creditoBar > 0 ? `\nCrédito bar (LM): +${fmtYen(stats.creditoBar)}\nLucro JBM: ${fmtYen(stats.lucroJbm)}` : ''}\nClique para ver detalhes`}
-        >
-          <div className="metric-label">Lucro real</div>
-          <div className="metric-value" style={{color:'var(--green)',fontSize:22}}>{fmtYen(stats.lucroMes)}</div>
-          <div className="metric-sub">
-            Venda − custo unitário · {stats.margem}%
-            {stats.creditoBar > 0 && ` · JBM c/ crédito ${fmtYen(stats.lucroJbm)}`}
-          </div>
-          <div className="metric-open-hint">Clique para ver detalhes →</div>
-        </MetricCardHover>
-        <MetricCardHover
-          className="gold"
-          onClick={() => setDetailModal('markup')}
-          tip={`Markup médio ${stats.markup}% · Margem ${stats.margem}%\n${stats.produtosDetalhe?.length || 0} produtos vendidos\nClique para ver por produto`}
-        >
-          <div className="metric-label">Avg markup</div>
-          <div className="metric-value" style={{color:'var(--gold)',fontSize:22}}>{stats.markup}%</div>
-          <div className="metric-sub">{stats.totalProdutos} products · margem {stats.margem}%</div>
-          <div className="metric-open-hint">Clique para ver detalhes →</div>
-        </MetricCardHover>
+      <div className="portal-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
+        <PortalHero
+          label={`Lucro · ${monthLabel(selMonth)}`}
+          value={fmtYen(m.lucro)}
+          sub={`Margem ${m.margem}% · receita ${fmtYen(m.receita)} − compras ${fmtYen(m.compras)}`}
+          onClick={() => goToReport(onNav, selMonth)}
+        />
+        <PortalKpi
+          label="A receber"
+          value={fmtYen(m.aReceber || 0)}
+          sub="Saldo pendente nas faturas do mês"
+          color={(m.aReceber || 0) > 0 ? 'var(--amber)' : 'var(--green)'}
+          onClick={() => onNav('faturas')}
+          hint="Ver faturas →"
+        />
+        <PortalKpi
+          label="Compras (notas)"
+          value={fmtYen(m.compras)}
+          sub={`${m.comprasCount} nota(s) pagas`}
+          color="var(--red)"
+          onClick={() => goToReport(onNav, selMonth)}
+          hint="Detalhe no Relatório →"
+        />
+        <PortalKpi
+          label="Receita"
+          value={fmtYen(m.receita)}
+          sub={`${m.vendasCount} entrega(s)`}
+          color="var(--navy)"
+          onClick={() => goToReport(onNav, selMonth)}
+          hint="Detalhe no Relatório →"
+        />
       </div>
 
-      <div className="grid2" style={{marginBottom:16}}>
-        <div className="card chart-card"><div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:4}}>Monthly revenue</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months · passe o mouse nas barras</div><BarChart data={stats.receitaPorMes} color="#001028"/></div>
-        <div className="card chart-card"><div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:4}}>Monthly profit</div><div style={{fontSize:11,color:'var(--text3)',marginBottom:12}}>Last 6 months · passe o mouse nas barras</div><BarChart data={stats.lucroPorMes} color="#1a6b4a"/></div>
-      </div>
+      <PortalSurface title="Lucro — últimos 6 meses" sub="Receita − compras pagas (valores das notas)">
+        <BarChart data={lucroChart} color="#1a6b4a" height={72} />
+      </PortalSurface>
 
-      <div className="grid2" style={{marginBottom:16}}>
-        <div className="card">
-          <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Profit by bar</div>
-          {stats.porBar.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales in {monthLabel(selMonth)}</div>
-          :stats.porBar.map(b=>(
-            <DataHoverRow key={b.id} tip={`${b.nome} · Receita ${fmtYen(b.receita)} · Custo ${fmtYen(b.custo||0)} · Lucro ${fmtYen(b.lucro)} · ${b.sales} venda(s)`}>
-              <div style={{marginBottom:8}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                <div style={{display:'flex',alignItems:'center',gap:8}}><div style={{width:8,height:8,borderRadius:'50%',background:b.cor}}/><span style={{fontWeight:600,fontSize:13}}>{b.nome}</span></div>
-                <span style={{fontWeight:800,color:b.lucro>=0?'var(--green)':'var(--red)',fontSize:13}}>{fmtYen(b.lucro)}</span>
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--text3)',marginBottom:6}}><span>Receita {fmtYen(b.receita)} · Custo unit. {fmtYen(b.custo||0)}</span><span>{b.sales} sales</span></div>
-              <div className="progress-bar"><div className="progress-fill" style={{width:stats.receitaMes>0?`${Math.round(b.receita/stats.receitaMes*100)}%`:'0%',background:b.cor}}/></div>
-              </div>
-            </DataHoverRow>
-          ))}
-        </div>
-        <div className="card">
-          <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:16}}>Top products</div>
-          {stats.topProdutos.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales in {monthLabel(selMonth)}</div>
-          :stats.topProdutos.map((p,i)=>(
-            <DataHoverRow key={i} tip={`${p.nome} · ${p.qtd} un. · Receita ${fmtYen(p.receita)} · Custo ${fmtYen(p.custo||0)} · Lucro ${fmtYen(p.lucro||0)}`}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--gold)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'var(--navy)':'var(--text3)'}}>{i+1}</div>
-                <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.qtd} un.</div></div>
-              </div>
-              <span style={{fontWeight:700,fontSize:12,color:'var(--navy)'}}>{fmtYen(p.receita)}</span>
-            </div>
-            </DataHoverRow>
-          ))}
-        </div>
-      </div>
-
-            <div className="card" style={{marginBottom:16}}>
-        <div style={{fontSize:13,fontWeight:700,color:'var(--green)',marginBottom:16}}>🏆 Most profitable drinks</div>
-        {stats.topLucro&&stats.topLucro.length===0?<div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No sales in {monthLabel(selMonth)}</div>
-        :(stats.topLucro||[]).map((p,i)=>(
-          <DataHoverRow key={i} tip={`${p.nome} · ${p.qtd} un. · Lucro ${fmtYen(p.lucro)} · Margem ${p.receita>0?Math.round(p.lucro/p.receita*100):0}%`}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:22,height:22,borderRadius:6,background:i===0?'var(--green)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:i===0?'white':'var(--text3)'}}>{i+1}</div>
-              <div><div style={{fontSize:12,fontWeight:600}}>{p.nome}</div><div style={{fontSize:10,color:'var(--text3)'}}>{p.qtd} un. · receita {fmtYen(p.receita)}</div></div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontWeight:700,fontSize:12,color:'var(--green)'}}>{fmtYen(p.lucro)}</div>
-              <div style={{fontSize:10,color:'var(--text3)'}}>{p.receita>0?Math.round(p.lucro/p.receita*100):0}% margin</div>
-            </div>
-          </div>
-          </DataHoverRow>
-        ))}
-      </div>
-
-      <div className="card">
-        <div style={{fontSize:13,fontWeight:700,color:'var(--navy)',marginBottom:14}}>Quick actions</div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-          {[{label:'New purchase',tab:'purchases'},{label:'Register sale',tab:'sales'},{label:'View orders',tab:'pedidos'},{label:'Emitir 領収書',tab:'ryoshusho'}].map(a=>(
-            <button key={a.tab} onClick={()=>onNav(a.tab)} className="btn-primary" style={{padding:'9px 18px',borderRadius:10,fontSize:12}}>{a.label}</button>
-          ))}
-        </div>
-      </div>
-
-      <ComprasDetailModal
-        open={detailModal === 'compras'}
-        onClose={() => setDetailModal(null)}
-        compras={stats.purchasesMes}
-        monthLabel={monthLabel(selMonth)}
-        custoVendidos={stats.custoMes}
-        creditoBar={stats.creditoBar}
+      <PortalSurface
+        title="Detalhes do mês"
+        sub="Quantidades, itens e custos por nota ficam no Relatório."
+        headerRight={(
+          <button type="button" onClick={() => goToReport(onNav, selMonth)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>
+            Abrir Relatório — {monthLabel(selMonth)}
+          </button>
+        )}
       />
 
-      <DashboardMetricModal
-        open={detailModal === 'receita' || detailModal === 'lucro' || detailModal === 'markup'}
-        onClose={() => setDetailModal(null)}
-        type={detailModal}
-        monthLabel={monthLabel(selMonth)}
-        stats={stats}
-      />
+      <PortalSurface title="Ações rápidas">
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Nova compra', tab: 'purchases' },
+            { label: 'Registrar venda', tab: 'sales' },
+            { label: 'Pedidos', tab: 'pedidos' },
+            { label: 'Leitor de cobrança', tab: 'seikyusho' },
+            { label: 'Faturas', tab: 'faturas' },
+          ].map(a => (
+            <button key={a.tab} onClick={() => onNav(a.tab)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>{a.label}</button>
+          ))}
+        </div>
+      </PortalSurface>
     </div>
   )
 }
@@ -535,6 +316,7 @@ function Shell() {
         <nav className="sidebar-nav">
           {tabs.map(t=>(
             <button key={t.id} onClick={()=>selectTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
+              <span>{t.icon}</span>
               <span style={{fontSize:13}}>{t.label}</span>
               {t.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
@@ -555,12 +337,13 @@ function Shell() {
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Painel admin JBM</div>
           <UiPrefsPanel />
-          <button onClick={signOut} className="sidebar-signout">Sign out</button>
+          <button onClick={signOut} className="sidebar-signout">Sair</button>
         </div>
       </aside>
 
-      <main className="app-main">
+      <main className="app-main app-main-wide">
         <div className="fade-in" key={tab}>
           {tab==='dashboard' && <Dashboard onNav={selectTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
@@ -572,12 +355,9 @@ function Shell() {
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
-        {tab==='faturas'   && <Faturas />}
-        {tab==='cashflow'   && <Cashflow />}
-        {tab==='bi'        && <BusinessIntel />}
-        {tab==='ai'        && <AIAssistant />}
-        {tab==='suppliers' && <Fornecedores />}
-        {tab==='barfinance' && <BarFinanceAdmin />}
+          {tab==='faturas'   && <Faturas />}
+          {tab==='cashflow'   && <Cashflow />}
+          {tab==='suppliers' && <Fornecedores />}
         </div>
       </main>
     </div>

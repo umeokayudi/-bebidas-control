@@ -1,7 +1,7 @@
 import ModalShell from './ModalShell'
 import { fmtYen, fmtDate } from './utils'
 
-export default function ComprasDetailModal({ open, onClose, compras, monthLabel: monthLbl, custoVendidos, creditoBar }) {
+export default function ComprasDetailModal({ open, onClose, compras, monthLabel: monthLbl, creditoBar }) {
   if (!open) return null
 
   const totalCompras = (compras || []).reduce((a, c) => a + (+c.total_real || 0), 0)
@@ -14,8 +14,7 @@ export default function ComprasDetailModal({ open, onClose, compras, monthLabel:
       title={`Compras — ${monthLbl}`}
       subtitle={
         <>
-          {sorted.length} compra(s) · Total pago {fmtYen(totalCompras)}
-          {custoVendidos != null && <> · Custo dos itens vendidos {fmtYen(custoVendidos)}</>}
+          {sorted.length} nota(s) · Total pago {fmtYen(totalCompras)}
           {creditoBar > 0 && <> · Crédito bar {fmtYen(creditoBar)}</>}
         </>
       }
@@ -47,7 +46,7 @@ export default function ComprasDetailModal({ open, onClose, compras, monthLabel:
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
                   {(c.compras_itens || []).map((it, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text2)', marginBottom: 3 }}>
-                      <span>{it.nome || '?'}</span>
+                      <span>{it.nome || '?'}{it.qtd ? ` · ${it.qtd} un.` : ''}</span>
                       <span>{fmtYen(it.custo_unitario)}</span>
                     </div>
                   ))}

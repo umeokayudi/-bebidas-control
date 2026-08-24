@@ -2,18 +2,23 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty } from './utils'
 import JbmHoldingPanel from './JbmHoldingPanel'
+import { AdminPage, PortalKpi, PortalSurface, PortalPills } from './ui/PageLayout'
 
 export default function Cashflow() {
   const [tab, setTab] = useState('overview')
   return (
-    <div>
-      <div style={{ fontSize:20, fontWeight:800, marginBottom:4 }}>Cash Flow</div>
-      <div style={{ fontSize:13, color:'var(--text2)', marginBottom:16 }}>Track money in (bar payments) and money out (supplier purchases)</div>
-      <div style={{ display:'flex', gap:8, marginBottom:24 }}>
-        {[['overview','📊 Visão geral'],['in','💚 Entradas'],['out','🔴 Saídas'],['purchases','🛒 Compras'],['holding','🏛 JBM Holding'],['caixa','💵 Caixa'],['calendario','📅 Calendário']].map(([id,label]) => (
-          <button key={id} onClick={()=>setTab(id)} style={{ padding:'8px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', background:tab===id?'var(--navy)':'var(--bg3)', color:tab===id?'white':'var(--text2)', border:'none' }}>{label}</button>
-        ))}
-      </div>
+    <AdminPage
+      title="Fluxo de caixa"
+      subtitle="Entradas, saídas e projeção"
+      wide
+      actions={
+        <PortalPills
+          options={[['overview','📊 Visão geral'],['in','💚 Entradas'],['out','🔴 Saídas'],['purchases','🛒 Compras'],['holding','🏛 JBM Holding'],['caixa','💵 Caixa'],['calendario','📅 Calendário']]}
+          value={tab}
+          onChange={setTab}
+        />
+      }
+    >
       {tab==='overview'  && <CashflowOverview />}
       {tab==='in'        && <MoneyIn />}
       {tab==='out'       && <MoneyOut />}
@@ -21,7 +26,7 @@ export default function Cashflow() {
       {tab==='holding'   && <JbmHoldingPanel />}
       {tab==='caixa'     && <Caixa />}
       {tab==='calendario' && <Calendario />}
-    </div>
+    </AdminPage>
   )
 }
 
@@ -37,7 +42,7 @@ function CashflowOverview() {
     setData({ faturas: fR.data||[], compras: cR.data||[] })
     setLoading(false)
   }
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
 
   const { faturas, compras } = data
   const today = new Date().toISOString().slice(0,10)
@@ -78,28 +83,21 @@ function CashflowOverview() {
 
   return (
     <div>
-      {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[
-          { label:'Total received', value:fmtYen(paidIn), color:'var(--green)', icon:'💚' },
-          { label:'Total paid out', value:fmtYen(paidOut), color:'var(--red)', icon:'🔴' },
-          { label:'Net cash', value:fmtYen(netCash), color:netCash>=0?'var(--green)':'var(--red)', icon:'💰' },
-          { label:'Pending in', value:fmtYen(pendingIn), color:'var(--amber)', icon:'⏳' },
+          { label:'Total recebido', value:fmtYen(paidIn), color:'var(--green)' },
+          { label:'Total pago', value:fmtYen(paidOut), color:'var(--red)' },
+          { label:'Caixa líquido', value:fmtYen(netCash), color:netCash>=0?'var(--green)':'var(--red)' },
+          { label:'A receber', value:fmtYen(pendingIn), color:'var(--amber)' },
         ].map(k=>(
-          <div key={k.label} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px' }}>
-            <div style={{ fontSize:20, marginBottom:4 }}>{k.icon}</div>
-            <div style={{ fontSize:18, fontWeight:800, color:k.color }}>{k.value}</div>
-            <div style={{ fontSize:10, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:4 }}>{k.label}</div>
-          </div>
+          <PortalKpi key={k.label} label={k.label} value={k.value} color={k.color} />
         ))}
       </div>
 
-      {/* Weekly cashflow chart */}
-      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px', marginBottom:16 }}>
-        <div style={{ fontSize:14, fontWeight:700, marginBottom:6 }}>Weekly cash flow — last 8 weeks</div>
+      <PortalSurface title="Fluxo semanal — últimas 8 semanas" style={{ marginBottom:16 }}>
         <div style={{ display:'flex', gap:16, marginBottom:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}><div style={{ width:12,height:12,borderRadius:2,background:'var(--green)' }}/> Money in</div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}><div style={{ width:12,height:12,borderRadius:2,background:'var(--red)' }}/> Money out</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}><div style={{ width:12,height:12,borderRadius:2,background:'var(--green)' }}/> Entradas</div>
+          <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}><div style={{ width:12,height:12,borderRadius:2,background:'var(--red)' }}/> Saídas</div>
         </div>
         <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:120 }}>
           {weeks.map((w,i) => (
@@ -113,12 +111,10 @@ function CashflowOverview() {
             </div>
           ))}
         </div>
-      </div>
+      </PortalSurface>
 
-      {/* Next 30 days */}
       {next30.length>0 && (
-        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px', marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Next 30 days — projected</div>
+        <PortalSurface title="Próximos 30 dias — projeção" style={{ marginBottom:16 }}>
           {next30.map((d,i)=>(
             <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
               <span style={{ color:'var(--text2)' }}>{fmtDate(d.date)}</span>
@@ -128,19 +124,17 @@ function CashflowOverview() {
               </div>
             </div>
           ))}
-        </div>
+        </PortalSurface>
       )}
 
-      {/* Summary */}
-      <div style={{ background:'var(--navy)', borderRadius:16, padding:'20px 24px', color:'white' }}>
-        <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Projected position</div>
+      <PortalSurface title="Posição projetada" style={{ background:'var(--navy)', color:'white', border:'none' }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Expected to receive</div><div style={{ fontSize:18, fontWeight:800, color:'#34c759' }}>{fmtYen(pendingIn)}</div></div>
-          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Expected to pay</div><div style={{ fontSize:18, fontWeight:800, color:'#ff6b6b' }}>{fmtYen(pendingOut)}</div></div>
-          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Projected net</div><div style={{ fontSize:20, fontWeight:800, color:projectedNet>=0?'var(--gold)':'#ff3b30' }}>{fmtYen(projectedNet)}</div></div>
-          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Current net cash</div><div style={{ fontSize:20, fontWeight:800, color:netCash>=0?'var(--gold)':'#ff3b30' }}>{fmtYen(netCash)}</div></div>
+          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Previsto a receber</div><div style={{ fontSize:18, fontWeight:800, color:'#34c759' }}>{fmtYen(pendingIn)}</div></div>
+          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Previsto a pagar</div><div style={{ fontSize:18, fontWeight:800, color:'#ff6b6b' }}>{fmtYen(pendingOut)}</div></div>
+          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Líquido projetado</div><div style={{ fontSize:20, fontWeight:800, color:projectedNet>=0?'var(--gold)':'#ff3b30' }}>{fmtYen(projectedNet)}</div></div>
+          <div><div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Caixa líquido atual</div><div style={{ fontSize:20, fontWeight:800, color:netCash>=0?'var(--gold)':'#ff3b30' }}>{fmtYen(netCash)}</div></div>
         </div>
-      </div>
+      </PortalSurface>
     </div>
   )
 }
@@ -153,7 +147,7 @@ function MoneyIn() {
     const { data } = await supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false})
     setFaturas(data||[]); setLoading(false)
   }
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
   const total = faturas.reduce((a,f)=>a+(+f.valor||0),0)
   const paid = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.valor||0),0)
   return (
@@ -207,7 +201,7 @@ function MoneyOut() {
     const { data } = await supabase.from('compras').select('*').order('data',{ascending:false}).limit(100)
     setCompras(data||[]); setLoading(false)
   }
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
   const total = compras.reduce((a,c)=>a+(+c.total_pago||0),0)
   const paid = compras.filter(c=>c.status_pagamento!=='pendente').reduce((a,c)=>a+(+c.total_pago||0),0)
   const pending = compras.filter(c=>c.status_pagamento==='pendente').reduce((a,c)=>a+(+c.total_pago||0),0)
@@ -265,7 +259,7 @@ function PurchasePayments() {
     setSaving(false); setModal(null); load()
   }
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
   const pendingCount = compras.filter(c=>c.status_pagamento==='pendente').length
 
   return (
@@ -349,7 +343,7 @@ function Caixa() {
   const totalOut = entries.filter(e=>e.tipo==='saida').reduce((a,e)=>a+(+e.valor||0),0)
   const balance = totalIn - totalOut
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
   return (
     <div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
@@ -480,7 +474,7 @@ function Calendario() {
 
   const nextEvents = allEvents.filter(e=>e.date>=today.toISOString().slice(0,10)).slice(0,5)
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
 
   return (
     <div>

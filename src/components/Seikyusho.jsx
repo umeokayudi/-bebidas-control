@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { imageDataUrlToParts } from '../lib/ai'
 import { analyzeSeikyusho, registerSeikyusho, calcLucroPreview } from '../lib/seikyusho'
-import { fmtYen, fmtDate, Spinner, SectionTitle, MetricCard } from './utils'
+import { fmtYen, fmtDate, Spinner, MetricCard } from './utils'
+import { PageHeader, PortalSurface } from './ui/PageLayout'
 
 export default function SeikyushoTab() {
   const [image, setImage] = useState(null)
@@ -107,16 +108,16 @@ export default function SeikyushoTab() {
   const lucro = extracted ? calcLucroPreview(extracted, catalog) : null
 
   return (
-    <div className="fade-in">
-      <SectionTitle>請求書 — Fatura de Fornecedor (IA Gemini)</SectionTitle>
-      <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-        Envie a 請求書, adicione um comentário (opcional), a IA analisa e pergunta se está correto antes de registrar no sistema.
-      </p>
+    <div className="fade-in" style={{ maxWidth: 1000 }}>
+      <PageHeader
+        title="Leitor de cobrança"
+        subtitle="Envie a fatura do fornecedor (請求書), revise os dados extraídos e confirme antes de registrar."
+      />
 
       {step !== 'done' && (
         <>
           <div
-            className="card"
+            className="portal-surface-card"
             style={{ border: '2px dashed var(--border)', textAlign: 'center', padding: 32, marginBottom: 16, cursor: 'pointer' }}
             onClick={() => document.getElementById('seikyusho-input')?.click()}
           >
@@ -125,7 +126,7 @@ export default function SeikyushoTab() {
                 <div style={{ padding: 24 }}>
                   <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>
                   <div style={{ fontWeight: 600 }}>PDF selecionado</div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>Pronto para análise com IA</div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>Pronto para leitura automática</div>
                 </div>
               ) : (
                 <img src={image} alt="seikyusho" style={{ maxHeight: 360, maxWidth: '100%', borderRadius: 8 }} />
@@ -133,17 +134,17 @@ export default function SeikyushoTab() {
             ) : (
               <div>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>
-                <div style={{ fontWeight: 600 }}>Clique para selecionar 請求書</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>JPG, PNG ou PDF escaneado</div>
+                <div style={{ fontWeight: 600 }}>Clique para selecionar a fatura</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>JPG, PNG ou PDF — 請求書 do fornecedor</div>
               </div>
             )}
             <input id="seikyusho-input" type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleFile} />
           </div>
 
           {step === 'upload' && image && (
-            <div className="card" style={{ marginBottom: 16 }}>
+            <PortalSurface style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase' }}>
-                Comentário para a IA (opcional)
+                Comentário (opcional)
               </label>
               <textarea
                 value={comentario}
@@ -153,24 +154,24 @@ export default function SeikyushoTab() {
                 style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, resize: 'vertical', marginBottom: 12 }}
               />
               <button className="btn-primary" onClick={() => scan()} disabled={loading} style={{ width: '100%', padding: 12, borderRadius: 12 }}>
-                {loading ? 'Analisando...' : '🤖 Analisar com Gemini'}
+                {loading ? 'Lendo fatura...' : 'Ler fatura'}
               </button>
-            </div>
+            </PortalSurface>
           )}
         </>
       )}
 
       {loading && (
         <div style={{ textAlign: 'center', padding: 24 }}>
-          <Spinner /> <span style={{ marginLeft: 8, color: 'var(--text2)' }}>Lendo 請求書...</span>
+          <Spinner /> <span style={{ marginLeft: 8, color: 'var(--text2)' }}>Lendo fatura...</span>
         </div>
       )}
 
       {step === 'review' && extracted && !result && (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <PortalSurface style={{ marginBottom: 16 }}>
           {plano && (
             <div style={{ marginBottom: 20, padding: 16, background: 'var(--blue-bg)', borderRadius: 12, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>🤖 O que a IA entendeu</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>Resumo da leitura</div>
               <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>{plano.resumo}</p>
               {plano.acoes?.length > 0 && (
                 <div style={{ marginBottom: 12 }}>
@@ -245,11 +246,11 @@ export default function SeikyushoTab() {
               ← Voltar e editar comentário inicial
             </button>
           </div>
-        </div>
+        </PortalSurface>
       )}
 
       {step === 'done' && result && (
-        <div className="card" style={{ borderLeft: '4px solid var(--green)' }}>
+        <PortalSurface style={{ borderLeft: '4px solid var(--green)' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)', marginBottom: 12 }}>✅ Registrado com sucesso</div>
           <ul style={{ fontSize: 13, lineHeight: 1.8, paddingLeft: 20 }}>
             {result.compra && <li>Compra registrada (custo {fmtYen(result.custo)})</li>}
@@ -265,9 +266,9 @@ export default function SeikyushoTab() {
             <li>Lucro real JBM: {fmtYen(result.lucro)} ({result.margemPct}% margem)</li>
           </ul>
           <button onClick={resetAll} style={{ marginTop: 12, padding: '8px 16px', borderRadius: 8 }}>
-            Nova 請求書
+            Nova fatura
           </button>
-        </div>
+        </PortalSurface>
       )}
     </div>
   )

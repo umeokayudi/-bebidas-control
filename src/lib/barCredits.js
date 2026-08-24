@@ -1,6 +1,6 @@
 export const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 
-/** Compras pagas diretamente pelo bar — crédito no custo JBM */
+/** Compras pagas diretamente pelo bar — abate na fatura (a receber), não é lucro */
 export const BAR_PAID_CREDITS = {
   '2026-07': [
     {

@@ -1,0 +1,28 @@
+import { monthLabel } from '../components/utils'
+
+export function faturaBalance(f) {
+  return Math.max(0, (+f.total || +f.valor || 0) - (+f.pago || 0))
+}
+
+/** Fatura cobre entregas / período do mês selecionado (YYYY-MM). */
+export function faturaCoversMonth(f, selMonth) {
+  if (!selMonth || !f) return false
+  const start = (f.periodo_inicio || f.data_emissao || '').slice(0, 7)
+  const end = (f.periodo_fim || f.data_vencimento || start).slice(0, 7)
+  if (start === selMonth || end === selMonth) return true
+  if (start && end && start <= selMonth && end >= selMonth) return true
+  const obs = (f.obs || '').toLowerCase()
+  const ml = monthLabel(selMonth).toLowerCase()
+  if (obs.includes(ml) || obs.includes(selMonth)) return true
+  return false
+}
+
+export function aReceberForMonth(faturas, selMonth) {
+  return (faturas || [])
+    .filter(f => f.status !== 'pago' && faturaCoversMonth(f, selMonth))
+    .reduce((a, f) => a + faturaBalance(f), 0)
+}
+
+export function faturasAbertasMes(faturas, selMonth) {
+  return (faturas || []).filter(f => f.status !== 'pago' && faturaCoversMonth(f, selMonth))
+}
