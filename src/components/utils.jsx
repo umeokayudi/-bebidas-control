@@ -3,7 +3,7 @@ export const fmtYen   = n => `¥${Math.round(+n || 0).toLocaleString('ja-JP')}`
 export const fmtDate  = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) : '—'
 export const monthKey = iso => iso ? String(iso).slice(0, 7) : ''
 export const compraDate = c => {
-  const d = c?.data_compra || c?.data || c?.data_pagamento || ''
+  const d = c?.data_compra || c?.data || ''
   return d ? String(d).slice(0, 10) : ''
 }
 export const compraMonthKey = c => monthKey(compraDate(c))

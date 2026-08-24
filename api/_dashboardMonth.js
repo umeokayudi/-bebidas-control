@@ -8,14 +8,14 @@ export function monthKey(d) {
 }
 
 export function compraMonthKey(c) {
-  const d = c?.data_compra || c?.data || c?.data_pagamento || ''
+  const d = c?.data_compra || c?.data || ''
   return monthKey(d)
 }
 
-/** Nota entra no mês se qualquer data (compra, lançamento ou pagamento) cair nele */
+/** Compra entra no mês da nota (data/data_compra), não no vencimento do pagamento */
 export function compraMatchesMonth(c, selMonth) {
   if (!selMonth || !c) return false
-  return [c.data_compra, c.data, c.data_pagamento].some(d => monthKey(d) === selMonth)
+  return [c.data_compra, c.data].some(d => monthKey(d) === selMonth)
 }
 
 export function compraTotal(c) {

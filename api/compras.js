@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     let compras = data || []
     if (month) {
       compras = compras.filter(c => {
-        const keys = [c.data, c.data_compra, c.data_pagamento].map(d => String(d || '').slice(0, 7))
+        const keys = [c.data, c.data_compra].map(d => String(d || '').slice(0, 7))
         return keys.includes(month)
       })
     }

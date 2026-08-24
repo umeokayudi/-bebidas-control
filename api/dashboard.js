@@ -51,7 +51,7 @@ export default async function handler(req, res) {
 
     const months = [...new Set([
       ...(compras || []).map(compraMonthKey),
-      ...(compras || []).flatMap(c => [c.data, c.data_compra, c.data_pagamento].map(d => String(d || '').slice(0, 7))),
+      ...(compras || []).flatMap(c => [c.data, c.data_compra].map(d => String(d || '').slice(0, 7))),
       ...vendas.map(saleMonthKey),
       ...(pedidos || []).map(pedidoMonthKey),
       ...faturaMonthKeys(faturas),

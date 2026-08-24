@@ -30,7 +30,7 @@ export function buildPedidoByVendaPrefix(pedidos) {
 }
 
 function compraDate(compra) {
-  const d = compra?.data_compra || compra?.data || compra?.data_pagamento || ''
+  const d = compra?.data_compra || compra?.data || ''
   return d ? String(d).slice(0, 10) : ''
 }
 

@@ -213,7 +213,7 @@ function Dashboard({ onNav }) {
         />
       </div>
 
-      <PortalSurface title="Lucro projetado — últimos 6 meses" sub="Faturamento − compras pagas (notas)">
+      <PortalSurface title="Lucro projetado — últimos 6 meses" sub="Faturamento do mês − compras do mês (notas)">
         <BarChart data={lucroChart} color="#1a6b4a" height={72} />
       </PortalSurface>
 
