@@ -7,17 +7,17 @@
   "total_zeikomi": 768900,
   "zeibetsu": 699000,
   "consumo": 69900,
-  "notas": "Preços 単価 da 請求書 são 税抜. Total a pagar ¥768,900 税込.",
+  "notas": "Preços 単価 da 請求書 Le Vin já são 税込 (imposto incluso). Total ¥768,900.",
   "produtos": [
-    { "nome": "Dom Perignon Brut", "qtd": 1, "zeibetsu": 24000 },
-    { "nome": "Moet NIR", "qtd": 7, "zeibetsu": 8000 },
-    { "nome": "Veuve Clicquot Brut", "qtd": 18, "zeibetsu": 6500 },
-    { "nome": "Moet Rosé", "qtd": 17, "zeibetsu": 6500 },
-    { "nome": "Grey Goose", "qtd": 9, "zeibetsu": 4500 },
-    { "nome": "Veuve Clicquot Rose", "qtd": 19, "zeibetsu": 7500 },
-    { "nome": "Moet Brut", "qtd": 12, "zeibetsu": 5500 },
-    { "nome": "Cuervo 1800 Añejo", "qtd": 12, "zeibetsu": 7500 },
-    { "nome": "Hennessy V.S", "qtd": 24, "zeibetsu": 3850 },
-    { "nome": "Krug Brut", "qtd": 1, "zeibetsu": 30000 }
+    { "nome": "Dom Perignon Brut", "qtd": 1, "zeikomi": 24000 },
+    { "nome": "Moet NIR", "qtd": 7, "zeikomi": 8000 },
+    { "nome": "Veuve Clicquot Brut", "qtd": 18, "zeikomi": 6500 },
+    { "nome": "Moet Rosé", "qtd": 17, "zeikomi": 6500 },
+    { "nome": "Grey Goose", "qtd": 9, "zeikomi": 4500 },
+    { "nome": "Veuve Clicquot Rose", "qtd": 19, "zeikomi": 7500 },
+    { "nome": "Moet Brut", "qtd": 12, "zeikomi": 5500 },
+    { "nome": "Cuervo 1800 Añejo", "qtd": 12, "zeikomi": 7500 },
+    { "nome": "Hennessy V.S", "qtd": 24, "zeikomi": 3850 },
+    { "nome": "Krug Brut", "qtd": 1, "zeikomi": 30000 }
   ]
 }

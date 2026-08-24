@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Corrige Le Vin com base na 請求書 #971 (PDF jul/2026).
+ * Le Vin cobra 税込 — 単価 da fatura já inclui 10% consumo.
  * Uso: node scripts/fix-le-vin.mjs
  */
 import { readFileSync } from 'fs'
@@ -19,8 +20,8 @@ function loadKey() {
   throw new Error('SUPABASE_SERVICE_ROLE_KEY missing')
 }
 
-function toZeikomi(zeibetsu) {
-  return Math.round(+zeibetsu * TAX)
+function toZeibetsu(zeikomi) {
+  return Math.round(+zeikomi / TAX)
 }
 
 async function matchProduct(sb, nome) {
@@ -36,19 +37,19 @@ async function main() {
 
   const lines = invoice.produtos.map(p => ({
     ...p,
-    zeikomi: toZeikomi(p.zeibetsu),
-    subtotalZeibetsu: p.qtd * p.zeibetsu,
+    zeibetsu: toZeibetsu(p.zeikomi),
+    subtotal: p.qtd * p.zeikomi,
   }))
-  const sumZeibetsu = lines.reduce((a, l) => a + l.subtotalZeibetsu, 0)
+  const sumItens = lines.reduce((a, l) => a + l.subtotal, 0)
 
-  console.log('\n🔧 Fix Le Vin — 請求書 #971\n')
+  console.log('\n🔧 Fix Le Vin — 請求書 #971 (税込)\n')
   console.log(`   Total fatura: ¥${invoice.total_zeikomi.toLocaleString('ja-JP')} 税込`)
-  console.log(`   Soma itens 税抜: ¥${sumZeibetsu.toLocaleString('ja-JP')} (fatura base ¥${invoice.zeibetsu.toLocaleString('ja-JP')})`)
+  console.log(`   Soma itens:   ¥${sumItens.toLocaleString('ja-JP')}`)
   console.log(`   Vencimento: ${invoice.vencimento}${overdue ? ' ⚠️ ATRASADO' : ''}\n`)
 
   await sb.from('fornecedores').update({
     pagamento: 'Dia 10',
-    notas: 'Pagamento todo dia 10 do mês (請求書 Le Vin)',
+    notas: 'Pagamento todo dia 10 do mês. Preços Le Vin são 税込.',
   }).eq('id', LE_VIN_ID)
 
   const { data: compra } = await sb.from('compras').select('id').eq('fornecedor', 'Le Vin').eq('data', '2026-07-15').maybeSingle()
@@ -60,7 +61,7 @@ async function main() {
       compra_id: compra.id,
       nome: l.nome,
       qtd: l.qtd,
-      custo_unitario: l.zeibetsu,
+      custo_unitario: l.zeikomi,
     }))
   )
 
@@ -75,12 +76,12 @@ async function main() {
   }).eq('id', compra.id)
 
   console.log('✅ Compra jul/2026 atualizada\n')
-  console.log('Produto | Qtd | 税抜/un | 税込/un')
+  console.log('Produto | Qtd | 税込/un | 税抜 ref.')
   console.log('---|---|---|---')
 
   let fpCount = 0
   for (const l of lines) {
-    console.log(`${l.nome} | ${l.qtd} | ¥${l.zeibetsu.toLocaleString('ja-JP')} | ¥${l.zeikomi.toLocaleString('ja-JP')}`)
+    console.log(`${l.nome} | ${l.qtd} | ¥${l.zeikomi.toLocaleString('ja-JP')} | ¥${l.zeibetsu.toLocaleString('ja-JP')}`)
     const prod = await matchProduct(sb, l.nome)
     if (prod) {
       await sb.from('produtos').update({ custo: l.zeibetsu }).eq('id', prod.id)
@@ -88,13 +89,13 @@ async function main() {
         fornecedor_id: LE_VIN_ID,
         produto_id: prod.id,
         preco: l.zeikomi,
-        notas: `Le Vin #971 税抜¥${l.zeibetsu}`,
+        notas: `Le Vin #971 税込¥${l.zeikomi}`,
         atualizado_em: new Date().toISOString(),
       }, { onConflict: 'fornecedor_id,produto_id' })
       fpCount++
     }
   }
-  console.log(`\n✅ fornecedor_precos: ${fpCount} produtos\n`)
+  console.log(`\n✅ fornecedor_precos: ${fpCount} produtos (税込)\n`)
 }
 
 main().catch(e => { console.error('❌', e.message); process.exit(1) })
