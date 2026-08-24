@@ -1,7 +1,6 @@
 import { LogoLogin } from './Logo'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { ThemeToggle, LayoutToggle } from './UiPrefsPanel'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -153,11 +152,6 @@ export function LoginPage() {
 
         <div style={{textAlign:'center',marginTop:20,fontSize:10,color:'rgba(255,255,255,0.2)',letterSpacing:'0.1em',textTransform:'uppercase'}}>
           Painel JBM Drinks
-        </div>
-
-        <div style={{ marginTop: 20, maxWidth: 320, marginLeft: 'auto', marginRight: 'auto' }}>
-          <ThemeToggle compact />
-          <div style={{ marginTop: 8 }}><LayoutToggle /></div>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useUiPrefs, THEMES, LAYOUTS } from '../lib/uiPrefs'
 
 export function ThemeToggle({ compact }) {
@@ -38,11 +39,27 @@ export function LayoutToggle() {
   )
 }
 
+/** Tema/layout recolhidos por padrão — não ocupa a sidebar */
 export default function UiPrefsPanel() {
+  const [open, setOpen] = useState(false)
+
   return (
-    <div className="ui-prefs-panel">
-      <ThemeToggle />
-      <LayoutToggle />
+    <div className="ui-prefs-wrap">
+      <button
+        type="button"
+        className="ui-prefs-toggle"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-label={open ? 'Ocultar aparência' : 'Mostrar aparência'}
+      >
+        {open ? '▾ Aparência' : '⚙ Aparência'}
+      </button>
+      {open && (
+        <div className="ui-prefs-panel">
+          <ThemeToggle />
+          <LayoutToggle />
+        </div>
+      )}
     </div>
   )
 }

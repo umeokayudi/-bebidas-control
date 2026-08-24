@@ -333,7 +333,6 @@ function Shell() {
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
-          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Painel admin JBM</div>
           <UiPrefsPanel />
           <button onClick={signOut} className="sidebar-signout">Sair</button>
         </div>

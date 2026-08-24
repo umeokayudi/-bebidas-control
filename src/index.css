@@ -1068,7 +1068,32 @@ body.menu-open {
   color: var(--navy);
 }
 
-/* ── Preferências UI (igual JBM Holding + layout mobile) ─────────────────── */
+/* ── Preferências UI (recolhidas na sidebar) ─────────────────────────────── */
+.ui-prefs-wrap {
+  margin-bottom: 10px;
+}
+
+.ui-prefs-toggle {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ui-prefs-toggle:hover {
+  color: rgba(193,156,86,0.85);
+  border-color: rgba(193,156,86,0.25);
+}
+
 .ui-prefs-panel {
   display: flex;
   flex-direction: column;
