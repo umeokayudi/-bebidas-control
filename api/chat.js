@@ -1,5 +1,14 @@
 import { setCorsHeaders, handleCorsPreflight } from './_cors.js'
 import { geminiGenerate } from './_gemini.js'
+import { createClient } from '@supabase/supabase-js'
+import { requireStaffOrTrustedOrigin } from './_requireStaff.js'
+
+function adminClient() {
+  const url = process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+}
 
 function extractText(data) {
   return data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
@@ -23,6 +32,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    const admin = adminClient()
+    const auth = await requireStaffOrTrustedOrigin(req, admin)
+    if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
 
     if (body.module === 'seikyusho') {

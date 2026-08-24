@@ -145,7 +145,7 @@ function MoneyIn() {
   const [loading, setLoading] = useState(true)
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
-    const { data } = await supabase.from('faturas').select('*, bars(nome)').order('vencimento',{ascending:false})
+    const { data } = await supabase.from('faturas').select('*, bars(nome)').order('data_vencimento',{ascending:false})
     setFaturas(data||[]); setLoading(false)
   }
   if (loading) return <Spinner text="Carregando..." />

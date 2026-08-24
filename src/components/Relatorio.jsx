@@ -6,6 +6,7 @@ import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
 import { aReceberForMonth, faturasAbertasMes } from '../lib/faturasMonth'
 import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
 import { loadAllCompras } from '../lib/loadCompras'
+import { loadDashboard } from '../lib/loadDashboard'
 import ComprasNotasSection from './ComprasNotasSection'
 import { AdminPage, PortalKpi, PortalSurface } from './ui/PageLayout'
 
@@ -15,6 +16,8 @@ export default function RelatorioTab() {
   const [vendas, setVendas] = useState([])
   const [ryoshusho, setRyoshusho] = useState([])
   const [faturas, setFaturas] = useState([])
+  const [dashByMonth, setDashByMonth] = useState({})
+  const [dashMonths, setDashMonths] = useState([])
   const [loading, setLoading] = useState(true)
   const [selMonth, setSelMonth] = useState('')
 
@@ -22,20 +25,24 @@ export default function RelatorioTab() {
 
   async function loadAll() {
     setLoading(true)
-    const [bR, vR, rR, fR, cData] = await Promise.all([
+    const [bR, vR, rR, fR, cData, dash] = await Promise.all([
       supabase.from('bars').select('id, nome, cor'),
       supabase.from('vendas').select('id, data, data_venda, total, bar_id, obs, origem, cast_id'),
       supabase.from('ryoshusho').select('*'),
       supabase.from('faturas').select('*, bars(nome)').order('data_vencimento', { ascending: false }),
       loadAllCompras(),
+      loadDashboard().catch(() => null),
     ])
     setBars(bR.data || [])
     setCompras(cData || [])
     setVendas(filterSupplierVendas(vR.data || []))
     setRyoshusho(rR.data || [])
     setFaturas(fR.data || [])
+    setDashByMonth(dash?.byMonth || {})
+    setDashMonths(dash?.months || [])
 
     const months = [...new Set([
+      ...(dash?.months || []),
       ...(cData || []).map(compraMonthKey),
       ...(vR.data || []).map(v => monthKey(v.data)),
     ])].filter(Boolean).sort().reverse()
@@ -51,23 +58,26 @@ export default function RelatorioTab() {
   }
 
   const allMonths = [...new Set([
+    ...dashMonths,
     ...compras.map(compraMonthKey),
     ...vendas.map(v => monthKey(v.data)),
   ])].filter(Boolean).sort().reverse()
 
+  const dash = dashByMonth[selMonth] || {}
   const comprasMes = compras.filter(c => compraMonthKey(c) === selMonth)
   const vendasMes = vendas.filter(v => saleMonthKey(v) === selMonth)
   const ryoMes = ryoshushoForMonth(ryoshusho, selMonth)
 
-  const custoCompras = comprasMes.reduce((a, c) => a + (+c.total_real || 0), 0)
+  const custoCompras = dash.compras ?? comprasMes.reduce((a, c) => a + (+c.total_real || 0), 0)
   const descontoTotal = comprasMes.reduce((a, c) => a + (+c.desconto_pontos || 0), 0)
   const creditoBar = barCreditsForMonth(selMonth)
   const creditosBar = barCreditsList(selMonth)
 
-  const receitaTotal = vendasMes.reduce((a, v) => a + (+v.total || 0), 0)
-  const lucroTotal = receitaTotal - custoCompras
-  const margemGeral = receitaTotal > 0 ? Math.round(lucroTotal / receitaTotal * 100) : 0
-  const aReceber = aReceberForMonth(faturas, selMonth)
+  const receitaTotal = dash.receita ?? vendasMes.reduce((a, v) => a + (+v.total || 0), 0)
+  const faturamento = dash.faturamento ?? receitaTotal
+  const lucroTotal = dash.lucroProjetado ?? dash.lucro ?? (receitaTotal - custoCompras)
+  const margemGeral = dash.margem ?? (faturamento > 0 ? Math.round(lucroTotal / faturamento * 100) : 0)
+  const aReceber = dash.aReceber ?? aReceberForMonth(faturas, selMonth)
   const faturasMes = faturasAbertasMes(faturas, selMonth)
   const ryoTotal = ryoMes.reduce((a, r) => a + ryoshushoMonthShare(r, selMonth), 0)
 
@@ -104,11 +114,11 @@ export default function RelatorioTab() {
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
         <PortalKpi label="Compras (notas)" value={fmtYen(custoCompras)} color="var(--red)"
-          sub={`${comprasMes.length} nota(s)`} />
-        <PortalKpi label="Receita" value={fmtYen(receitaTotal)} color="var(--navy)"
-          sub={`${vendasMes.length} entrega(s)`} />
-        <PortalKpi label="Lucro" value={fmtYen(lucroTotal)} color="var(--green)"
-          sub={`${margemGeral}% · receita − notas`} />
+          sub={dash.comprasEstimadas ? `${comprasMes.length} ref. · custo est. jul/2026` : `${comprasMes.length} nota(s)`} />
+        <PortalKpi label="Faturamento" value={fmtYen(faturamento)} color="var(--navy)"
+          sub={`${vendasMes.length} entrega(s) · ${dash.comprasEstimadas ? 'pedidos/notas' : 'cobrança'}`} />
+        <PortalKpi label="Lucro projetado" value={fmtYen(lucroTotal)} color="var(--green)"
+          sub={`${margemGeral}% · fat. − custo`} />
         <PortalKpi label="A receber" value={fmtYen(aReceber)} color={aReceber > 0 ? 'var(--amber)' : 'var(--green)'}
           sub={faturasMes.length ? `${faturasMes.length} fatura(s) em aberto` : 'Nada pendente'} />
       </div>

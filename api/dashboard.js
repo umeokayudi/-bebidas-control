@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireStaff as checkStaff } from './_requireStaff.js'
 import { isSupplierVenda } from './_supplierVenda.js'
 import {
   monthDashboardStats,
@@ -13,16 +14,6 @@ function adminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
-
-async function requireStaff(req, admin) {
-  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim()
-  if (!token) return { error: 'Não autenticado', status: 401 }
-  const { data: { user }, error } = await admin.auth.getUser(token)
-  if (error || !user) return { error: 'Sessão inválida', status: 401 }
-  const { data: perfil } = await admin.from('perfis').select('role').eq('id', user.id).single()
-  if (!perfil || perfil.role === 'cliente') return { error: 'Sem permissão', status: 403 }
-  return { user, perfil }
 }
 
 function lastMonths(n = 6) {
@@ -40,7 +31,7 @@ export default async function handler(req, res) {
 
   try {
     const admin = adminClient()
-    const auth = await requireStaff(req, admin)
+    const auth = await checkStaff(req, admin)
     if (auth.error) return res.status(auth.status).json({ error: auth.error })
 
     const chartMonths = lastMonths(6)

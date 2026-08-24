@@ -4,6 +4,7 @@ import { ensureVendaFromPedido, findVendaForPedido, findVendaKeysForPedidos, ped
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
 import { SupplierCostHint } from './SupplierPriceCheck'
+import { staffFetch } from '../lib/apiAuth'
 import { AdminPage, PortalSurface } from './ui/PageLayout'
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────────
@@ -198,7 +199,7 @@ export function UsuariosTab() {
   useEffect(() => { load() }, [])
 
   async function loadUsers() {
-    const res = await fetch('/api/admin-user')
+    const res = await staffFetch('/api/admin-user')
     const json = await res.json()
     if (!res.ok) throw new Error(json.error || 'Failed to load users')
     return json.users || []
@@ -231,7 +232,7 @@ export function UsuariosTab() {
     setSaving(true)
     setErr('')
     try {
-      const res = await fetch('/api/admin-user', {
+      const res = await staffFetch('/api/admin-user', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -320,7 +321,7 @@ export function UsuariosTab() {
                 setCreating(true)
                 setErr('')
                 try {
-                  const res = await fetch('/api/admin-user', {
+                  const res = await staffFetch('/api/admin-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: newEmail, password: newPw, nome: form.nome, role: form.role, bar_id: form.bar_id || null })
@@ -686,7 +687,7 @@ export function PedidosAdminTab() {
                     <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>Confirmar</button>
                     <button onClick={()=>updateStatus(p.id,'cancelado')} className="btn-danger" style={{padding:'6px 14px',fontSize:11,borderRadius:8}}>Cancelar</button>
                   </>}
-                  <button onClick={async()=>{ if(!confirm('Excluir este pedido?'))return; setPedidos(prev=>prev.filter(x=>x.id!==p.id)); await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); const {data:v}=await supabase.from('vendas').select('id').eq('obs','Auto: order '+p.id.slice(0,8)).maybeSingle(); if(v){await supabase.from('vendas_itens').delete().eq('venda_id',v.id); await supabase.from('vendas').delete().eq('id',v.id);} await supabase.from('faturas').delete().eq('venda_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600,cursor:'pointer'}}>🗑</button>
+                  <button onClick={async()=>{ if(!confirm('Excluir este pedido?'))return; setPedidos(prev=>prev.filter(x=>x.id!==p.id)); await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); const {data:v}=await supabase.from('vendas').select('id').eq('obs','Auto: order '+p.id.slice(0,8)).maybeSingle(); if(v){await supabase.from('vendas_itens').delete().eq('venda_id',v.id); await supabase.from('vendas').delete().eq('id',v.id);} await supabase.from('pedidos').delete().eq('id',p.id); }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600,cursor:'pointer'}}>🗑</button>
                   {p.status==='confirmado'&&(
                     <button onClick={()=>openChecklist(p)} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--green)',color:'white',border:'none',fontWeight:600}}>&#10003; Marcar entregue</button>
                   )}

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { callGeminiChat } from '../lib/ai'
 import { Spinner } from './utils'
+import { staffFetch } from '../lib/apiAuth'
 import {
   fetchHoldingSystemSnapshot,
   buildHoldingFullAuditPrompt,
@@ -43,7 +44,7 @@ export default function JbmHoldingAI({ holdingProfile }) {
       setSnapshot(local)
       // Enriquecer com API server-side se disponível
       try {
-        const res = await fetch('/api/holding-audit')
+        const res = await staffFetch('/api/holding-audit')
         if (res.ok) {
           const server = await res.json()
           setSnapshot(s => ({ ...s, ...server, holding: s?.holding || server.holding }))

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireStaff } from './_requireStaff.js'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -26,6 +27,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    const auth = await requireStaff(req, admin)
+    if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
     if (req.method === 'GET') {
       const [{ data: perfis, error: pErr }, { data: authData, error: aErr }] = await Promise.all([
         admin.from('perfis').select('*').order('nome'),

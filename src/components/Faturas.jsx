@@ -216,7 +216,7 @@ function InvoiceList() {
     const period = getBillingPeriod(new Date().toISOString().slice(0,10))
     const venc = customDue || period.due
     const total = vendas.filter(v=>v.bar_id===selBar&&v.data>=period.start&&v.data<=period.end).reduce((a,v)=>a+(+v.total||0),0)
-    await supabase.from('faturas').insert({ bar_id:selBar, valor:total, data_emissao:period.start, data_data_vencimento:period.end, data_vencimento:period.due, total, pago:0, status:'pendente' })
+    await supabase.from('faturas').insert({ bar_id:selBar, valor:total, data_emissao:period.start, periodo_inicio:period.start, periodo_fim:period.end, data_vencimento:venc, total, pago:0, status:'pendente' })
     setSaving(false); setShowForm(false); load()
   }
   async function registerPayment() {

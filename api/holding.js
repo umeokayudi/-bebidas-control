@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireStaff } from './_requireStaff.js'
 
 const BUCKET = 'system-private'
 const FILE = 'jbm_holding.json'
@@ -21,6 +22,8 @@ function adminClient() {
 export default async function handler(req, res) {
   try {
     const sb = adminClient()
+    const auth = await requireStaff(req, sb)
+    if (auth.error) return res.status(auth.status).json({ error: auth.error })
 
     if (req.method === 'GET') {
       const { data, error } = await sb.storage.from(BUCKET).download(FILE)

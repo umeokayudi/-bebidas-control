@@ -1917,7 +1917,7 @@ function FaturasTab({ bar }) {
   const pending = filtered.filter(f=>f.status!=="pago")
   const totalPending = pending.reduce((a,f)=>a+(+f.valor||0)-(+f.pago||0),0)
   const overdue = pending.filter(f=>new Date(f.data_vencimento)<new Date())
-  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.vencimento))
+  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.data_vencimento))
   const monthlySpend = []
   const monthLabels = []
   for (let i=5; i>=0; i--) {
@@ -2168,7 +2168,7 @@ function CalendarioTab({ bar }) {
   })
 
   const upcoming = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento>=today.toISOString().slice(0,10))
-    .sort((a,b)=>a.data_vencimento.localeCompare(b.vencimento))
+    .sort((a,b)=>a.data_vencimento.localeCompare(b.data_vencimento))
 
   if (loading) return <Spinner text="Loading..." />
 

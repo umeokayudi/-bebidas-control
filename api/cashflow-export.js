@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { fixAtomicReceivables, revertAtomicPedidosToJune } from './_atomicJuneFix.js'
 import { isSupplierVenda } from './_supplierVenda.js'
+import { requireStaff, requireStaffOrTrustedOrigin } from './_requireStaff.js'
 
 const BUCKET = 'system-private'
 const FILE = 'cashflow_snapshot.json'
@@ -96,17 +97,23 @@ export default async function handler(req, res) {
   const origin = req.headers.origin
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*')
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
     const sb = adminClient()
+
+    if (req.query.revertPedidosJune === '1' || req.query.fixAtomicJune === '1') {
+      const auth = await requireStaff(req, sb)
+      if (auth.error) return res.status(auth.status).json({ error: auth.error })
+    } else {
+      const auth = await requireStaffOrTrustedOrigin(req, sb)
+      if (auth.error) return res.status(auth.status).json({ error: auth.error })
+    }
 
     if (req.query.revertPedidosJune === '1' && req.query.confirm === 'atomic-june-465000') {
       const revert = await revertAtomicPedidosToJune(sb)

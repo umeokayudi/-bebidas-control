@@ -1,0 +1,231 @@
+{
+  "geradoEm": "2026-08-24",
+  "fontes": {
+    "miraido": {
+      "nome": "Felicity / Miraido Online Shop",
+      "url": "https://www.miraido-onlineshop.com/",
+      "pagamento": "Online",
+      "notas": "Preços públicos do site (税込). Frete grátis em muitos cases. Cadastro B2B."
+    },
+    "liquorMountain": {
+      "nome": "Liquor Mountain (六本木DS)",
+      "id": "499916d4-75c8-4fa9-b5da-05407739f8c3",
+      "pagamento": "Card",
+      "notas": "Notas jul/2026 — 税抜 na nota, +10% no sistema"
+    },
+    "leVin": {
+      "nome": "Le Vin",
+      "id": "fa471fc2-62e5-4680-b50f-e11586861f17",
+      "pagamento": "Invoice 30d",
+      "notas": "請求書 jul/15/2026 — champagne & premium"
+    }
+  },
+  "volumeJul2026": {
+    "totalComprasLM": 488350,
+    "totalComprasLeVin": 768900,
+    "topProdutos": [
+      { "produto": "Red Bull", "qtd": 336, "fornecedorAtual": "Liquor Mountain" },
+      { "produto": "Asahi Beer 330ml", "qtd": 150, "fornecedorAtual": "Liquor Mountain" },
+      { "produto": "Heineken 330ml", "qtd": 144, "fornecedorAtual": "Liquor Mountain" },
+      { "produto": "Corona Extra 355ml", "qtd": 120, "fornecedorAtual": "Liquor Mountain" },
+      { "produto": "Hennessy V.S", "qtd": 24, "fornecedorAtual": "Le Vin" },
+      { "produto": "Veuve Clicquot Brut", "qtd": 18, "fornecedorAtual": "Le Vin" },
+      { "produto": "Veuve Clicquot Rose", "qtd": 19, "fornecedorAtual": "Le Vin" },
+      { "produto": "Moet Rosé", "qtd": 17, "fornecedorAtual": "Le Vin" },
+      { "produto": "Moet Brut", "qtd": 12, "fornecedorAtual": "Le Vin" },
+      { "produto": "Baileys", "qtd": 13, "fornecedorAtual": "Liquor Mountain" },
+      { "produto": "Malibu", "qtd": 13, "fornecedorAtual": "Liquor Mountain" }
+    ]
+  },
+  "produtos": [
+    {
+      "produto": "Red Bull 250ml",
+      "volumeJul": 336,
+      "unidade": "lata",
+      "liquorMountain": { "zeibetsu": 178, "zeikomi": 196, "pack": "24/case ¥4,704" },
+      "miraido": { "zeibetsu": 169, "zeikomi": 169, "pack": "24/case ¥4,061", "url": "https://www.miraido-onlineshop.com/item/red0004/" },
+      "leVin": null,
+      "melhor": "miraido",
+      "economiaUnit": 27,
+      "economiaJul": 9072
+    },
+    {
+      "produto": "Asahi Beer 330ml",
+      "volumeJul": 150,
+      "unidade": "lata",
+      "liquorMountain": { "zeibetsu": 203, "zeikomi": 224, "pack": "30/case" },
+      "miraido": { "zeibetsu": null, "zeikomi": null, "pack": "330ml case N/A — 350ml case ¥4,908 (¥205/un)", "url": "https://www.miraido-onlineshop.com/item_list/ashbersdry/" },
+      "leVin": null,
+      "melhor": "liquorMountain",
+      "notas": "Miraido não vende 330ml; 350ml é comparável"
+    },
+    {
+      "produto": "Heineken 330ml",
+      "volumeJul": 144,
+      "liquorMountain": { "zeibetsu": 257, "zeikomi": 283, "pack": "24/case" },
+      "miraido": null,
+      "leVin": null,
+      "melhor": "liquorMountain",
+      "notas": "Só LM no catálogo atual"
+    },
+    {
+      "produto": "Baileys 700ml",
+      "volumeJul": 13,
+      "liquorMountain": { "zeibetsu": 1850, "zeikomi": 2035 },
+      "miraido": { "zeibetsu": 1580, "zeikomi": 1738, "url": "https://www.miraido-onlineshop.com/item/9-baileys-700/" },
+      "leVin": null,
+      "melhor": "miraido",
+      "economiaUnit": 297,
+      "economiaJul": 3861
+    },
+    {
+      "produto": "Malibu 700ml",
+      "volumeJul": 13,
+      "liquorMountain": { "zeibetsu": 1350, "zeikomi": 1485 },
+      "miraido": { "zeibetsu": 1090, "zeikomi": 1199, "url": "https://www.miraido-onlineshop.com/item/9-malibu-21/" },
+      "leVin": null,
+      "melhor": "miraido",
+      "economiaUnit": 286,
+      "economiaJul": 3718
+    },
+    {
+      "produto": "Jägermeister 700ml",
+      "volumeJul": 5,
+      "liquorMountain": { "zeibetsu": 1980, "zeikomi": 2178 },
+      "miraido": { "zeibetsu": 1345, "zeikomi": 1480, "url": "https://www.miraido-onlineshop.com/item/9-jagermeister-35-p/" },
+      "leVin": null,
+      "melhor": "miraido",
+      "economiaUnit": 698,
+      "economiaJul": 3490
+    },
+    {
+      "produto": "Fireball 750ml",
+      "volumeJul": 6,
+      "liquorMountain": { "zeibetsu": 1880, "zeikomi": 2068 },
+      "miraido": { "zeibetsu": 1664, "zeikomi": 1830, "url": "https://www.miraido-onlineshop.com/item/9-fb-cnmn-700/" },
+      "leVin": null,
+      "melhor": "miraido",
+      "economiaUnit": 238,
+      "economiaJul": 1428
+    },
+    {
+      "produto": "Chandon Brut 750ml",
+      "volumeJul": 6,
+      "liquorMountain": { "zeibetsu": 2480, "zeikomi": 2728 },
+      "miraido": { "zeibetsu": 2180, "zeikomi": 2398, "url": "https://www.miraido-onlineshop.com/item/green-point-2-zz/" },
+      "leVin": null,
+      "melhor": "miraido",
+      "economiaUnit": 330,
+      "economiaJul": 1980
+    },
+    {
+      "produto": "Hennessy V.S 700ml",
+      "volumeJul": 24,
+      "liquorMountain": null,
+      "miraido": { "zeibetsu": 3380, "zeikomi": 3718, "url": "https://www.miraido-onlineshop.com/item/4-hennessy-vs-nb/" },
+      "leVin": { "zeikomi": 4042 },
+      "melhor": "miraido",
+      "economiaUnit": 324,
+      "economiaJul": 7776
+    },
+    {
+      "produto": "Veuve Clicquot Brut 750ml",
+      "volumeJul": 18,
+      "liquorMountain": null,
+      "miraido": { "zeibetsu": 5809, "zeikomi": 6390, "url": "https://www.miraido-onlineshop.com/item/veuve-cliquot-1-p/" },
+      "leVin": { "zeikomi": 6823 },
+      "melhor": "miraido",
+      "economiaUnit": 433,
+      "economiaJul": 7794
+    },
+    {
+      "produto": "Moet Brut Imperial 750ml",
+      "volumeJul": 12,
+      "liquorMountain": null,
+      "miraido": { "zeibetsu": 5680, "zeikomi": 6248, "url": "https://www.miraido-onlineshop.com/item/moet-1/" },
+      "leVin": { "zeikomi": 5774 },
+      "melhor": "leVin",
+      "economiaUnit": 474,
+      "economiaJul": 5688
+    },
+    {
+      "produto": "Moet Rosé 750ml",
+      "volumeJul": 17,
+      "liquorMountain": null,
+      "miraido": { "zeikomi": 6406, "notas": "est. moet roze Miraido ~¥6,400" },
+      "leVin": { "zeikomi": 6823 },
+      "melhor": "miraido",
+      "economiaUnit": 417,
+      "economiaJul": 7089
+    },
+    {
+      "produto": "Dom Perignon Brut 750ml",
+      "volumeJul": 1,
+      "liquorMountain": null,
+      "miraido": { "zeikomi": 25400, "url": "https://www.miraido-onlineshop.com/item/dom_peri2012-p-gb/" },
+      "leVin": { "zeikomi": 25194 },
+      "melhor": "leVin",
+      "economiaUnit": 206
+    },
+    {
+      "produto": "Krug Brut 750ml",
+      "volumeJul": 1,
+      "liquorMountain": null,
+      "miraido": null,
+      "leVin": { "zeikomi": 31508 },
+      "melhor": "leVin",
+      "notas": "Só Le Vin no mix atual"
+    },
+    {
+      "produto": "Grey Goose 700ml",
+      "volumeJul": 9,
+      "liquorMountain": null,
+      "miraido": { "zeibetsu": 4118, "zeikomi": 4530, "url": "https://www.miraido-onlineshop.com/item/6-gryg/" },
+      "leVin": { "zeikomi": 472, "alerta": "PREÇO ERRADO NO SISTEMA — provável bug (deveria ~¥5.000+)" },
+      "melhor": "miraido",
+      "notas": "Corrigir custo Grey Goose no pedido Le Vin"
+    },
+    {
+      "produto": "Yamazaki 12 Year 700ml",
+      "volumeJul": 4,
+      "liquorMountain": { "zeibetsu": 13800, "zeikomi": 15180 },
+      "miraido": { "zeibetsu": 21100, "zeikomi": 23210, "url": "https://www.miraido-onlineshop.com/item/2-yamazaki-vt12/" },
+      "leVin": null,
+      "melhor": "liquorMountain",
+      "economiaUnit": 8030,
+      "economiaJul": 32120
+    },
+    {
+      "produto": "Hakushu 700ml",
+      "volumeJul": 2,
+      "liquorMountain": { "zeibetsu": 13000, "zeikomi": 14300 },
+      "miraido": { "zeikomi": 15000, "notas": "est. mercado; confirmar no site" },
+      "leVin": null,
+      "melhor": "liquorMountain"
+    },
+    {
+      "produto": "Tonic Water 500ml",
+      "volumeJul": 48,
+      "liquorMountain": { "zeibetsu": 115, "zeikomi": 127, "pack": "24/case" },
+      "miraido": { "zeikomi": 135, "pack": "Schweppes 250ml 24/case ¥3,564", "notas": "tamanho diferente" },
+      "leVin": null,
+      "melhor": "liquorMountain"
+    },
+    {
+      "produto": "Orange Juice 1L",
+      "volumeJul": 48,
+      "liquorMountain": { "zeibetsu": 338, "zeikomi": 372 },
+      "miraido": null,
+      "leVin": null,
+      "melhor": "liquorMountain"
+    }
+  ],
+  "resumoEconomiaJul": {
+    "miraidoVsLM_mixers": 14477,
+    "miraidoVsLeVin_champagne_spirits": 22659,
+    "leVinVsMiraido_moet_dom": 5894,
+    "liquorMountainVsMiraido_yamazaki": 32120,
+    "economiaLiquidaEstimadaSeOtimizar": 33242,
+    "notas": "Estimativa se mover mixers LM→Miraido e Hennessy/Veuve Le Vin→Miraido, mantendo Moet Brut/Dom no Le Vin e whisky japonês no LM"
+  }
+}

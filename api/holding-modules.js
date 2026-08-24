@@ -1,11 +1,23 @@
 import { setCorsHeaders, handleCorsPreflight } from './_cors.js'
 import { holdingAdminClient, fetchAllHoldingModules } from './_holdingData.js'
+import { createClient } from '@supabase/supabase-js'
+import { requireStaffOrTrustedOrigin } from './_requireStaff.js'
+
+function drinksAdmin() {
+  const url = process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+}
 
 export default async function handler(req, res) {
   if (handleCorsPreflight(req, res)) return
   setCorsHeaders(req, res)
 
   try {
+    const auth = await requireStaffOrTrustedOrigin(req, drinksAdmin())
+    if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
     const sb = await holdingAdminClient()
 
     if (req.method === 'GET') {
