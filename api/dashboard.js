@@ -1,9 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { isSupplierVenda } from './_supplierVenda.js'
-
-const BAR_CREDITS = {
-  '2026-07': 488350,
-}
+import { aReceberForMonth } from './_faturasMonth.js'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -50,9 +47,10 @@ export default async function handler(req, res) {
 
     const chartMonths = lastMonths(6)
 
-    const [{ data: compras }, { data: vendasRaw }, { count: pedidosPendentes }] = await Promise.all([
+    const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { count: pedidosPendentes }] = await Promise.all([
       admin.from('compras').select('data, total_real').order('data'),
       admin.from('vendas').select('data, data_venda, total, obs, origem, cast_id').order('data'),
+      admin.from('faturas').select('total, valor, pago, status, periodo_inicio, periodo_fim, data_emissao, data_vencimento, obs'),
       admin.from('pedidos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
     ])
 
@@ -74,7 +72,7 @@ export default async function handler(req, res) {
       const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
       const comprasTotal = (compras || []).filter(c => monthKey(c.data) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
       const lucro = receita - comprasTotal
-      const creditoBar = BAR_CREDITS[m] || 0
+      const aReceber = aReceberForMonth(faturas, m)
       byMonth[m] = {
         receita,
         compras: comprasTotal,
@@ -82,8 +80,7 @@ export default async function handler(req, res) {
         margem: receita > 0 ? Math.round(lucro / receita * 100) : 0,
         vendasCount: vendas.filter(v => saleMonthKey(v) === m).length,
         comprasCount: (compras || []).filter(c => monthKey(c.data) === m).length,
-        creditoBar,
-        lucroJbm: lucro + creditoBar,
+        aReceber,
       }
     }
 

@@ -172,12 +172,20 @@ function Dashboard({ onNav }) {
         </PortalAlert>
       )}
 
-      <div className="portal-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
+      <div className="portal-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
         <PortalHero
           label={`Lucro · ${monthLabel(selMonth)}`}
           value={fmtYen(m.lucro)}
           sub={`Margem ${m.margem}% · receita ${fmtYen(m.receita)} − compras ${fmtYen(m.compras)}`}
           onClick={() => goToReport(onNav, selMonth)}
+        />
+        <PortalKpi
+          label="A receber"
+          value={fmtYen(m.aReceber || 0)}
+          sub="Saldo pendente nas faturas do mês"
+          color={(m.aReceber || 0) > 0 ? 'var(--amber)' : 'var(--green)'}
+          onClick={() => onNav('faturas')}
+          hint="Ver faturas →"
         />
         <PortalKpi
           label="Compras (notas)"
@@ -190,7 +198,7 @@ function Dashboard({ onNav }) {
         <PortalKpi
           label="Receita"
           value={fmtYen(m.receita)}
-          sub={`${m.vendasCount} entrega(s)${m.creditoBar > 0 ? ` · crédito bar ${fmtYen(m.creditoBar)}` : ''}`}
+          sub={`${m.vendasCount} entrega(s)`}
           color="var(--navy)"
           onClick={() => goToReport(onNav, selMonth)}
           hint="Detalhe no Relatório →"

@@ -84,8 +84,9 @@ export default function ComprasNotasSection({ comprasMes, totalCompras, creditoB
     <PortalSurface title={`Notas de compra — ${sorted.length} nota(s)`} sub="Clique na nota para ver quantidade e custo de cada item.">
 
       {creditoBar > 0 && (
-        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(26,107,74,0.08)', fontSize: 12, color: 'var(--text2)' }}>
-          Créditos bar: {(creditosBar || []).map(c => `${c.fornecedor} ${fmtYen(c.valor)}`).join(' · ')}
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--blue-bg)', fontSize: 12, color: 'var(--text2)' }}>
+          Pago direto pelo bar: {(creditosBar || []).map(c => `${c.fornecedor} ${fmtYen(c.valor)}`).join(' · ')}
+          {' '}— valor abatido na cobrança, não soma ao lucro.
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, filterSupplierVendas, saleMonthKey, compraMonthKey } from './utils'
 import { aggregateComprasItens } from '../lib/marginCost'
 import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
+import { aReceberForMonth, faturasAbertasMes } from '../lib/faturasMonth'
 import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
 import { loadAllCompras } from '../lib/loadCompras'
 import ComprasNotasSection from './ComprasNotasSection'
@@ -13,6 +14,7 @@ export default function RelatorioTab() {
   const [compras, setCompras] = useState([])
   const [vendas, setVendas] = useState([])
   const [ryoshusho, setRyoshusho] = useState([])
+  const [faturas, setFaturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [selMonth, setSelMonth] = useState('')
 
@@ -20,16 +22,18 @@ export default function RelatorioTab() {
 
   async function loadAll() {
     setLoading(true)
-    const [bR, vR, rR, cData] = await Promise.all([
+    const [bR, vR, rR, fR, cData] = await Promise.all([
       supabase.from('bars').select('id, nome, cor'),
       supabase.from('vendas').select('id, data, data_venda, total, bar_id, obs, origem, cast_id'),
       supabase.from('ryoshusho').select('*'),
+      supabase.from('faturas').select('*, bars(nome)').order('data_vencimento', { ascending: false }),
       loadAllCompras(),
     ])
     setBars(bR.data || [])
     setCompras(cData || [])
     setVendas(filterSupplierVendas(vR.data || []))
     setRyoshusho(rR.data || [])
+    setFaturas(fR.data || [])
 
     const months = [...new Set([
       ...(cData || []).map(compraMonthKey),
@@ -62,9 +66,9 @@ export default function RelatorioTab() {
 
   const receitaTotal = vendasMes.reduce((a, v) => a + (+v.total || 0), 0)
   const lucroTotal = receitaTotal - custoCompras
-  const lucroJbmTotal = lucroTotal + creditoBar
   const margemGeral = receitaTotal > 0 ? Math.round(lucroTotal / receitaTotal * 100) : 0
-  const margemJbmGeral = receitaTotal > 0 ? Math.round(lucroJbmTotal / receitaTotal * 100) : 0
+  const aReceber = aReceberForMonth(faturas, selMonth)
+  const faturasMes = faturasAbertasMes(faturas, selMonth)
   const ryoTotal = ryoMes.reduce((a, r) => a + ryoshushoMonthShare(r, selMonth), 0)
 
   const porProdutoComprado = aggregateComprasItens(comprasMes)
@@ -98,24 +102,26 @@ export default function RelatorioTab() {
         </>
       }
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
         <PortalKpi label="Compras (notas)" value={fmtYen(custoCompras)} color="var(--red)"
           sub={`${comprasMes.length} nota(s)`} />
         <PortalKpi label="Receita" value={fmtYen(receitaTotal)} color="var(--navy)"
-          sub={`${vendasMes.length} venda(s)`} />
+          sub={`${vendasMes.length} entrega(s)`} />
         <PortalKpi label="Lucro" value={fmtYen(lucroTotal)} color="var(--green)"
           sub={`${margemGeral}% · receita − notas`} />
+        <PortalKpi label="A receber" value={fmtYen(aReceber)} color={aReceber > 0 ? 'var(--amber)' : 'var(--green)'}
+          sub={faturasMes.length ? `${faturasMes.length} fatura(s) em aberto` : 'Nada pendente'} />
       </div>
 
       {(creditoBar > 0 || descontoTotal > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: creditoBar > 0 ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: creditoBar > 0 && descontoTotal > 0 ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 18 }}>
           {creditoBar > 0 && (
-            <PortalKpi label="Lucro JBM" value={fmtYen(lucroJbmTotal)} color="var(--green)"
-              sub={`+${fmtYen(creditoBar)} crédito bar · ${margemJbmGeral}%`} />
+            <PortalKpi label="Pago direto pelo bar" value={fmtYen(creditoBar)} color="var(--navy)"
+              sub="Compra paga pelo cliente (ex.: LM) — abate na fatura, não é lucro" />
           )}
           {descontoTotal > 0 && (
             <PortalKpi label="Pontos" value={fmtYen(descontoTotal)} color="var(--gold)"
-              sub="desconto nas notas" />
+              sub="desconto nas notas de compra" />
           )}
         </div>
       )}
