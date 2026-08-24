@@ -81,6 +81,17 @@ export function PortalPills({ options, value, onChange }) {
   )
 }
 
+export function AdminPage({ title, subtitle, actions, children, wide = false }) {
+  return (
+    <div className="fade-in" style={{ maxWidth: wide ? 1100 : 1000 }}>
+      {(title || subtitle || actions) && (
+        <PageHeader title={title} subtitle={subtitle} actions={actions} />
+      )}
+      {children}
+    </div>
+  )
+}
+
 export function PortalAlert({ variant = 'amber', children, onClick }) {
   const styles = {
     amber: { background: '#fffbeb', border: '1px solid #fcd34d', color: 'inherit' },
