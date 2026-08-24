@@ -1,13 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import { fixAtomicReceivables, revertAtomicPedidosToJune, ATOMIC_BAR_ID } from './_atomicJuneFix.js'
 import { fixVendaDatesFromPedidos, dedupePedidoVendas, syncMissingVendasFromPedidos, backfillVendaItensFromPedidos, fixSeikyushoCompraDates } from './_pedidoVendaFix.js'
-
-function adminClient() {
-  const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada no Vercel')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
+import { drinksAdminClient } from './_supabaseAdmin.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -25,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const sb = adminClient()
+    const sb = drinksAdminClient()
     const action = body.action || 'fix'
 
     if (action === 'revertPedidos') {

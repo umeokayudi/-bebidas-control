@@ -118,10 +118,13 @@ function Dashboard({ onNav }) {
   const [data, setData] = useState(null)
   const [selMonth, setSelMonth] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
 
   useEffect(() => { if (user) loadStats() }, [user])
 
   async function loadStats() {
+    setLoadErr('')
+    setLoading(true)
     try {
       const payload = await loadDashboard()
       const mesAtual = new Date().toISOString().slice(0, 7)
@@ -129,6 +132,7 @@ function Dashboard({ onNav }) {
       setSelMonth(prev => prev || (payload.months?.includes(mesAtual) ? mesAtual : payload.months?.[0]) || mesAtual)
     } catch (e) {
       console.error('loadStats error', e)
+      setLoadErr(e.message || 'Erro ao carregar dashboard')
     } finally {
       setLoading(false)
     }
@@ -143,7 +147,24 @@ function Dashboard({ onNav }) {
   }))
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text2)' }}><span className="spinner" />Carregando...</div>
-  if (!m) return null
+  if (loadErr) {
+    return (
+      <div style={{ maxWidth: 520, padding: 24 }}>
+        <PortalAlert variant="red">
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Não foi possível carregar o dashboard</div>
+          <div style={{ fontSize: 13, opacity: 0.9 }}>{loadErr}</div>
+        </PortalAlert>
+        <button className="btn-primary" onClick={loadStats} style={{ marginTop: 16 }}>Tentar novamente</button>
+      </div>
+    )
+  }
+  if (!m) {
+    return (
+      <div style={{ maxWidth: 520, padding: 24, color: 'var(--text2)' }}>
+        Sem dados para exibir. Verifique compras e vendas no sistema.
+      </div>
+    )
+  }
 
   const mesAtual = new Date().toISOString().slice(0, 7)
   const isCurrentMonth = selMonth === mesAtual

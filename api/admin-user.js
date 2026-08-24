@@ -1,18 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { requireStaff } from './_requireStaff.js'
-
-function adminClient() {
-  const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) {
-    throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY is not configured. Add it in Vercel → Settings → Environment Variables.'
-    )
-  }
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
+import { drinksAdminClient } from './_supabaseAdmin.js'
 
 function authEmail(user) {
   return user?.email || ''
@@ -21,7 +8,7 @@ function authEmail(user) {
 export default async function handler(req, res) {
   let admin
   try {
-    admin = adminClient()
+    admin = drinksAdminClient()
   } catch (e) {
     return res.status(500).json({ error: e.message })
   }

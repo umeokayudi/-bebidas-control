@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { requireStaff } from './_requireStaff.js'
+import { drinksAdminClient } from './_supabaseAdmin.js'
 
 const BUCKET = 'system-private'
 const FILE = 'jbm_holding.json'
@@ -12,16 +12,9 @@ const DEFAULT_HOLDING = {
   negocios: [],
 }
 
-function adminClient() {
-  const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
-
 export default async function handler(req, res) {
   try {
-    const sb = adminClient()
+    const sb = drinksAdminClient()
     const auth = await requireStaff(req, sb)
     if (auth.error) return res.status(auth.status).json({ error: auth.error })
 

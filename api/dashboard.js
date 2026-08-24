@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { requireStaff as checkStaff } from './_requireStaff.js'
+import { drinksAdminClient } from './_supabaseAdmin.js'
 import { isSupplierVenda } from './_supplierVenda.js'
 import {
   monthDashboardStats,
@@ -8,13 +8,6 @@ import {
   saleMonthKey,
   pedidoMonthKey,
 } from './_dashboardMonth.js'
-
-function adminClient() {
-  const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 function lastMonths(n = 6) {
   const out = []
@@ -30,7 +23,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const admin = adminClient()
+    const admin = drinksAdminClient()
     const auth = await checkStaff(req, admin)
     if (auth.error) return res.status(auth.status).json({ error: auth.error })
 

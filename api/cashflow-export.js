@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
 import { fixAtomicReceivables, revertAtomicPedidosToJune } from './_atomicJuneFix.js'
 import { isSupplierVenda } from './_supplierVenda.js'
 import { requireStaff, requireStaffOrTrustedOrigin } from './_requireStaff.js'
+import { drinksAdminClient } from './_supabaseAdmin.js'
 
 const BUCKET = 'system-private'
 const FILE = 'cashflow_snapshot.json'
@@ -12,13 +12,6 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
 ]
-
-function adminClient() {
-  const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-}
 
 async function buildLiveSnapshot(sb) {
   const today = new Date().toISOString().slice(0, 10)
@@ -105,7 +98,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const sb = adminClient()
+    const sb = drinksAdminClient()
 
     if (req.query.revertPedidosJune === '1' || req.query.fixAtomicJune === '1') {
       const auth = await requireStaff(req, sb)
