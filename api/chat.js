@@ -1,5 +1,7 @@
 import { setCorsHeaders, handleCorsPreflight } from './_cors.js'
 import { geminiGenerate } from './_gemini.js'
+import { requireStaffOrTrustedOrigin } from './_requireStaff.js'
+import { drinksAdminClient } from './_supabaseAdmin.js'
 
 function extractText(data) {
   return data.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''
@@ -23,6 +25,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    const admin = drinksAdminClient()
+    const auth = await requireStaffOrTrustedOrigin(req, admin)
+    if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
 
     if (body.module === 'seikyusho') {

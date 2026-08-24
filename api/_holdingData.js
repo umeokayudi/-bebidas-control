@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
+import { DRINKS_SUPABASE_URL } from './_supabaseAdmin.js'
 
 const HOLDING_URL = process.env.HOLDING_SUPABASE_URL || 'https://fxsakrshmldmkdmbevna.supabase.co'
-const DRINKS_URL = process.env.VITE_SUPABASE_URL || 'https://ojirgkqtqvugqktyuhem.supabase.co'
+const rawDrinksUrl = process.env.VITE_SUPABASE_URL || ''
+const DRINKS_URL = /^https:\/\/[a-z0-9]+\.supabase\.co/i.test(rawDrinksUrl) ? rawDrinksUrl : DRINKS_SUPABASE_URL
 const BUCKET = 'system-private'
 const KEY_FILE = 'holding_service_role_key.txt'
 

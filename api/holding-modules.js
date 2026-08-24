@@ -1,11 +1,16 @@
 import { setCorsHeaders, handleCorsPreflight } from './_cors.js'
 import { holdingAdminClient, fetchAllHoldingModules } from './_holdingData.js'
+import { requireStaffOrTrustedOrigin } from './_requireStaff.js'
+import { drinksAdminClient } from './_supabaseAdmin.js'
 
 export default async function handler(req, res) {
   if (handleCorsPreflight(req, res)) return
   setCorsHeaders(req, res)
 
   try {
+    const auth = await requireStaffOrTrustedOrigin(req, drinksAdminClient())
+    if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
     const sb = await holdingAdminClient()
 
     if (req.method === 'GET') {

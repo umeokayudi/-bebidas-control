@@ -26,8 +26,13 @@ const CATEGORY_DAYS = {
 
 export function parsePaymentTerms(pagamento = '') {
   const p = String(pagamento).toLowerCase()
-  if (/60/.test(p)) return { mode: 'deferred', days: 60, label: 'Fatura 60 dias' }
-  if (/30|invoice|fatura/.test(p)) return { mode: 'deferred', days: 30, label: 'Fatura 30 dias' }
+  const dayOfMonth = p.match(/dia\s*(\d{1,2})/i) || p.match(/day\s*(\d{1,2})/i) || p.match(/every\s*(\d{1,2})/i)
+  if (dayOfMonth) {
+    const n = +dayOfMonth[1]
+    return { mode: 'deferred', days: 30, paymentDay: n, label: `Dia ${n} do mês` }
+  }
+  if (/60/.test(p)) return { mode: 'deferred', days: 60, paymentDay: 60, label: 'Fatura 60 dias' }
+  if (/30|invoice|fatura/.test(p)) return { mode: 'deferred', days: 30, paymentDay: 30, label: 'Fatura 30 dias' }
   if (/transfer|bank|transferência/.test(p)) return { mode: 'deferred', days: 7, label: 'Transferência (~7d)' }
   if (/card|cartão|credit|debit/.test(p)) return { mode: 'immediate', days: 0, label: 'Cartão (imediato)' }
   if (/cash|dinheiro|à vista|avista/.test(p)) return { mode: 'immediate', days: 0, label: 'À vista' }

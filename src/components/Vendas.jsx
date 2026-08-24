@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
-import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, SectionTitle, DelBtn, MetricCard, isSupplierProduct, filterSupplierVendas } from './utils'
+import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, DelBtn, isSupplierProduct, filterSupplierVendas } from './utils'
+import { AdminPage, PortalSurface, PortalKpi } from './ui/PageLayout'
 
 export default function VendasTab() {
   const { user } = useAuth()
@@ -73,9 +74,8 @@ export default function VendasTab() {
   }
 
   return (
-    <div className="fade-in">
-      <div className="card">
-        <SectionTitle>Register sale</SectionTitle>
+    <AdminPage title="Vendas" subtitle="Entregas e receita dos bars">
+      <PortalSurface title="Registrar venda">
         <div className="grid3" style={{ marginBottom: 12 }}>
           <div><label className="form-label">Data</label>
             <input type="date" value={form.data} onChange={e=>setF('data',e.target.value)} /></div>
@@ -120,31 +120,31 @@ export default function VendasTab() {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ fontSize:14 }}>Total: <strong>{fmtYen(totalVendaForm)}</strong></div>
           <button className="btn-primary" onClick={saveVenda} disabled={saving}>
-            {saving ? <><span className="spinner" />Saving...</> : 'Save sale'}
+            {saving ? <><span className="spinner" />Salvando...</> : 'Salvar venda'}
           </button>
         </div>
-      </div>
+      </PortalSurface>
 
-      <div className="card">
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
-          <SectionTitle style={{ margin:0 }}>Sales history</SectionTitle>
+      <PortalSurface
+        title="Histórico"
+        headerRight={
           <div style={{ display:'flex', gap:8 }}>
             <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{ width:'auto' }}>
-              <option value="">All months</option>
+              <option value="">Todos os meses</option>
               {months.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
             <select value={filterBar} onChange={e=>setFilterBar(e.target.value)} style={{ width:'auto' }}>
-              <option value="">All bars</option>
+              <option value="">Todos os bars</option>
               {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
           </div>
+        }
+      >
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:14 }}>
+          <PortalKpi label="Total vendido" value={fmtYen(totalReceita)} color="var(--blue)" />
         </div>
 
-        <div style={{ marginBottom:14 }}>
-          <MetricCard label="Total vendido" value={fmtYen(totalReceita)} color="var(--blue)" />
-        </div>
-
-        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="No sales recorded" /> : (
+        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="Nenhuma venda registrada" /> : (
           <table>
             <thead>
               <tr><th>Data</th><th>Bar</th><th>Itens</th><th>Total</th><th>Obs</th><th></th></tr>
@@ -170,7 +170,7 @@ export default function VendasTab() {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
+      </PortalSurface>
+    </AdminPage>
   )
 }

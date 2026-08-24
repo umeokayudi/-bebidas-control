@@ -1,0 +1,441 @@
+{
+  "geradoEm": "2026-08-24T04:56:22.933Z",
+  "fornecedores": {
+    "miraido": "Felicity (miraido-onlineshop.com)",
+    "liquorMountain": "Liquor Mountain",
+    "leVin": "Le Vin"
+  },
+  "produtos": [
+    {
+      "produto": "Red Bull",
+      "volumeJul": 336,
+      "liquorMountain": {
+        "zeibetsu": 178,
+        "zeikomi": 196,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Asahi Beer 330ml",
+      "volumeJul": 150,
+      "liquorMountain": {
+        "zeibetsu": 203,
+        "zeikomi": 224,
+        "pack": 30
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Heineken 330ml",
+      "volumeJul": 144,
+      "liquorMountain": {
+        "zeibetsu": 258,
+        "zeikomi": 283,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Corona Extra 355ml",
+      "volumeJul": 120,
+      "liquorMountain": {
+        "zeibetsu": 260,
+        "zeikomi": 286,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Water 500ml",
+      "volumeJul": 96,
+      "liquorMountain": {
+        "zeibetsu": 49,
+        "zeikomi": 54,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Estrella Damm 330ml",
+      "volumeJul": 72,
+      "liquorMountain": {
+        "zeibetsu": 232,
+        "zeikomi": 255,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Guiness Beer",
+      "volumeJul": 72,
+      "liquorMountain": {
+        "zeibetsu": 250,
+        "zeikomi": 275,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Orange Juice",
+      "volumeJul": 48,
+      "liquorMountain": {
+        "zeibetsu": 338,
+        "zeikomi": 372,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Tonic Water",
+      "volumeJul": 48,
+      "liquorMountain": {
+        "zeibetsu": 115,
+        "zeikomi": 127,
+        "pack": 24
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Soda Water 500ml",
+      "volumeJul": 36,
+      "liquorMountain": {
+        "zeibetsu": 115,
+        "zeikomi": 127,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Hennessy V.S",
+      "volumeJul": 24,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 4042
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Pineapple Juice",
+      "volumeJul": 24,
+      "liquorMountain": {
+        "zeibetsu": 338,
+        "zeikomi": 372,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Coca Cola 700ml",
+      "volumeJul": 20,
+      "liquorMountain": {
+        "zeibetsu": 148,
+        "zeikomi": 163,
+        "pack": 20
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Veuve Clicquot Rose",
+      "volumeJul": 19,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 7873
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Cranberry Juice",
+      "volumeJul": 18,
+      "liquorMountain": {
+        "zeibetsu": 498,
+        "zeikomi": 548,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Jasmine Tea (caixa 6)",
+      "volumeJul": 18,
+      "liquorMountain": {
+        "zeibetsu": 180,
+        "zeikomi": 198,
+        "pack": 6
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Veuve Clicquot Brut",
+      "volumeJul": 18,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 6823
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Moet Rosé",
+      "volumeJul": 17,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 6823
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Baileys",
+      "volumeJul": 13,
+      "liquorMountain": {
+        "zeibetsu": 1850,
+        "zeikomi": 2035,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Malibu",
+      "volumeJul": 13,
+      "liquorMountain": {
+        "zeibetsu": 1350,
+        "zeikomi": 1485,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Cuervo 1800 Añejo",
+      "volumeJul": 12,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 7873
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Moet Brut",
+      "volumeJul": 12,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 5774
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Grey Goose",
+      "volumeJul": 9,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 472
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Moet NIR",
+      "volumeJul": 7,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 8398
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Chandon Brut",
+      "volumeJul": 6,
+      "liquorMountain": {
+        "zeibetsu": 2480,
+        "zeikomi": 2728,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Fireball",
+      "volumeJul": 6,
+      "liquorMountain": {
+        "zeibetsu": 1880,
+        "zeikomi": 2068,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Green Tea",
+      "volumeJul": 6,
+      "liquorMountain": {
+        "zeibetsu": 120,
+        "zeikomi": 132,
+        "pack": 6
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Uron Tea",
+      "volumeJul": 6,
+      "liquorMountain": {
+        "zeibetsu": 120,
+        "zeikomi": 132,
+        "pack": 6
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Water 2L (case 6)",
+      "volumeJul": 6,
+      "liquorMountain": {
+        "zeibetsu": 100,
+        "zeikomi": 110,
+        "pack": 6
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Jägermeister",
+      "volumeJul": 5,
+      "liquorMountain": {
+        "zeibetsu": 1980,
+        "zeikomi": 2178,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Mango Juice",
+      "volumeJul": 4,
+      "liquorMountain": {
+        "zeibetsu": 398,
+        "zeikomi": 438,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Yamazaki 12 Year",
+      "volumeJul": 4,
+      "liquorMountain": {
+        "zeibetsu": 13800,
+        "zeikomi": 15180,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Wilkson Vodka 1800 Ml",
+      "volumeJul": 3,
+      "liquorMountain": {
+        "zeibetsu": 1880,
+        "zeikomi": 2068,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Hakushu",
+      "volumeJul": 2,
+      "liquorMountain": {
+        "zeibetsu": 13000,
+        "zeikomi": 14300,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Nikka Black 4L",
+      "volumeJul": 2,
+      "liquorMountain": {
+        "zeibetsu": 3780,
+        "zeikomi": 4158,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Shochu 4L",
+      "volumeJul": 2,
+      "liquorMountain": {
+        "zeibetsu": 2350,
+        "zeikomi": 2585,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Suntory Lime",
+      "volumeJul": 2,
+      "liquorMountain": {
+        "zeibetsu": 718,
+        "zeikomi": 790,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Wilkinson Gin 1.8L",
+      "volumeJul": 2,
+      "liquorMountain": {
+        "zeibetsu": 1880,
+        "zeikomi": 2068,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    },
+    {
+      "produto": "Dom Perignon Brut",
+      "volumeJul": 1,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 25194
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Krug Brut",
+      "volumeJul": 1,
+      "liquorMountain": null,
+      "leVin": {
+        "zeikomi": 31508
+      },
+      "miraido": null
+    },
+    {
+      "produto": "Suntory Cocktail Lemon",
+      "volumeJul": 1,
+      "liquorMountain": {
+        "zeibetsu": 608,
+        "zeikomi": 669,
+        "pack": 1
+      },
+      "leVin": null,
+      "miraido": null
+    }
+  ]
+}

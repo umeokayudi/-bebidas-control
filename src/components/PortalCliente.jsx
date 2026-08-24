@@ -4,6 +4,7 @@ import { useAuth } from './Auth'
 import { callGeminiChat, imageDataUrlToParts, parseJsonFromAI } from '../lib/ai'
 import { HOLDING_DRINKS } from '../lib/holdingLinks'
 import { LogoSidebar } from './Logo'
+import { MobileTopBar, ShellOverlay, useMobileMenuLock } from './MobileShell'
 import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, isSupplierProduct, filterSupplierVendas, PedidoItemChip } from './utils'
 import {
   analyzePurchases,
@@ -599,7 +600,7 @@ function OrdersTab({ bar }) {
   async function load() {
     const [pR, pedR] = await Promise.all([
       supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
-      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*))').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
+      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(nome,preco_venda,categoria,volume_ml))').eq('bar_id', bar.id).order('criado_em', { ascending:false }).limit(50),
     ])
     setProdutos((pR.data || []).filter(isSupplierProduct))
     setPedidos(pedR.data || [])
@@ -1853,7 +1854,7 @@ function FaturasTab({ bar }) {
 
   async function load() {
     const [fR, vR, pR] = await Promise.all([
-      supabase.from("faturas").select("*").eq("bar_id", bar.id).order("vencimento", { ascending:false }),
+      supabase.from("faturas").select("*").eq("bar_id", bar.id).order("data_vencimento", { ascending:false }),
       supabase.from("vendas").select("total,data").eq("bar_id", bar.id).order("data", { ascending:false }),
       supabase.from("fatura_pagamentos").select("*").order("criado_em", { ascending:false }),
     ])
@@ -1916,7 +1917,7 @@ function FaturasTab({ bar }) {
   const pending = filtered.filter(f=>f.status!=="pago")
   const totalPending = pending.reduce((a,f)=>a+(+f.valor||0)-(+f.pago||0),0)
   const overdue = pending.filter(f=>new Date(f.data_vencimento)<new Date())
-  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.vencimento))
+  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.data_vencimento))
   const monthlySpend = []
   const monthLabels = []
   for (let i=5; i>=0; i--) {
@@ -2167,7 +2168,7 @@ function CalendarioTab({ bar }) {
   })
 
   const upcoming = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento>=today.toISOString().slice(0,10))
-    .sort((a,b)=>a.data_vencimento.localeCompare(b.vencimento))
+    .sort((a,b)=>a.data_vencimento.localeCompare(b.data_vencimento))
 
   if (loading) return <Spinner text="Loading..." />
 
@@ -2269,6 +2270,14 @@ import { NotificationBell } from './Notifications'
 
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
   const [tab, setTab] = useState('home')
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  useMobileMenuLock(menuOpen)
+
+  function selectTab(id) {
+    setTab(id)
+    setMenuOpen(false)
+  }
 
   const NAV = [
     { id:'home',       label:'Home',       icon:'🏠' },
@@ -2283,47 +2292,49 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   ]
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh', background:'var(--bg)' }}>
-      <aside className="sidebar">
-        <div style={{padding:'24px 20px 20px',borderBottom:'1px solid rgba(193,156,86,0.15)'}}>
+    <div className="app-shell">
+      <ShellOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <MobileTopBar
+        open={menuOpen}
+        onToggle={() => setMenuOpen(o => !o)}
+        title={<div className="logo-mobile-header"><span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>{bar.nome}</span></div>}
+      >
+        <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
+      </MobileTopBar>
+
+      <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
+        <div className="sidebar-brand">
           <LogoSidebar />
         </div>
-        <div style={{padding:'12px 0',flex:1}}>
+        <nav className="sidebar-nav">
           {NAV.map(n => (
-            <button key={n.id} onClick={() => setTab(n.id)} style={{
-              display:'flex', alignItems:'center', gap:10,
-              padding:'10px 20px', background: tab===n.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-              border:'none', color: tab===n.id ? 'white' : 'rgba(255,255,255,0.55)',
-              fontSize:13, fontWeight: tab===n.id ? 700 : 400,
-              cursor:'pointer', textAlign:'left', width:'100%',
-              borderLeft: tab===n.id ? '3px solid var(--gold)' : '3px solid transparent',
-              transition:'all 0.15s'
-            }}>
-              <span>{n.icon}</span>{n.label}
+            <button key={n.id} onClick={() => selectTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
+              <span>{n.icon}</span>
+              <span>{n.label}</span>
             </button>
           ))}
-        </div>
-        <div style={{padding:'16px 20px',borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+        </nav>
+        <div className="sidebar-footer">
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Client portal</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
-          <a href={HOLDING_DRINKS} target="_blank" rel="noreferrer" style={{display:'block',fontSize:11,color:'rgba(255,255,255,0.55)',marginBottom:10,textDecoration:'none',padding:'8px 10px',borderRadius:8,border:'1px solid rgba(193,156,86,0.25)',background:'rgba(193,156,86,0.08)'}}>
+          <a href={HOLDING_DRINKS} target="_blank" rel="noreferrer" className="sidebar-link">
             ↗ JBM Holding — visão consolidada
           </a>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>
             Estoque, preços POS e faturas sincronizados com o painel admin JBM.
           </div>
-          <div style={{marginBottom:8}}>
-            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={setTab}/>
+          <div className="sidebar-footer-notifs">
+            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
-          <button onClick={signOut} style={{width:'100%',padding:'7px',fontSize:11,color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,background:'transparent',textTransform:'uppercase',letterSpacing:'0.04em'}}>Sign out</button>
+          <button onClick={signOut} className="sidebar-signout">Sign out</button>
         </div>
       </aside>
-      <main style={{flex:1,padding:'28px 32px',overflowY:'auto',maxWidth:1100}}>
-        {tab==='home'       && <HomeTab bar={bar} onTab={setTab} />}
-        {tab==='analytics'  && <ClientAnalyticsTab bar={bar} onTab={setTab} />}
+      <main className="app-main app-main-wide">
+        {tab==='home'       && <HomeTab bar={bar} onTab={selectTab} />}
+        {tab==='analytics'  && <ClientAnalyticsTab bar={bar} onTab={selectTab} />}
         {tab==='orders'     && <OrdersTab bar={bar} />}
         {tab==='deliveries' && <DeliveriesTab bar={bar} />}
-        {tab==='inventory'  && <InventoryTab bar={bar} onOrder={()=>setTab('orders')} />}
+        {tab==='inventory'  && <InventoryTab bar={bar} onOrder={()=>selectTab('orders')} />}
         {tab==='pricing'    && <PricingTab bar={bar} />}
         {tab==='menu'       && <MenuTab bar={bar} />}
         {tab==='faturas'    && <FaturasTab bar={bar} />}
