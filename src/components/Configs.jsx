@@ -515,8 +515,9 @@ export function PedidosAdminTab() {
         await supabase.from('pedidos').update({status}).eq('id',id)
         await supabase.from('notificacoes').insert({
           user_id:pedido.criado_por,tipo:'pedido_entregue',
-          titulo:'Order delivered',
-          mensagem:'Delivered. Total: \u00a5'+Math.round(pedido.total_estimado).toLocaleString()
+          titulo:'Pedido entregue',
+          mensagem:'Entregue. Total: \u00a5'+Math.round(pedido.total_estimado).toLocaleString(),
+          link:'pedidos',
         }).catch(()=>{})
         const saleDate = pedidoSaleDate(pedido)
         const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
@@ -541,7 +542,7 @@ export function PedidosAdminTab() {
       const pedido=pedidos.find(p=>p.id===id)
       if(pedido) await supabase.from('notificacoes').insert({
         user_id:pedido.criado_por,tipo:'pedido_confirmado',
-        titulo:'Order confirmed',mensagem:'Your order is being prepared.'
+        titulo:'Pedido confirmado',mensagem:'Seu pedido está sendo preparado.',link:'pedidos',
       }).catch(()=>{})
     }
     setPedidos(prev => prev.map(p => p.id===id ? {...p, status} : p))
@@ -567,7 +568,7 @@ export function PedidosAdminTab() {
     try {
       const venda = await registerVendaForPedido(pedido)
       await supabase.from("pedidos").update({status:"entregue"}).eq("id",id)
-      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Order delivered",mensagem:`Delivered · ¥${Math.round(venda.total||0).toLocaleString()} · ${venda.data}`}).catch(()=>{})
+      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Pedido entregue",mensagem:`Entregue · ¥${Math.round(venda.total||0).toLocaleString()} · ${venda.data}`,link:"pedidos"}).catch(()=>{})
 
       const saleDate = pedidoSaleDate(pedido)
       const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)

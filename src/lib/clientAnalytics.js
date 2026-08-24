@@ -1,4 +1,5 @@
 import { filterSupplierVendas } from '../components/utils'
+import { filterJbmDrinksFaturas, faturaPago, faturaValor, faturaVencimento } from './barPortal'
 
 export function buildPricingMap(barPricing = []) {
   const map = {}
@@ -28,6 +29,7 @@ export function projectItemRevenue(item, pricingMap) {
       margin: posTotal - jbmTotal,
       marginPct: posTotal > 0 ? Math.round((posTotal - jbmTotal) / posTotal * 100) : 0,
       source: 'pos',
+      sourceLabel: 'preço POS cadastrado',
       drinks,
       preco_drink: pr.preco_drink,
       drinks_por_garrafa: pr.drinks_por_garrafa,
@@ -42,6 +44,7 @@ export function projectItemRevenue(item, pricingMap) {
     margin: posTotal - jbmTotal,
     marginPct: posTotal > 0 ? Math.round((posTotal - jbmTotal) / posTotal * 100) : 0,
     source: 'estimate',
+    sourceLabel: 'estimativa (sem preço POS)',
     drinks: qtd,
     preco_drink: bottlePos,
     drinks_por_garrafa: 1,
@@ -127,19 +130,19 @@ export function monthlyAccountSummary(vendas, faturas, monthKey) {
 
   const growth = contaPrev > 0 ? Math.round((contaMes - contaPrev) / contaPrev * 100) : null
 
-  const barFaturas = (faturas || []).filter(f =>
+  const barFaturas = filterJbmDrinksFaturas(faturas).filter(f =>
     f.data_emissao?.startsWith(monthKey) ||
-    f.data_vencimento?.startsWith(monthKey) ||
+    faturaVencimento(f)?.startsWith(monthKey) ||
     (f.periodo_inicio?.startsWith(monthKey) || f.periodo_fim?.startsWith(monthKey))
   )
 
   const faturaPendente = barFaturas
     .filter(f => f.status !== 'pago')
-    .reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
+    .reduce((a, f) => a + Math.max(0, faturaValor(f) - faturaPago(f)), 0)
 
   const faturaPaga = barFaturas
     .filter(f => f.status === 'pago')
-    .reduce((a, f) => a + (+f.pago || +f.valor || +f.total || 0), 0)
+    .reduce((a, f) => a + (faturaPago(f) || faturaValor(f)), 0)
 
   return {
     contaMes,

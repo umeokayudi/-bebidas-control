@@ -1603,3 +1603,29 @@ html[data-layout="mobile"] .metric-card-hover:hover {
     background: white; z-index: 9999;
   }
 }
+
+/* Portal cliente — grids responsivos */
+@media (max-width: 900px) {
+  .portal-page .portal-grid-hero {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .portal-page .portal-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .portal-page .portal-grid-2,
+  .portal-page .portal-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .portal-page .form-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .portal-page .portal-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
