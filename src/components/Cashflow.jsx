@@ -13,6 +13,7 @@ export default function Cashflow() {
       wide
       actions={
         <PortalPills
+          scrollable
           options={[['overview','📊 Visão geral'],['in','💚 Entradas'],['out','🔴 Saídas'],['purchases','🛒 Compras'],['holding','🏛 JBM Holding'],['caixa','💵 Caixa'],['calendario','📅 Calendário']]}
           value={tab}
           onChange={setTab}

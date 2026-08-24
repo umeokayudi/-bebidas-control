@@ -139,7 +139,7 @@ function Dashboard({ onNav }) {
     label: monthLabel(row.month).split('/')[0],
     month: monthLabel(row.month),
     value: row.lucro,
-    tip: `${monthLabel(row.month)} · Lucro ${fmtYen(row.lucro)} · Rec. ${fmtYen(row.receita)} · Compras ${fmtYen(row.compras)}`,
+    tip: `${monthLabel(row.month)} · Lucro proj. ${fmtYen(row.lucro)} · Fat. ${fmtYen(row.faturamento || row.receita)} · Compras ${fmtYen(row.compras)}`,
   }))
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text2)' }}><span className="spinner" />Carregando...</div>
@@ -154,9 +154,9 @@ function Dashboard({ onNav }) {
         title="Dashboard"
         subtitle={`${isCurrentMonth ? 'Mês atual' : 'Histórico'} · ${monthLabel(selMonth)}`}
         actions={(
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Mês</span>
-            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ width: 'auto', minWidth: 120 }}>
+          <div className="page-header-actions">
+            <span className="page-header-actions-label">Mês</span>
+            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} className="page-header-select">
               {(data?.months || []).map(mon => <option key={mon} value={mon}>{monthLabel(mon)}</option>)}
             </select>
           </div>
@@ -172,12 +172,22 @@ function Dashboard({ onNav }) {
         </PortalAlert>
       )}
 
-      <div className="portal-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
+      <div className="portal-hero-grid">
         <PortalHero
-          label={`Lucro · ${monthLabel(selMonth)}`}
-          value={fmtYen(m.lucro)}
-          sub={`Margem ${m.margem}% · receita ${fmtYen(m.receita)} − compras ${fmtYen(m.compras)}`}
+          label={`Lucro projetado · ${monthLabel(selMonth)}`}
+          value={fmtYen(m.lucroProjetado ?? m.lucro)}
+          sub={`Margem ${m.margem}% · faturamento ${fmtYen(m.faturamento ?? m.receita)} − compras ${fmtYen(m.compras)}`}
           onClick={() => goToReport(onNav, selMonth)}
+        />
+        <PortalKpi
+          label="Faturamento"
+          value={fmtYen(m.faturamento ?? m.receita)}
+          sub={m.receita > 0 && m.faturamento !== m.receita
+            ? `${fmtYen(m.receita)} já recebido`
+            : `${m.vendasCount} entrega(s) · cobrança do mês`}
+          color="var(--navy)"
+          onClick={() => onNav('faturas')}
+          hint="Ver faturas →"
         />
         <PortalKpi
           label="A receber"
@@ -188,24 +198,16 @@ function Dashboard({ onNav }) {
           hint="Ver faturas →"
         />
         <PortalKpi
-          label="Compras (notas)"
-          value={fmtYen(m.compras)}
-          sub={`${m.comprasCount} nota(s) pagas`}
-          color="var(--red)"
-          onClick={() => goToReport(onNav, selMonth)}
-          hint="Detalhe no Relatório →"
-        />
-        <PortalKpi
-          label="Receita"
-          value={fmtYen(m.receita)}
-          sub={`${m.vendasCount} entrega(s)`}
-          color="var(--navy)"
+          label="Margem projetada"
+          value={`${m.margem}%`}
+          sub={`Compras ${fmtYen(m.compras)} · ${m.comprasCount} nota(s)`}
+          color={m.margem >= 20 ? 'var(--green)' : m.margem > 0 ? 'var(--amber)' : 'var(--red)'}
           onClick={() => goToReport(onNav, selMonth)}
           hint="Detalhe no Relatório →"
         />
       </div>
 
-      <PortalSurface title="Lucro — últimos 6 meses" sub="Receita − compras pagas (valores das notas)">
+      <PortalSurface title="Lucro projetado — últimos 6 meses" sub="Faturamento − compras pagas (notas)">
         <BarChart data={lucroChart} color="#1a6b4a" height={72} />
       </PortalSurface>
 

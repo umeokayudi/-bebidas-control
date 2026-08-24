@@ -64,9 +64,9 @@ export function PortalSurface({ title, sub, children, style, headerRight }) {
   )
 }
 
-export function PortalPills({ options, value, onChange }) {
+export function PortalPills({ options, value, onChange, scrollable }) {
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div className={scrollable ? 'portal-pills-scroll' : undefined} style={scrollable ? undefined : { display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {options.map(([id, label]) => (
         <button
           key={id}

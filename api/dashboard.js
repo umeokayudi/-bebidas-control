@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { isSupplierVenda } from './_supplierVenda.js'
-import { aReceberForMonth } from './_faturasMonth.js'
+import { aReceberForMonth, faturamentoForMonth } from './_faturasMonth.js'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -37,6 +37,37 @@ function lastMonths(n = 6) {
   return out
 }
 
+function faturaMonthKeys(faturas) {
+  const keys = []
+  for (const f of faturas || []) {
+    const start = monthKey(f.periodo_inicio || f.data_emissao)
+    const end = monthKey(f.periodo_fim || f.data_vencimento || start)
+    if (start) keys.push(start)
+    if (end && end !== start) keys.push(end)
+  }
+  return keys
+}
+
+function monthStats(m, vendas, compras, faturas) {
+  const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
+  const comprasTotal = (compras || []).filter(c => monthKey(c.data) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
+  const faturamentoFaturas = faturamentoForMonth(faturas, m)
+  const faturamento = faturamentoFaturas || receita
+  const lucroProjetado = faturamento - comprasTotal
+  const aReceber = aReceberForMonth(faturas, m)
+  return {
+    receita,
+    faturamento,
+    compras: comprasTotal,
+    lucro: receita - comprasTotal,
+    lucroProjetado,
+    margem: faturamento > 0 ? Math.round(lucroProjetado / faturamento * 100) : 0,
+    vendasCount: vendas.filter(v => saleMonthKey(v) === m).length,
+    comprasCount: (compras || []).filter(c => monthKey(c.data) === m).length,
+    aReceber,
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -59,29 +90,18 @@ export default async function handler(req, res) {
     const months = [...new Set([
       ...(compras || []).map(c => monthKey(c.data)),
       ...vendas.map(saleMonthKey),
+      ...faturaMonthKeys(faturas),
     ])].filter(Boolean).sort().reverse()
 
     const chart = chartMonths.map(m => {
-      const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
-      const comprasTotal = (compras || []).filter(c => monthKey(c.data) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
-      return { month: m, receita, compras: comprasTotal, lucro: receita - comprasTotal }
+      const s = monthStats(m, vendas, compras, faturas)
+      return { month: m, receita: s.receita, faturamento: s.faturamento, compras: s.compras, lucro: s.lucroProjetado }
     })
 
     const byMonth = {}
-    for (const m of months) {
-      const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
-      const comprasTotal = (compras || []).filter(c => monthKey(c.data) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
-      const lucro = receita - comprasTotal
-      const aReceber = aReceberForMonth(faturas, m)
-      byMonth[m] = {
-        receita,
-        compras: comprasTotal,
-        lucro,
-        margem: receita > 0 ? Math.round(lucro / receita * 100) : 0,
-        vendasCount: vendas.filter(v => saleMonthKey(v) === m).length,
-        comprasCount: (compras || []).filter(c => monthKey(c.data) === m).length,
-        aReceber,
-      }
+    const allMonths = [...new Set([...months, ...chartMonths])]
+    for (const m of allMonths) {
+      byMonth[m] = monthStats(m, vendas, compras, faturas)
     }
 
     return res.status(200).json({ months, chart, byMonth, pedidosPendentes: pedidosPendentes || 0 })
