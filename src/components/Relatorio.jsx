@@ -4,7 +4,7 @@ import { fmtYen, monthKey, monthLabel, fmtDate, Spinner, Empty, filterSupplierVe
 import { aggregateComprasItens } from '../lib/marginCost'
 import { barCreditsForMonth, barCreditsList } from '../lib/barCredits'
 import { aReceberForMonth, faturasAbertasMes } from '../lib/faturasMonth'
-import { ryoshushoForMonth, ryoshushoMonthShare } from '../lib/reportPeriod'
+import { ryoshushoForMonth, ryoshushoMonthShare, ryoshushoPeriodSplit } from '../lib/reportPeriod'
 import { loadAllCompras } from '../lib/loadCompras'
 import { loadDashboard } from '../lib/loadDashboard'
 import ComprasNotasSection from './ComprasNotasSection'
@@ -194,21 +194,28 @@ export default function RelatorioTab() {
           <Empty text="Nenhum 領収書 neste mês" />
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 12, fontSize: 13 }}>
               <span>Parte do mês: <strong style={{ color: 'var(--gold)' }}>{fmtYen(ryoTotal)}</strong></span>
-              <span>Receita: <strong>{fmtYen(receitaTotal)}</strong></span>
+              <span>Faturamento: <strong>{fmtYen(faturamento)}</strong></span>
             </div>
+            <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px', lineHeight: 1.55 }}>
+              領収書 é o recibo de recebimento (entregas). Faturamento vem da fatura do mês — são documentos diferentes.
+              Se o recibo cobre mais de um mês, a coluna abaixo mostra só a fatia proporcional deste mês.
+            </p>
             {ryoMes.map(r => {
-              const share = ryoshushoMonthShare(r, selMonth)
+              const split = ryoshushoPeriodSplit(r, selMonth)
               const bar = bars.find(b => b.id === r.bar_id)
               return (
                 <div key={r.id} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', marginBottom: 6, fontSize: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                     <span>{bar?.nome || '—'} · {r.numero || '—'}</span>
-                    <span style={{ color: 'var(--gold)' }}>{fmtYen(share)}</span>
+                    <span style={{ color: 'var(--gold)' }}>{fmtYen(split.share)}</span>
                   </div>
                   <div style={{ color: 'var(--text2)', marginTop: 2 }}>
                     {fmtDate(r.periodo_inicio)} – {fmtDate(r.periodo_fim)}
+                    {split.multiMonth && split.share !== split.total && (
+                      <> · total do recibo {fmtYen(split.total)} ({split.overlapDays}/{split.periodDays} dias neste mês)</>
+                    )}
                   </div>
                 </div>
               )

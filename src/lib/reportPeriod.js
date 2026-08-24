@@ -19,11 +19,17 @@ export function ryoshushoForMonth(ryoshusho, selMonth) {
 
 /** Receita coberta por um ryoshusho no mês (proporcional se período > 1 mês) */
 export function ryoshushoMonthShare(r, selMonth) {
+  return ryoshushoPeriodSplit(r, selMonth).share
+}
+
+/** Detalhe da alocação proporcional (para exibir no relatório) */
+export function ryoshushoPeriodSplit(r, selMonth) {
   const total = +r.total || 0
-  if (!total) return 0
   const ini = r.periodo_inicio || r.data_emissao
   const fim = r.periodo_fim || r.data_emissao || ini
-  if (!ini) return total
+  if (!total || !ini) {
+    return { share: total, total, overlapDays: 0, periodDays: 0, multiMonth: false }
+  }
 
   const [y, m] = selMonth.split('-').map(Number)
   const monthStart = new Date(y, m - 1, 1)
@@ -32,9 +38,18 @@ export function ryoshushoMonthShare(r, selMonth) {
   const periodEnd = new Date(fim + 'T12:00:00')
   const overlapStart = new Date(Math.max(monthStart, periodStart))
   const overlapEnd = new Date(Math.min(monthEnd, periodEnd))
-  if (overlapEnd < overlapStart) return 0
+  if (overlapEnd < overlapStart) {
+    return { share: 0, total, overlapDays: 0, periodDays: 0, multiMonth: ini.slice(0, 7) !== fim.slice(0, 7) }
+  }
 
   const periodDays = Math.max(1, Math.round((periodEnd - periodStart) / 86400000) + 1)
   const overlapDays = Math.max(1, Math.round((overlapEnd - overlapStart) / 86400000) + 1)
-  return Math.round(total * overlapDays / periodDays)
+  const multiMonth = ini.slice(0, 7) !== fim.slice(0, 7)
+  return {
+    share: Math.round(total * overlapDays / periodDays),
+    total,
+    overlapDays,
+    periodDays,
+    multiMonth,
+  }
 }
