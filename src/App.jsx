@@ -176,7 +176,9 @@ function Dashboard({ onNav }) {
         <PortalHero
           label={`Lucro projetado · ${monthLabel(selMonth)}`}
           value={fmtYen(m.lucroProjetado ?? m.lucro)}
-          sub={`Margem ${m.margem}% · faturamento ${fmtYen(m.faturamento ?? m.receita)} − compras ${fmtYen(m.compras)}`}
+          sub={m.comprasEstimadas
+            ? `Margem ${m.margem}% · custo estimado (preços jul/2026) · fat. ${fmtYen(m.faturamento ?? m.receita)}`
+            : `Margem ${m.margem}% · faturamento ${fmtYen(m.faturamento ?? m.receita)} − compras ${fmtYen(m.compras)}`}
           onClick={() => goToReport(onNav, selMonth)}
         />
         <PortalKpi
@@ -200,7 +202,9 @@ function Dashboard({ onNav }) {
         <PortalKpi
           label="Margem projetada"
           value={`${m.margem}%`}
-          sub={`Compras ${fmtYen(m.compras)} · ${m.comprasCount} nota(s)`}
+          sub={m.comprasEstimadas
+            ? `Compras est. ${fmtYen(m.compras)} · preços jul/2026`
+            : `Compras ${fmtYen(m.compras)} · ${m.comprasCount} nota(s)`}
           color={m.margem >= 20 ? 'var(--green)' : m.margem > 0 ? 'var(--amber)' : 'var(--red)'}
           onClick={() => goToReport(onNav, selMonth)}
           hint="Detalhe no Relatório →"

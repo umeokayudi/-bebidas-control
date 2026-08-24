@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { isSupplierVenda } from './_supplierVenda.js'
 import { aReceberForMonth, faturamentoForMonth } from './_faturasMonth.js'
+import { juneStatsFromJulyPrices } from './_juneFromJuly.js'
+
+const JUNE_MONTH = '2026-06'
 
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
@@ -63,14 +66,28 @@ function pedidosFaturamentoForMonth(pedidos, m) {
     .reduce((a, p) => a + (+p.total_estimado || 0), 0)
 }
 
-function monthStats(m, vendas, compras, faturas, pedidos) {
+function monthStats(m, vendas, compras, faturas, pedidos, produtos) {
   const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
-  const comprasTotal = (compras || []).filter(c => compraMonthKey(c) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
+  const comprasMes = (compras || []).filter(c => compraMonthKey(c) === m)
+  const comprasTotal = comprasMes.reduce((a, c) => a + (+c.total_real || 0), 0)
   const faturamentoFaturas = faturamentoForMonth(faturas, m)
   const faturamentoPedidos = pedidosFaturamentoForMonth(pedidos, m)
+  const aReceber = aReceberForMonth(faturas, m)
+
+  if (m === JUNE_MONTH) {
+    return juneStatsFromJulyPrices({
+      compras,
+      pedidos,
+      produtos,
+      faturas,
+      faturamentoFaturas,
+      faturamentoPedidos,
+      aReceber,
+    })
+  }
+
   const faturamento = receita || faturamentoFaturas || faturamentoPedidos
   const lucroProjetado = faturamento - comprasTotal
-  const aReceber = aReceberForMonth(faturas, m)
   return {
     receita,
     faturamento,
@@ -79,7 +96,7 @@ function monthStats(m, vendas, compras, faturas, pedidos) {
     lucroProjetado,
     margem: faturamento > 0 ? Math.round(lucroProjetado / faturamento * 100) : 0,
     vendasCount: vendas.filter(v => saleMonthKey(v) === m).length,
-    comprasCount: (compras || []).filter(c => compraMonthKey(c) === m).length,
+    comprasCount: comprasMes.length,
     aReceber,
   }
 }
@@ -94,11 +111,12 @@ export default async function handler(req, res) {
 
     const chartMonths = lastMonths(6)
 
-    const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { count: pedidosPendentes }] = await Promise.all([
-      admin.from('compras').select('data, data_compra, data_pagamento, total_real').order('data'),
+    const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { data: produtos }, { count: pedidosPendentes }] = await Promise.all([
+      admin.from('compras').select('data, data_compra, data_pagamento, total_real, compras_itens(produto_id, nome, custo_unitario)').order('data'),
       admin.from('vendas').select('data, data_venda, total, obs, origem, cast_id').order('data'),
       admin.from('faturas').select('total, valor, pago, status, periodo_inicio, periodo_fim, data_emissao, data_vencimento, obs'),
-      admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status'),
+      admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status, pedidos_itens(produto_id, nome, qtd, preco_unitario)'),
+      admin.from('produtos').select('id, nome, custo').eq('ativo', true),
       admin.from('pedidos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
     ])
 
@@ -112,14 +130,14 @@ export default async function handler(req, res) {
     ])].filter(Boolean).sort().reverse()
 
     const chart = chartMonths.map(m => {
-      const s = monthStats(m, vendas, compras, faturas, pedidos)
+      const s = monthStats(m, vendas, compras, faturas, pedidos, produtos)
       return { month: m, receita: s.receita, faturamento: s.faturamento, compras: s.compras, lucro: s.lucroProjetado }
     })
 
     const byMonth = {}
     const allMonths = [...new Set([...months, ...chartMonths])]
     for (const m of allMonths) {
-      byMonth[m] = monthStats(m, vendas, compras, faturas, pedidos)
+      byMonth[m] = monthStats(m, vendas, compras, faturas, pedidos, produtos)
     }
 
     return res.status(200).json({ months, chart, byMonth, pedidosPendentes: pedidosPendentes || 0 })
