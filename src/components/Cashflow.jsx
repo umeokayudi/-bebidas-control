@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty, compraDueDate, isCompraOverdue } from './utils'
-import { splitPendingCompras, buildCashflowEvents, pagamentoFor, pagamentoMap } from '../lib/compraPagamentos'
+import { splitPendingCompras, splitPendingFaturas, buildCashflowEvents, pagamentoFor, pagamentoMap } from '../lib/compraPagamentos'
 import { uploadCobrancaDoc, buildCobrancaDocument, downloadTextFile } from '../lib/cobrancaDocs'
 import JbmHoldingPanel from './JbmHoldingPanel'
 import { AdminPage, PortalKpi, PortalSurface, PortalPills } from './ui/PageLayout'
@@ -39,7 +39,7 @@ function CashflowOverview() {
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
   async function load() {
     const [fR, cR, pR, foR] = await Promise.all([
-      supabase.from('faturas').select('*').order('data_vencimento'),
+      supabase.from('faturas').select('*, bars(nome)').order('data_vencimento'),
       supabase.from('compras').select('*').order('data'),
       supabase.from('fatura_pagamentos').select('valor,confirmado,metodo,data').eq('confirmado', false),
       supabase.from('fornecedores').select('nome,pagamento'),
@@ -57,6 +57,7 @@ function CashflowOverview() {
   const { faturas, compras, pagamentosPendentes = [], fornecedores = [] } = data
   const today = new Date().toISOString().slice(0,10)
   const pendingSplit = splitPendingCompras(compras, fornecedores)
+  const faturaSplit = splitPendingFaturas(faturas, today)
 
   // Entradas = valor já recebido dos bars (parcial ou total), não só fatura "paga"
   const paidIn = faturas.reduce((a, f) => a + (+f.pago || 0), 0)
@@ -108,13 +109,46 @@ function CashflowOverview() {
           { label:'Pago (fornec.)', value:fmtYen(paidOut), color:'var(--red)', sub:'notas marcadas pagas' },
           { label:'Caixa líquido', value:fmtYen(netCash), color:netCash>=0?'var(--green)':'var(--red)', sub:'recebido − pago' },
           { label:'A receber', value:fmtYen(pendingIn), color:'var(--amber)', sub:'saldo faturas em aberto' },
+          ...(faturaSplit.overdueTotal > 0 ? [{ label:'Faturas atrasadas', value:fmtYen(faturaSplit.overdueTotal), color:'var(--red)', sub:`${faturaSplit.overdue.length} fatura(s) vencida(s)` }] : []),
           ...(emAnalise > 0 ? [{ label:'Em análise', value:fmtYen(emAnalise), color:'var(--amber)', sub:'Stripe etc. — ainda não creditado' }] : []),
-          ...(overdueOut > 0 ? [{ label:'Atrasado', value:fmtYen(overdueOut), color:'var(--red)', sub:'vencimento já passou (ex. Le Vin)' }] : []),
+          ...(overdueOut > 0 ? [{ label:'A pagar (atrasado)', value:fmtYen(overdueOut), color:'var(--red)', sub:'fornecedor — vencimento passou' }] : []),
           ...(futureOut > 0 ? [{ label:'A pagar', value:fmtYen(futureOut), color:'var(--amber)', sub:'próximos vencimentos' }] : []),
         ].map(k=>(
           <PortalKpi key={k.label} label={k.label} value={k.value} color={k.color} sub={k.sub} />
         ))}
       </div>
+
+      {faturaSplit.overdue.length > 0 && (
+        <PortalSurface title="⚠️ Faturas em atraso — cobrar dos bars" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {faturaSplit.overdue.map(f => (
+              <div key={f.id} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 160 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)' }}>↑ A receber · Atrasada</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtYen(f.amount)}</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{f.bars?.nome || 'Bar'}</div>
+                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(f.dueDate)}</div>
+              </div>
+            ))}
+          </div>
+        </PortalSurface>
+      )}
+
+      {pendingSplit.overdue.length > 0 && (
+        <PortalSurface title="⚠️ Pagamentos atrasados — fornecedores" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {pendingSplit.overdue.map(c => (
+              <div key={c.id} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 160 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)' }}>↓ A pagar · Atrasado</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtYen(c.amount)}</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{c.fornecedor || 'Fornecedor'}</div>
+                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(c.dueDate)}</div>
+                {c.foto_url && <a href={c.foto_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--blue)' }}>📎 Doc</a>}
+              </div>
+            ))}
+          </div>
+        </PortalSurface>
+      )}
+
       {netCash < 0 && pendingIn > Math.abs(netCash) && (
         <PortalSurface title="Por que o caixa está negativo?" style={{ marginBottom: 16 }}>
           <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0, lineHeight: 1.55 }}>
@@ -179,15 +213,34 @@ function MoneyIn() {
     setFaturas(data||[]); setLoading(false)
   }
   if (loading) return <Spinner text="Carregando..." />
+  const today = new Date().toISOString().slice(0, 10)
+  const faturaSplit = splitPendingFaturas(faturas, today)
   const total = faturas.reduce((a,f)=>a+(+f.valor||0),0)
   const paid = faturas.filter(f=>f.status==='pago').reduce((a,f)=>a+(+f.valor||0),0)
   return (
     <div>
+      {faturaSplit.overdue.length > 0 && (
+        <PortalSurface title="⚠️ Faturas em atraso" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            {faturaSplit.overdue.map(f => (
+              <div key={f.id} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 160 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--red)' }}>{fmtYen(f.amount)}</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{f.bars?.nome || 'Bar'}</div>
+                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(f.dueDate)}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text2)' }}>
+            Total atrasado: <strong style={{ color: 'var(--red)' }}>{fmtYen(faturaSplit.overdueTotal)}</strong>
+          </div>
+        </PortalSurface>
+      )}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
         {[
-          { label:'Total billed', value:fmtYen(total), color:'var(--navy)' },
-          { label:'Received', value:fmtYen(paid), color:'var(--green)' },
-          { label:'Outstanding', value:fmtYen(total-paid), color:total-paid>0?'var(--red)':'var(--green)' },
+          { label:'Total faturado', value:fmtYen(total), color:'var(--navy)' },
+          { label:'Recebido', value:fmtYen(paid), color:'var(--green)' },
+          { label:'Em aberto', value:fmtYen(total-paid), color:total-paid>0?'var(--amber)':'var(--green)' },
+          ...(faturaSplit.overdueTotal > 0 ? [{ label:'Atrasadas', value:fmtYen(faturaSplit.overdueTotal), color:'var(--red)' }] : []),
         ].map(k=>(
           <div key={k.label} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px' }}>
             <div style={{ fontSize:22, fontWeight:800, color:k.color }}>{k.value}</div>
@@ -198,18 +251,18 @@ function MoneyIn() {
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
         {faturas.map(f=>{
           const pct = f.valor>0?Math.round((f.pago||0)/f.total*100):0
-          const isOverdue = f.status!=='pago'&&new Date(f.data_vencimento)<new Date()
+          const isOverdue = f.status!=='pago'&&f.data_vencimento&&f.data_vencimento<today
           return (
-            <div key={f.id} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 16px' }}>
+            <div key={f.id} style={{ background:'var(--bg2)', border:'1px solid', borderColor: isOverdue ? 'rgba(239,68,68,0.45)' : 'var(--border)', borderRadius:12, padding:'14px 16px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                 <div>
                   <div style={{ fontSize:13, fontWeight:700 }}>{f.bars?.nome}</div>
-                  <div style={{ fontSize:11, color:'var(--text2)' }}>Due {fmtDate(f.data_vencimento)}</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>Vencimento {fmtDate(f.data_vencimento)}</div>
                 </div>
                 <div style={{ textAlign:'right' }}>
                   <div style={{ fontSize:15, fontWeight:800 }}>{fmtYen(f.total||0)}</div>
                   <span style={{ fontSize:11, fontWeight:700, color:f.status==='pago'?'var(--green)':isOverdue?'var(--red)':'var(--amber)' }}>
-                    {f.status==='pago'?'Paid':isOverdue?'Overdue':'Pending'}
+                    {f.status==='pago'?'Pago':isOverdue?'Atrasada':'Pendente'}
                   </span>
                 </div>
               </div>
@@ -562,6 +615,8 @@ function Calendario() {
     return map
   }, [allEvents, monthStr])
 
+  const overdueFaturas = allEvents.filter(e => e.status === 'atrasado' && e.type === 'in')
+  const overdueCompras = allEvents.filter(e => e.status === 'atrasado' && e.type === 'out')
   const overdueEvents = allEvents.filter(e => e.status === 'atrasado')
   const upcomingEvents = allEvents.filter(e => e.date >= todayStr && e.status !== 'atrasado').slice(0, 8)
 
@@ -577,19 +632,37 @@ function Calendario() {
   return (
     <div>
       {overdueEvents.length > 0 && (
-        <PortalSurface title="⚠️ Atrasado — precisa pagar/receber" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {overdueEvents.map((ev, i) => (
-              <div key={i} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 150 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)' }}>{ev.type === 'in' ? '↑ A receber' : '↓ A pagar'} · {statusLabel[ev.status]}</div>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtYen(ev.amount)}</div>
-                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ev.label}</div>
-                <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(ev.date)}</div>
-                {ev.docUrl && <a href={ev.docUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--blue)' }}>📎 Doc</a>}
+        <>
+          {overdueFaturas.length > 0 && (
+            <PortalSurface title="⚠️ Faturas em atraso — cobrar dos bars" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {overdueFaturas.map((ev, i) => (
+                  <div key={i} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 150 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)' }}>↑ A receber · Atrasada</div>
+                    <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtYen(ev.amount)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ev.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(ev.date)}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </PortalSurface>
+            </PortalSurface>
+          )}
+          {overdueCompras.length > 0 && (
+            <PortalSurface title="⚠️ Pagamentos atrasados — fornecedores" style={{ marginBottom: 16, borderColor: 'rgba(239,68,68,0.35)' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {overdueCompras.map((ev, i) => (
+                  <div key={i} style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', minWidth: 150 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)' }}>↓ A pagar · Atrasado</div>
+                    <div style={{ fontSize: 14, fontWeight: 800 }}>{fmtYen(ev.amount)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text2)' }}>{ev.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Venceu {fmtDate(ev.date)}</div>
+                    {ev.docUrl && <a href={ev.docUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--blue)' }}>📎 Doc</a>}
+                  </div>
+                ))}
+              </div>
+            </PortalSurface>
+          )}
+        </>
       )}
 
       {upcomingEvents.length > 0 && (

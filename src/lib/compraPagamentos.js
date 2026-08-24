@@ -16,6 +16,47 @@ export function compraPendingAmount(c) {
   return +c.total_real || +c.total_pago || 0
 }
 
+/** Saldo em aberto de uma fatura */
+export function faturaOutstanding(f) {
+  return Math.max(0, (+f.total || +f.valor || 0) - (+f.pago || 0))
+}
+
+/** Fatura vencida e ainda não quitada */
+export function isFaturaOverdue(f, today = new Date().toISOString().slice(0, 10)) {
+  if (f?.status === 'pago') return false
+  if (!f?.data_vencimento) return false
+  return f.data_vencimento < today && faturaOutstanding(f) > 0
+}
+
+/** Faturas em aberto separadas em atrasadas vs futuras */
+export function splitPendingFaturas(faturas = [], today = new Date().toISOString().slice(0, 10)) {
+  const overdue = []
+  const future = []
+
+  for (const f of faturas) {
+    if (f.status === 'pago') continue
+    const amount = faturaOutstanding(f)
+    if (amount <= 0) continue
+    const row = { ...f, amount, dueDate: f.data_vencimento }
+
+    if (f.data_vencimento && f.data_vencimento < today) overdue.push(row)
+    else future.push(row)
+  }
+
+  overdue.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+  future.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+
+  const sum = rows => rows.reduce((a, r) => a + r.amount, 0)
+
+  return {
+    overdue,
+    future,
+    overdueTotal: sum(overdue),
+    futureTotal: sum(future),
+    pendingTotal: sum(overdue) + sum(future),
+  }
+}
+
 /** Compras pendentes separadas em atrasadas vs futuras */
 export function splitPendingCompras(compras = [], fornecedores = []) {
   const map = pagamentoMap(fornecedores)
