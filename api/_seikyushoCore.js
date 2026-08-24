@@ -46,6 +46,31 @@ Regras:
 - Em plano.acoes, liste passos concretos: registrar compra, atualizar preços fornecedor, sincronizar pedidos entregues, etc.
 - Em plano.pergunta, pergunte explicitamente se pode registrar no sistema.`
 
+function leVinDueDate(compraDate) {
+  if (!compraDate) return null
+  const d = new Date(String(compraDate).slice(0, 10) + 'T12:00:00')
+  d.setMonth(d.getMonth() + 1)
+  d.setDate(10)
+  return d.toISOString().slice(0, 10)
+}
+
+function resolveCompraPayment(extracted, fornecedores) {
+  const nome = String(extracted.fornecedor || '').toLowerCase()
+  const forn = (fornecedores || []).find(f => String(f.nome || '').toLowerCase() === nome)
+  const pagamento = forn?.pagamento || extracted.pagamento || 'Transfer'
+  const compraDate = extracted.periodo_inicio || extracted.periodo_fim || extracted.data || new Date().toISOString().slice(0, 10)
+  let data_pagamento = extracted.data_vencimento || null
+  if (/le vin/i.test(extracted.fornecedor || '') || /dia\s*10/i.test(pagamento)) {
+    data_pagamento = leVinDueDate(compraDate)
+    return { pagamento: 'Dia 10', data_pagamento, status_pagamento: 'pendente' }
+  }
+  return {
+    pagamento,
+    data_pagamento,
+    status_pagamento: data_pagamento ? 'pendente' : 'pago',
+  }
+}
+
 function adminClient() {
   const url = process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -150,16 +175,17 @@ export async function registerSeikyusho(body) {
 
   if (totalCusto > 0) {
     const compraDate = extracted.periodo_inicio || extracted.periodo_fim || extracted.data || new Date().toISOString().slice(0, 10)
+    const pay = resolveCompraPayment(extracted, fornecedores)
     const { data: compra, error } = await sb.from('compras').insert({
       data: compraDate,
       fornecedor: extracted.fornecedor || 'Fornecedor',
-      pagamento: extracted.pagamento || 'Transfer',
+      pagamento: pay.pagamento,
       subtotal: +extracted.subtotal || totalCusto,
       desconto_pontos: 0,
       total_pago: +extracted.total || totalCusto,
       total_real: totalCusto,
-      data_pagamento: extracted.data_vencimento || null,
-      status_pagamento: extracted.data_vencimento ? 'pendente' : 'pago',
+      data_pagamento: pay.data_pagamento,
+      status_pagamento: pay.status_pagamento,
       obs: `Seikyusho ${extracted.numero_fatura || ''} — ${obsExtra}`.trim(),
     }).select().single()
 
@@ -168,16 +194,12 @@ export async function registerSeikyusho(body) {
 
     if (itensCusto.length) {
       await sb.from('compras_itens').insert(
-        itensCusto.map(it => {
-          const prod = matchProduct(it.nome, prods)
-          return {
-            compra_id: compra.id,
-            produto_id: prod?.id || null,
-            nome: it.nome,
-            qtd: it.qtd || 1,
-            custo_unitario: it.custo_unitario || 0,
-          }
-        })
+        itensCusto.map(it => ({
+          compra_id: compra.id,
+          nome: it.nome,
+          qtd: it.qtd || 1,
+          custo_unitario: it.custo_unitario || 0,
+        }))
       )
     }
     report.custo = totalCusto
