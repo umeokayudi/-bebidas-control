@@ -48,11 +48,27 @@ function faturaMonthKeys(faturas) {
   return keys
 }
 
-function monthStats(m, vendas, compras, faturas) {
+function compraMonthKey(c) {
+  const d = c?.data || c?.data_compra || c?.data_pagamento || ''
+  return monthKey(d)
+}
+
+function pedidoMonthKey(p) {
+  return monthKey(p?.data_pedido || p?.data_entrega_prevista || p?.criado_em || '')
+}
+
+function pedidosFaturamentoForMonth(pedidos, m) {
+  return (pedidos || [])
+    .filter(p => pedidoMonthKey(p) === m && ['entregue', 'confirmado'].includes(p.status))
+    .reduce((a, p) => a + (+p.total_estimado || 0), 0)
+}
+
+function monthStats(m, vendas, compras, faturas, pedidos) {
   const receita = vendas.filter(v => saleMonthKey(v) === m).reduce((a, v) => a + (+v.total || 0), 0)
-  const comprasTotal = (compras || []).filter(c => monthKey(c.data) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
+  const comprasTotal = (compras || []).filter(c => compraMonthKey(c) === m).reduce((a, c) => a + (+c.total_real || 0), 0)
   const faturamentoFaturas = faturamentoForMonth(faturas, m)
-  const faturamento = faturamentoFaturas || receita
+  const faturamentoPedidos = pedidosFaturamentoForMonth(pedidos, m)
+  const faturamento = receita || faturamentoFaturas || faturamentoPedidos
   const lucroProjetado = faturamento - comprasTotal
   const aReceber = aReceberForMonth(faturas, m)
   return {
@@ -63,7 +79,7 @@ function monthStats(m, vendas, compras, faturas) {
     lucroProjetado,
     margem: faturamento > 0 ? Math.round(lucroProjetado / faturamento * 100) : 0,
     vendasCount: vendas.filter(v => saleMonthKey(v) === m).length,
-    comprasCount: (compras || []).filter(c => monthKey(c.data) === m).length,
+    comprasCount: (compras || []).filter(c => compraMonthKey(c) === m).length,
     aReceber,
   }
 }
@@ -78,30 +94,32 @@ export default async function handler(req, res) {
 
     const chartMonths = lastMonths(6)
 
-    const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { count: pedidosPendentes }] = await Promise.all([
-      admin.from('compras').select('data, total_real').order('data'),
+    const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { count: pedidosPendentes }] = await Promise.all([
+      admin.from('compras').select('data, data_compra, data_pagamento, total_real').order('data'),
       admin.from('vendas').select('data, data_venda, total, obs, origem, cast_id').order('data'),
       admin.from('faturas').select('total, valor, pago, status, periodo_inicio, periodo_fim, data_emissao, data_vencimento, obs'),
+      admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status'),
       admin.from('pedidos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
     ])
 
     const vendas = (vendasRaw || []).filter(isSupplierVenda)
 
     const months = [...new Set([
-      ...(compras || []).map(c => monthKey(c.data)),
+      ...(compras || []).map(compraMonthKey),
       ...vendas.map(saleMonthKey),
+      ...(pedidos || []).map(pedidoMonthKey),
       ...faturaMonthKeys(faturas),
     ])].filter(Boolean).sort().reverse()
 
     const chart = chartMonths.map(m => {
-      const s = monthStats(m, vendas, compras, faturas)
+      const s = monthStats(m, vendas, compras, faturas, pedidos)
       return { month: m, receita: s.receita, faturamento: s.faturamento, compras: s.compras, lucro: s.lucroProjetado }
     })
 
     const byMonth = {}
     const allMonths = [...new Set([...months, ...chartMonths])]
     for (const m of allMonths) {
-      byMonth[m] = monthStats(m, vendas, compras, faturas)
+      byMonth[m] = monthStats(m, vendas, compras, faturas, pedidos)
     }
 
     return res.status(200).json({ months, chart, byMonth, pedidosPendentes: pedidosPendentes || 0 })

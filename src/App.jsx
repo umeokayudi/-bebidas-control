@@ -211,16 +211,6 @@ function Dashboard({ onNav }) {
         <BarChart data={lucroChart} color="#1a6b4a" height={72} />
       </PortalSurface>
 
-      <PortalSurface
-        title="Detalhes do mês"
-        sub="Quantidades, itens e custos por nota ficam no Relatório."
-        headerRight={(
-          <button type="button" onClick={() => goToReport(onNav, selMonth)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>
-            Abrir Relatório — {monthLabel(selMonth)}
-          </button>
-        )}
-      />
-
       <PortalSurface title="Ações rápidas">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {[

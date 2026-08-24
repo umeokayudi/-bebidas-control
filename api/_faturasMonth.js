@@ -8,12 +8,14 @@ export function faturaBalance(f) {
 
 export function faturaCoversMonth(f, selMonth) {
   if (!selMonth || !f) return false
-  const start = (f.periodo_inicio || f.data_emissao || '').slice(0, 7)
-  const end = (f.periodo_fim || f.data_vencimento || start).slice(0, 7)
-  if (start === selMonth || end === selMonth) return true
-  if (start && end && start <= selMonth && end >= selMonth) return true
-  const obs = (f.obs || '').toLowerCase()
-  if (obs.includes(selMonth) || obs.includes(selMonth.replace('-', '/'))) return true
+  const [y, m] = selMonth.split('-').map(Number)
+  const monthStart = `${selMonth}-01`
+  const lastDay = new Date(y, m, 0).getDate()
+  const monthEnd = `${selMonth}-${String(lastDay).padStart(2, '0')}`
+  const start = (f.periodo_inicio || f.data_emissao || '').slice(0, 10)
+  const end = (f.periodo_fim || f.data_vencimento || start).slice(0, 10)
+  if (start && end && start <= monthEnd && end >= monthStart) return true
+  if ((f.data_emissao || '').slice(0, 7) === selMonth) return true
   return false
 }
 
