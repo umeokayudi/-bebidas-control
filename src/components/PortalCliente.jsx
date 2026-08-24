@@ -15,12 +15,6 @@ import {
   faturaPeriodoFim,
 } from '../lib/barPortal'
 import {
-  buildPaymentRyoshushoHtml,
-  buildRyoshushoNumero,
-  printRyoshushoHtml,
-  savePaymentRyoshusho,
-} from '../lib/ryoshushoPrint'
-import {
   analyzePurchases,
   buildPricingMap,
   monthlyAccountSummary,
@@ -28,6 +22,8 @@ import {
   projectItemRevenue,
 } from '../lib/clientAnalytics'
 import ClientAnalyticsTab from './ClientAnalyticsTab'
+import PortalRecibosTab from './PortalRecibosTab'
+import PortalClienteAI from './PortalClienteAI'
 
 const STATUS_PEDIDO = {
   pendente:   { label:'Pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -1860,74 +1856,8 @@ function FaturasTab({ bar }) {
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scannedData, setScannedData] = useState(null)
-  const [emittingReceipt, setEmittingReceipt] = useState(null)
-  const [ryoSeq, setRyoSeq] = useState(1)
 
   useEffect(() => { load() }, [bar])
-
-  function receiptableItems() {
-    const items = []
-    for (const f of faturas) {
-      const confirmed = pagamentos.filter(p => p.fatura_id === f.id && p.confirmado)
-      for (const p of confirmed) {
-        items.push({
-          key: `p-${p.id}`,
-          valor: +p.valor || 0,
-          data: p.data,
-          metodo: p.metodo,
-          notas: p.notas,
-          fatura: f,
-        })
-      }
-      const confirmedSum = confirmed.reduce((a, p) => a + (+p.valor || 0), 0)
-      const pago = faturaPago(f)
-      if (pago > confirmedSum + 0.5) {
-        items.push({
-          key: `f-${f.id}-saldo`,
-          valor: pago - confirmedSum,
-          data: f.data_pagamento || faturaEmissao(f) || faturaVencimento(f),
-          metodo: 'Pagamento confirmado',
-          notas: f.obs || '',
-          fatura: f,
-        })
-      }
-    }
-    return items
-      .filter(i => i.valor > 0)
-      .sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')))
-  }
-
-  async function emitPaymentReceipt(item) {
-    if (!item?.valor) return
-    setEmittingReceipt(item.key)
-    try {
-      const numero = buildRyoshushoNumero(ryoSeq)
-      const dataEmissao = (item.data || new Date().toISOString().slice(0, 10)).slice(0, 10)
-      const html = buildPaymentRyoshushoHtml({
-        numero,
-        dataEmissao,
-        barNome: bar.nome,
-        valor: item.valor,
-        metodo: item.metodo,
-        notas: item.notas,
-        periodoInicio: faturaEmissao(item.fatura),
-        periodoFim: faturaPeriodoFim(item.fatura),
-      })
-      printRyoshushoHtml(html)
-      await savePaymentRyoshusho(supabase, {
-        barId: bar.id,
-        numero,
-        dataEmissao,
-        valor: item.valor,
-        metodo: item.metodo,
-        periodoInicio: faturaEmissao(item.fatura),
-        periodoFim: faturaPeriodoFim(item.fatura),
-      })
-      setRyoSeq(s => s + 1)
-    } finally {
-      setEmittingReceipt(null)
-    }
-  }
 
   async function load() {
     const [fR, vR, pR] = await Promise.all([
@@ -1939,8 +1869,6 @@ function FaturasTab({ bar }) {
     setFaturas(jbmFaturas)
     setVendas(filterSupplierVendas(vR.data||[]))
     setPagamentos(pR.data||[])
-    const { count } = await supabase.from('ryoshusho').select('id', { count: 'exact', head: true }).eq('bar_id', bar.id)
-    setRyoSeq((count || 0) + 1)
     setLoading(false)
   }
 
@@ -2013,8 +1941,6 @@ function FaturasTab({ bar }) {
   const maxSpend = Math.max(...monthlySpend, 1)
   const mwd = monthlySpend.filter(v=>v>0).length
   const avgMonthly = mwd>0?Math.round(monthlySpend.reduce((a,v)=>a+v,0)/mwd):0
-  const recibos = receiptableItems()
-
   if (loading) return <Spinner text="Carregando faturas..." />
   return (
     <div className="fade-in portal-page" style={{ maxWidth:860 }}>
@@ -2050,37 +1976,6 @@ function FaturasTab({ bar }) {
           ))}
         </div>
       </div>
-      {recibos.length > 0 && (
-        <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🧾 Emissão de recibo (領収書)</div>
-          <div style={{ fontSize:12, color:"var(--text2)", marginBottom:14 }}>
-            Pagamentos já confirmados — emita o recibo com valor e data de cada pagamento.
-          </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {recibos.map(item => (
-              <div key={item.key} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, padding:"12px 14px", background:"var(--bg3)", borderRadius:12, flexWrap:"wrap" }}>
-                <div style={{ flex:1, minWidth:180 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:"var(--navy)" }}>{fmtYen(item.valor)}</div>
-                  <div style={{ fontSize:11, color:"var(--text2)", marginTop:2 }}>
-                    Pago em {fmtDate(item.data)} · {item.metodo}
-                  </div>
-                  <div style={{ fontSize:10, color:"var(--text3)", marginTop:2 }}>
-                    Fatura {fmtDate(faturaEmissao(item.fatura))} a {fmtDate(faturaPeriodoFim(item.fatura))}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => emitPaymentReceipt(item)}
-                  disabled={emittingReceipt === item.key}
-                  style={{ padding:"8px 16px", fontSize:12, borderRadius:10, border:"none", background:"var(--gold)", color:"var(--navy)", cursor:"pointer", fontWeight:700, whiteSpace:"nowrap" }}
-                >
-                  {emittingReceipt === item.key ? 'Gerando...' : 'Emitir 領収書'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       {upcoming.length>0 && (
         <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Próximos vencimentos</div>
@@ -2316,6 +2211,8 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
     { id:'estoque',   label:'Estoque',          icon:'📊' },
     { id:'precos',    label:'Preços & Cardápio', icon:'💰' },
     { id:'faturas',   label:'Faturas JBM',      icon:'💳' },
+    { id:'recibos',   label:'Recibos',          icon:'🧾' },
+    { id:'ia',        label:'Assistente IA',    icon:'🤖' },
   ]
 
   return (
@@ -2345,7 +2242,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Portal do cliente</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>
-            Compras, estoque, preços POS e faturas JBM Drinks — tudo em um só lugar.
+            Compras, estoque, faturas, recibos e assistente IA — tudo em um só lugar.
           </div>
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
@@ -2367,6 +2264,8 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='estoque'   && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}
         {tab==='precos'    && <PrecosCardapioTab bar={bar} />}
         {tab==='faturas'   && <FaturasTab bar={bar} />}
+        {tab==='recibos'  && <PortalRecibosTab bar={bar} />}
+        {tab==='ia'       && <PortalClienteAI bar={bar} />}
       </main>
     </div>
   )
