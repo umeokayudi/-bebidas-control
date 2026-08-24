@@ -44,9 +44,9 @@ export function filterSupplierVendas(list) {
 }
 
 export function roleLabel(role) {
-  if (role === 'admin') return 'Administrator'
-  if (role === 'cliente') return 'Client'
-  if (role === 'funcionario') return 'Staff'
+  if (role === 'admin') return 'Administrador'
+  if (role === 'cliente') return 'Cliente'
+  if (role === 'funcionario') return 'Funcionário'
   return 'Staff'
 }
 

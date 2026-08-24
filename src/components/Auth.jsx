@@ -104,14 +104,14 @@ export function LoginPage() {
         }}>
           <div style={{fontSize:14,fontWeight:600,color:'rgba(255,255,255,0.6)',
             marginBottom:24,textAlign:'center',letterSpacing:'0.05em',textTransform:'uppercase'}}>
-            {mode==='login'?'System access':'Create account'}
+            {mode==='login'?'Acesso ao sistema':'Criar conta'}
           </div>
 
           {mode==='signup'&&(
             <div style={{marginBottom:14}}>
-              <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Name</label>
+              <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Nome</label>
               <input type="text" value={nome} onChange={e=>setName(e.target.value)}
-                placeholder="Your name"
+                placeholder="Seu nome"
                 style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}/>
             </div>
           )}
@@ -122,7 +122,7 @@ export function LoginPage() {
               style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}/>
           </div>
           <div style={{marginBottom:24}}>
-            <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Password</label>
+            <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Senha</label>
             <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
               placeholder="••••••••"
               style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}
@@ -140,19 +140,19 @@ export function LoginPage() {
 
           <button className="btn-gold" onClick={submit} disabled={busy}
             style={{width:'100%',padding:'13px',fontSize:14,borderRadius:10,letterSpacing:'0.05em',textTransform:'uppercase'}}>
-            {busy?<><span className="spinner"/>Please wait...</>:mode==='login'?'Sign in':'Create account'}
+            {busy?<><span className="spinner"/>Aguarde...</>:mode==='login'?'Entrar':'Criar conta'}
           </button>
 
           <div style={{textAlign:'center',marginTop:20,fontSize:12,color:'rgba(255,255,255,0.35)'}}>
             {mode==='login'
-              ?<>Don't have access? <button onClick={()=>setMode('signup')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>Request access</button></>
-              :<>Already have an account? <button onClick={()=>setMode('login')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>Sign in</button></>
+              ?<>Sem acesso? <button onClick={()=>setMode('signup')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>Solicitar acesso</button></>
+              :<>Já tem conta? <button onClick={()=>setMode('login')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>Entrar</button></>
             }
           </div>
         </div>
 
         <div style={{textAlign:'center',marginTop:20,fontSize:10,color:'rgba(255,255,255,0.2)',letterSpacing:'0.1em',textTransform:'uppercase'}}>
-          Management System — JBM Drinks
+          Painel JBM Drinks
         </div>
 
         <div style={{ marginTop: 20, maxWidth: 320, marginLeft: 'auto', marginRight: 'auto' }}>
