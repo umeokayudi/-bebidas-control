@@ -12,7 +12,14 @@ import {
   faturaVencimento,
   faturaEmissao,
   faturaRemaining,
+  faturaPeriodoFim,
 } from '../lib/barPortal'
+import {
+  buildPaymentRyoshushoHtml,
+  buildRyoshushoNumero,
+  printRyoshushoHtml,
+  savePaymentRyoshusho,
+} from '../lib/ryoshushoPrint'
 import {
   analyzePurchases,
   buildPricingMap,
@@ -1853,8 +1860,74 @@ function FaturasTab({ bar }) {
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scannedData, setScannedData] = useState(null)
+  const [emittingReceipt, setEmittingReceipt] = useState(null)
+  const [ryoSeq, setRyoSeq] = useState(1)
 
   useEffect(() => { load() }, [bar])
+
+  function receiptableItems() {
+    const items = []
+    for (const f of faturas) {
+      const confirmed = pagamentos.filter(p => p.fatura_id === f.id && p.confirmado)
+      for (const p of confirmed) {
+        items.push({
+          key: `p-${p.id}`,
+          valor: +p.valor || 0,
+          data: p.data,
+          metodo: p.metodo,
+          notas: p.notas,
+          fatura: f,
+        })
+      }
+      const confirmedSum = confirmed.reduce((a, p) => a + (+p.valor || 0), 0)
+      const pago = faturaPago(f)
+      if (pago > confirmedSum + 0.5) {
+        items.push({
+          key: `f-${f.id}-saldo`,
+          valor: pago - confirmedSum,
+          data: f.data_pagamento || faturaEmissao(f) || faturaVencimento(f),
+          metodo: 'Pagamento confirmado',
+          notas: f.obs || '',
+          fatura: f,
+        })
+      }
+    }
+    return items
+      .filter(i => i.valor > 0)
+      .sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')))
+  }
+
+  async function emitPaymentReceipt(item) {
+    if (!item?.valor) return
+    setEmittingReceipt(item.key)
+    try {
+      const numero = buildRyoshushoNumero(ryoSeq)
+      const dataEmissao = (item.data || new Date().toISOString().slice(0, 10)).slice(0, 10)
+      const html = buildPaymentRyoshushoHtml({
+        numero,
+        dataEmissao,
+        barNome: bar.nome,
+        valor: item.valor,
+        metodo: item.metodo,
+        notas: item.notas,
+        periodoInicio: faturaEmissao(item.fatura),
+        periodoFim: faturaPeriodoFim(item.fatura),
+      })
+      printRyoshushoHtml(html)
+      await savePaymentRyoshusho(supabase, {
+        barId: bar.id,
+        numero,
+        dataEmissao,
+        valor: item.valor,
+        metodo: item.metodo,
+        periodoInicio: faturaEmissao(item.fatura),
+        periodoFim: faturaPeriodoFim(item.fatura),
+      })
+      setRyoSeq(s => s + 1)
+    } finally {
+      setEmittingReceipt(null)
+    }
+  }
 
   async function load() {
     const [fR, vR, pR] = await Promise.all([
@@ -1866,6 +1939,8 @@ function FaturasTab({ bar }) {
     setFaturas(jbmFaturas)
     setVendas(filterSupplierVendas(vR.data||[]))
     setPagamentos(pR.data||[])
+    const { count } = await supabase.from('ryoshusho').select('id', { count: 'exact', head: true }).eq('bar_id', bar.id)
+    setRyoSeq((count || 0) + 1)
     setLoading(false)
   }
 
@@ -1938,6 +2013,7 @@ function FaturasTab({ bar }) {
   const maxSpend = Math.max(...monthlySpend, 1)
   const mwd = monthlySpend.filter(v=>v>0).length
   const avgMonthly = mwd>0?Math.round(monthlySpend.reduce((a,v)=>a+v,0)/mwd):0
+  const recibos = receiptableItems()
 
   if (loading) return <Spinner text="Carregando faturas..." />
   return (
@@ -1974,6 +2050,37 @@ function FaturasTab({ bar }) {
           ))}
         </div>
       </div>
+      {recibos.length > 0 && (
+        <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🧾 Emissão de recibo (領収書)</div>
+          <div style={{ fontSize:12, color:"var(--text2)", marginBottom:14 }}>
+            Pagamentos já confirmados — emita o recibo com valor e data de cada pagamento.
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {recibos.map(item => (
+              <div key={item.key} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, padding:"12px 14px", background:"var(--bg3)", borderRadius:12, flexWrap:"wrap" }}>
+                <div style={{ flex:1, minWidth:180 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"var(--navy)" }}>{fmtYen(item.valor)}</div>
+                  <div style={{ fontSize:11, color:"var(--text2)", marginTop:2 }}>
+                    Pago em {fmtDate(item.data)} · {item.metodo}
+                  </div>
+                  <div style={{ fontSize:10, color:"var(--text3)", marginTop:2 }}>
+                    Fatura {fmtDate(faturaEmissao(item.fatura))} a {fmtDate(faturaPeriodoFim(item.fatura))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => emitPaymentReceipt(item)}
+                  disabled={emittingReceipt === item.key}
+                  style={{ padding:"8px 16px", fontSize:12, borderRadius:10, border:"none", background:"var(--gold)", color:"var(--navy)", cursor:"pointer", fontWeight:700, whiteSpace:"nowrap" }}
+                >
+                  {emittingReceipt === item.key ? 'Gerando...' : 'Emitir 領収書'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {upcoming.length>0 && (
         <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Próximos vencimentos</div>
@@ -2066,6 +2173,16 @@ function FaturasTab({ bar }) {
                         </div>
                         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                           {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>📎 Comprovante</a>}
+                          {p.confirmado && (
+                            <button
+                              type="button"
+                              onClick={() => emitPaymentReceipt({ key:`p-${p.id}`, valor:+p.valor, data:p.data, metodo:p.metodo, notas:p.notas, fatura:f })}
+                              disabled={emittingReceipt === `p-${p.id}`}
+                              style={{ fontSize:11, padding:"4px 10px", borderRadius:8, border:"none", background:"var(--gold)", color:"var(--navy)", cursor:"pointer", fontWeight:700 }}
+                            >
+                              {emittingReceipt === `p-${p.id}` ? '...' : '🧾 Recibo'}
+                            </button>
+                          )}
                           <span style={{ fontWeight:700, color:"var(--green)" }}>{fmtYen(p.valor)}</span>
                         </div>
                       </div>
