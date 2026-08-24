@@ -37,29 +37,26 @@ import { loadDashboard } from './lib/loadDashboard'
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
   { id:'dashboard', label:'Dashboard'  },
-  { id:'purchases',   label:'Purchases'  },
-  { id:'sales',    label:'Sales'      },
-  { id:'pedidos',   label:'Orders'     },
-  { id:'relatorio', label:'Report'     },
+  { id:'purchases', label:'Compras'  },
+  { id:'sales',    label:'Vendas'      },
+  { id:'pedidos',   label:'Pedidos'     },
+  { id:'relatorio', label:'Relatório'     },
   { id:'ryoshusho', label:'領収書'      },
-  { id:'seikyusho', label:'請求書 IA'   },
-  { id:'products',  label:'Products'   },
-  { id:'bars',      label:'Bars'       },
-  { id:'usuarios',  label:'Users'      },
-  { id:'faturas',    label:'💰 Invoices '  },
-  { id:'bi',         label:'📊 Reports'   },
-  { id:'ai',         label:'🤖 AI'       },
-  { id:'suppliers',  label:'Suppliers'  },
-  { id:'cashflow',   label:'💸 Cash Flow' },
-  { id:'barfinance', label:'🏛 Bar Finance' },
+  { id:'seikyusho', label:'Leitor de cobrança'   },
+  { id:'products',  label:'Produtos'   },
+  { id:'bars',      label:'Bares'       },
+  { id:'usuarios',  label:'Usuários'      },
+  { id:'faturas',    label:'💰 Faturas'  },
+  { id:'suppliers',  label:'Fornecedores'  },
+  { id:'cashflow',   label:'💸 Fluxo de caixa' },
 ]
 
 const STAFF_TABS = [
-  { id:'purchases',   label:'Purchases'  },
-  { id:'sales',    label:'Sales'      },
-  { id:'relatorio', label:'Report'     },
+  { id:'purchases', label:'Compras'  },
+  { id:'sales',    label:'Vendas'      },
+  { id:'relatorio', label:'Relatório'     },
   { id:'ryoshusho', label:'領収書'      },
-  { id:'products',  label:'Products'   },
+  { id:'products',  label:'Produtos'   },
 ]
 
 // ── MINI BAR CHART ────────────────────────────────────────────────────────────
