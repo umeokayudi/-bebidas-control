@@ -25,38 +25,36 @@ import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
-import AIAssistant from './components/AIAssistant'
-import BusinessIntel from './components/BusinessIntel'
-import BarFinanceAdmin from './components/BarFinanceAdmin'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, monthLabel, roleLabel } from './components/utils'
 import UiPrefsPanel from './components/UiPrefsPanel'
 import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
 import { loadDashboard } from './lib/loadDashboard'
+import { PageHeader, PortalHero, PortalKpi, PortalSurface, PortalAlert } from './components/ui/PageLayout'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
-  { id:'dashboard', label:'Dashboard'  },
-  { id:'purchases', label:'Compras'  },
-  { id:'sales',    label:'Vendas'      },
-  { id:'pedidos',   label:'Pedidos'     },
-  { id:'relatorio', label:'Relatório'     },
-  { id:'ryoshusho', label:'領収書'      },
-  { id:'seikyusho', label:'Leitor de cobrança'   },
-  { id:'products',  label:'Produtos'   },
-  { id:'bars',      label:'Bares'       },
-  { id:'usuarios',  label:'Usuários'      },
-  { id:'faturas',    label:'💰 Faturas'  },
-  { id:'suppliers',  label:'Fornecedores'  },
-  { id:'cashflow',   label:'💸 Fluxo de caixa' },
+  { id:'dashboard', label:'Dashboard', icon:'📊' },
+  { id:'purchases', label:'Compras', icon:'🛒' },
+  { id:'sales',    label:'Vendas', icon:'💴' },
+  { id:'pedidos',   label:'Pedidos', icon:'📋' },
+  { id:'relatorio', label:'Relatório', icon:'📈' },
+  { id:'ryoshusho', label:'領収書', icon:'🧾' },
+  { id:'seikyusho', label:'Leitor de cobrança', icon:'📄' },
+  { id:'products',  label:'Produtos', icon:'🍾' },
+  { id:'bars',      label:'Bares', icon:'🏪' },
+  { id:'usuarios',  label:'Usuários', icon:'👥' },
+  { id:'faturas',    label:'Faturas', icon:'💰' },
+  { id:'suppliers',  label:'Fornecedores', icon:'🏭' },
+  { id:'cashflow',   label:'Fluxo de caixa', icon:'💸' },
 ]
 
 const STAFF_TABS = [
-  { id:'purchases', label:'Compras'  },
-  { id:'sales',    label:'Vendas'      },
-  { id:'relatorio', label:'Relatório'     },
-  { id:'ryoshusho', label:'領収書'      },
-  { id:'products',  label:'Produtos'   },
+  { id:'purchases', label:'Compras', icon:'🛒' },
+  { id:'sales',    label:'Vendas', icon:'💴' },
+  { id:'relatorio', label:'Relatório', icon:'📈' },
+  { id:'ryoshusho', label:'領収書', icon:'🧾' },
+  { id:'products',  label:'Produtos', icon:'🍾' },
 ]
 
 // ── MINI BAR CHART ────────────────────────────────────────────────────────────
@@ -97,20 +95,16 @@ function BarChart({ data, color='#c19c56', height=80, valueLabel=fmtYen }) {
   )
 }
 
-function MetricCard({ label, value, sub, color, border, onClick, hint }) {
+function MetricCard({ label, value, sub, color, onClick, hint }) {
   return (
-    <div
-      className={`metric-card${onClick ? ' metric-card-hover is-clickable' : ''}`}
+    <PortalKpi
+      label={label}
+      value={value}
+      sub={sub}
+      color={color}
       onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      style={border ? { borderTop: `3px solid ${border}` } : undefined}
-    >
-      <div className="metric-label">{label}</div>
-      <div className="metric-value" style={{ color, fontSize: 22 }}>{value}</div>
-      {sub && <div className="metric-sub">{sub}</div>}
-      {hint && <div className="metric-open-hint">{hint}</div>}
-    </div>
+      hint={hint}
+    />
   )
 }
 
@@ -156,89 +150,81 @@ function Dashboard({ onNav }) {
   const isCurrentMonth = selMonth === mesAtual
 
   return (
-    <div className="fade-in">
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--navy)', letterSpacing: -0.5 }}>Dashboard</div>
-          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-            {isCurrentMonth ? 'Mês atual' : 'Histórico'} · {monthLabel(selMonth)}
+    <div className="fade-in" style={{ maxWidth: 1000 }}>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${isCurrentMonth ? 'Mês atual' : 'Histórico'} · ${monthLabel(selMonth)}`}
+        actions={(
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Mês</span>
+            <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ width: 'auto', minWidth: 120 }}>
+              {(data?.months || []).map(mon => <option key={mon} value={mon}>{monthLabel(mon)}</option>)}
+            </select>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>Mês:</span>
-          <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ width: 'auto', minWidth: 120 }}>
-            {(data?.months || []).map(mon => <option key={mon} value={mon}>{monthLabel(mon)}</option>)}
-          </select>
-        </div>
-      </div>
+        )}
+      />
 
       {data.pedidosPendentes > 0 && (
-        <div onClick={() => onNav('pedidos')} style={{
-          background: 'linear-gradient(135deg,var(--navy),var(--navy2))',
-          borderRadius: 12, padding: '12px 16px', marginBottom: 14, cursor: 'pointer',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          border: '1px solid rgba(193,156,86,0.3)',
-        }}>
-          <div style={{ color: 'white', fontSize: 13, fontWeight: 600 }}>
-            {data.pedidosPendentes} pedido(s) aguardando confirmação
+        <PortalAlert variant="navy" onClick={() => onNav('pedidos')}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{data.pedidosPendentes} pedido(s) aguardando confirmação</span>
+            <span style={{ color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>Ver →</span>
           </div>
-          <span style={{ color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>Ver →</span>
-        </div>
+        </PortalAlert>
       )}
 
-      <div className="grid3" style={{ marginBottom: 16 }}>
-        <MetricCard
+      <div className="portal-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
+        <PortalHero
+          label={`Lucro · ${monthLabel(selMonth)}`}
+          value={fmtYen(m.lucro)}
+          sub={`Margem ${m.margem}% · receita ${fmtYen(m.receita)} − compras ${fmtYen(m.compras)}`}
+          onClick={() => goToReport(onNav, selMonth)}
+        />
+        <PortalKpi
           label="Compras (notas)"
           value={fmtYen(m.compras)}
-          sub={`${m.comprasCount} nota(s)`}
+          sub={`${m.comprasCount} nota(s) pagas`}
           color="var(--red)"
-          border="var(--red)"
           onClick={() => goToReport(onNav, selMonth)}
-          hint="Detalhes no Report →"
+          hint="Detalhe no Relatório →"
         />
-        <MetricCard
+        <PortalKpi
           label="Receita"
           value={fmtYen(m.receita)}
-          sub={`${m.vendasCount} venda(s)`}
+          sub={`${m.vendasCount} entrega(s)${m.creditoBar > 0 ? ` · crédito bar ${fmtYen(m.creditoBar)}` : ''}`}
           color="var(--navy)"
-          border="#001028"
           onClick={() => goToReport(onNav, selMonth)}
-          hint="Detalhes no Report →"
-        />
-        <MetricCard
-          label="Lucro"
-          value={fmtYen(m.lucro)}
-          sub={`${m.margem}%${m.creditoBar > 0 ? ` · JBM ${fmtYen(m.lucroJbm)}` : ''}`}
-          color="var(--green)"
-          border="var(--green)"
-          onClick={() => goToReport(onNav, selMonth)}
-          hint="Detalhes no Report →"
+          hint="Detalhe no Relatório →"
         />
       </div>
 
-      <div className="card chart-card" style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', marginBottom: 4 }}>Lucro — últimos 6 meses</div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>Receita − compras pagas (valores das notas)</div>
-        <BarChart data={lucroChart} color="#1a6b4a" height={64} />
-      </div>
+      <PortalSurface title="Lucro — últimos 6 meses" sub="Receita − compras pagas (valores das notas)">
+        <BarChart data={lucroChart} color="#1a6b4a" height={72} />
+      </PortalSurface>
 
-      <div className="card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ fontSize: 13, color: 'var(--text2)' }}>
-          Itens, quantidades e custos das notas ficam no <strong style={{ color: 'var(--navy)' }}>Report</strong>.
-        </div>
-        <button type="button" onClick={() => goToReport(onNav, selMonth)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>
-          Abrir Report — {monthLabel(selMonth)}
-        </button>
-      </div>
+      <PortalSurface
+        title="Detalhes do mês"
+        sub="Quantidades, itens e custos por nota ficam no Relatório."
+        headerRight={(
+          <button type="button" onClick={() => goToReport(onNav, selMonth)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>
+            Abrir Relatório — {monthLabel(selMonth)}
+          </button>
+        )}
+      />
 
-      <div className="card">
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)', marginBottom: 12 }}>Ações rápidas</div>
+      <PortalSurface title="Ações rápidas">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {[{ label: 'Nova compra', tab: 'purchases' }, { label: 'Registrar venda', tab: 'sales' }, { label: 'Pedidos', tab: 'pedidos' }, { label: '領収書', tab: 'ryoshusho' }].map(a => (
+          {[
+            { label: 'Nova compra', tab: 'purchases' },
+            { label: 'Registrar venda', tab: 'sales' },
+            { label: 'Pedidos', tab: 'pedidos' },
+            { label: 'Leitor de cobrança', tab: 'seikyusho' },
+            { label: 'Faturas', tab: 'faturas' },
+          ].map(a => (
             <button key={a.tab} onClick={() => onNav(a.tab)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>{a.label}</button>
           ))}
         </div>
-      </div>
+      </PortalSurface>
     </div>
   )
 }
@@ -323,6 +309,7 @@ function Shell() {
         <nav className="sidebar-nav">
           {tabs.map(t=>(
             <button key={t.id} onClick={()=>selectTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
+              <span>{t.icon}</span>
               <span style={{fontSize:13}}>{t.label}</span>
               {t.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
@@ -343,12 +330,13 @@ function Shell() {
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Painel admin JBM</div>
           <UiPrefsPanel />
-          <button onClick={signOut} className="sidebar-signout">Sign out</button>
+          <button onClick={signOut} className="sidebar-signout">Sair</button>
         </div>
       </aside>
 
-      <main className="app-main">
+      <main className="app-main app-main-wide">
         <div className="fade-in" key={tab}>
           {tab==='dashboard' && <Dashboard onNav={selectTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
@@ -360,12 +348,9 @@ function Shell() {
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
           {tab==='usuarios'  && <UsuariosTab/>}
-        {tab==='faturas'   && <Faturas />}
-        {tab==='cashflow'   && <Cashflow />}
-        {tab==='bi'        && <BusinessIntel />}
-        {tab==='ai'        && <AIAssistant />}
-        {tab==='suppliers' && <Fornecedores />}
-        {tab==='barfinance' && <BarFinanceAdmin />}
+          {tab==='faturas'   && <Faturas />}
+          {tab==='cashflow'   && <Cashflow />}
+          {tab==='suppliers' && <Fornecedores />}
         </div>
       </main>
     </div>

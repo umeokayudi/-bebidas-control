@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { imageDataUrlToParts } from '../lib/ai'
 import { analyzeSeikyusho, registerSeikyusho, calcLucroPreview } from '../lib/seikyusho'
-import { fmtYen, fmtDate, Spinner, SectionTitle, MetricCard } from './utils'
+import { fmtYen, fmtDate, Spinner, MetricCard } from './utils'
+import { PageHeader, PortalSurface } from './ui/PageLayout'
 
 export default function SeikyushoTab() {
   const [image, setImage] = useState(null)
@@ -107,16 +108,16 @@ export default function SeikyushoTab() {
   const lucro = extracted ? calcLucroPreview(extracted, catalog) : null
 
   return (
-    <div className="fade-in">
-      <SectionTitle>Leitor de cobrança</SectionTitle>
-      <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-        Envie a fatura do fornecedor (請求書), revise os dados extraídos e confirme antes de registrar compra e entregas no sistema.
-      </p>
+    <div className="fade-in" style={{ maxWidth: 1000 }}>
+      <PageHeader
+        title="Leitor de cobrança"
+        subtitle="Envie a fatura do fornecedor (請求書), revise os dados extraídos e confirme antes de registrar."
+      />
 
       {step !== 'done' && (
         <>
           <div
-            className="card"
+            className="portal-surface-card"
             style={{ border: '2px dashed var(--border)', textAlign: 'center', padding: 32, marginBottom: 16, cursor: 'pointer' }}
             onClick={() => document.getElementById('seikyusho-input')?.click()}
           >
@@ -141,7 +142,7 @@ export default function SeikyushoTab() {
           </div>
 
           {step === 'upload' && image && (
-            <div className="card" style={{ marginBottom: 16 }}>
+            <PortalSurface style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 8, textTransform: 'uppercase' }}>
                 Comentário (opcional)
               </label>
@@ -155,7 +156,7 @@ export default function SeikyushoTab() {
               <button className="btn-primary" onClick={() => scan()} disabled={loading} style={{ width: '100%', padding: 12, borderRadius: 12 }}>
                 {loading ? 'Lendo fatura...' : 'Ler fatura'}
               </button>
-            </div>
+            </PortalSurface>
           )}
         </>
       )}
@@ -167,7 +168,7 @@ export default function SeikyushoTab() {
       )}
 
       {step === 'review' && extracted && !result && (
-        <div className="card" style={{ marginBottom: 16 }}>
+        <PortalSurface style={{ marginBottom: 16 }}>
           {plano && (
             <div style={{ marginBottom: 20, padding: 16, background: 'var(--blue-bg)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>Resumo da leitura</div>
@@ -245,11 +246,11 @@ export default function SeikyushoTab() {
               ← Voltar e editar comentário inicial
             </button>
           </div>
-        </div>
+        </PortalSurface>
       )}
 
       {step === 'done' && result && (
-        <div className="card" style={{ borderLeft: '4px solid var(--green)' }}>
+        <PortalSurface style={{ borderLeft: '4px solid var(--green)' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)', marginBottom: 12 }}>✅ Registrado com sucesso</div>
           <ul style={{ fontSize: 13, lineHeight: 1.8, paddingLeft: 20 }}>
             {result.compra && <li>Compra registrada (custo {fmtYen(result.custo)})</li>}
@@ -267,7 +268,7 @@ export default function SeikyushoTab() {
           <button onClick={resetAll} style={{ marginTop: 12, padding: '8px 16px', borderRadius: 8 }}>
             Nova fatura
           </button>
-        </div>
+        </PortalSurface>
       )}
     </div>
   )
