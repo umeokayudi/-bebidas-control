@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty, filterSupplierVendas } from './utils'
 import { PageHeader, PortalKpi, PortalSurface, PortalPills, PortalAlert } from './ui/PageLayout'
+import { pagamentoStatus, pagamentosPendentes, totalPagamentosPendentes } from '../lib/faturaPagamentos'
 
 function getBillingPeriod(date) {
   const d = new Date(date)
@@ -94,11 +95,13 @@ function Overview() {
       {/* Pending client payments */}
       {pagamentos.length>0 && (
         <PortalAlert variant="amber">
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>🔔 {pagamentos.length} pagamento{pagamentos.length>1?'s':''} aguardando confirmação</div>
-          {pagamentos.map(p=>(
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>🔔 {pagamentos.length} pagamento{pagamentos.length>1?'s':''} em análise / aguardando confirmação</div>
+          {pagamentos.map(p=>{
+            const st = pagamentoStatus(p)
+            return (
             <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid rgba(0,0,0,0.06)' }}>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:600 }}>{p.faturas?.bars?.nome} — {fmtYen(p.valor)}</div>
+                <div style={{ fontSize:13, fontWeight:600 }}>{p.faturas?.bars?.nome} — {fmtYen(p.valor)} <span style={{ fontSize:11, color: st.tone==='green'?'var(--green)':'var(--amber)', marginLeft:6 }}>{st.label}</span></div>
                 <div style={{ fontSize:11, color:'var(--text2)' }}>{fmtDate(p.data)} · {p.metodo} {p.notas?'· '+p.notas:''}</div>
               </div>
               <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -110,10 +113,10 @@ function Overview() {
                   await supabase.from('fatura_pagamentos').update({ confirmado:true, confirmado_em:new Date().toISOString() }).eq('id',p.id)
                   await supabase.from('faturas').update({ pago:newPago, status:newPago>=totalFatura?'pago':'parcial' }).eq('id',f.id)
                   load()
-                }} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'#16a34a', color:'white', cursor:'pointer', fontWeight:700 }}>Confirmar</button>
+                }} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'#16a34a', color:'white', cursor:'pointer', fontWeight:700 }}>Confirmar crédito</button>
               </div>
             </div>
-          ))}
+          )})}
         </PortalAlert>
       )}
 
@@ -194,20 +197,22 @@ function InvoiceList() {
   const [showForm, setShowForm] = useState(false)
   const [customDue, setCustomDue] = useState('')
   const [payModal, setPayModal] = useState(null)
-  const [payForm, setPayForm] = useState({ valor:'', metodo:'Cash', notas:'' })
+  const [payForm, setPayForm] = useState({ valor:'', metodo:'Cash', notas:'', emAnalise:false })
   const [saving, setSaving] = useState(false)
   const [selBar, setSelBar] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [expanded, setExpanded] = useState(null)
 
   useEffect(() => { load(); const iv=setInterval(load,30000); return ()=>clearInterval(iv) }, [])
+  const [allPagamentos, setAllPagamentos] = useState([])
   async function load() {
-    const [fR, bR, vR] = await Promise.all([
+    const [fR, bR, vR, pR] = await Promise.all([
       supabase.from('faturas').select('*, bars(nome)').order('data_vencimento',{ascending:false}),
       supabase.from('bars').select('*').order('nome'),
       supabase.from('vendas').select('*, vendas_itens(qtd,preco_unitario,produtos(nome))').order('data',{ascending:false}),
+      supabase.from('fatura_pagamentos').select('*').order('criado_em',{ascending:false}),
     ])
-    setFaturas(fR.data||[]); setBars(bR.data||[]); setVendas(filterSupplierVendas(vR.data||[]))
+    setFaturas(fR.data||[]); setBars(bR.data||[]); setVendas(filterSupplierVendas(vR.data||[])); setAllPagamentos(pR.data||[])
     if (bR.data?.length>0 && !selBar) setSelBar(bR.data[0].id)
     setLoading(false)
   }
@@ -222,10 +227,21 @@ function InvoiceList() {
   async function registerPayment() {
     if (!payForm.valor||!payModal) return; setSaving(true)
     const valor = +payForm.valor
-    await supabase.from('fatura_pagamentos').insert({ fatura_id:payModal.id, valor, metodo:payForm.metodo, notas:payForm.notas, data:new Date().toISOString().slice(0,10) })
-    const newPago = (payModal.pago||0)+valor
-    await supabase.from('faturas').update({ pago:newPago, status:newPago>=payModal.valor?'pago':'parcial' }).eq('id',payModal.id)
-    setSaving(false); setPayModal(null); setPayForm({ valor:'', metodo:'Cash', notas:'' }); load()
+    const emAnalise = payForm.emAnalise || /cart/i.test(payForm.metodo || '')
+    await supabase.from('fatura_pagamentos').insert({
+      fatura_id: payModal.id,
+      valor,
+      metodo: payForm.metodo,
+      notas: payForm.notas,
+      data: new Date().toISOString().slice(0, 10),
+      confirmado: !emAnalise,
+      confirmado_em: emAnalise ? null : new Date().toISOString(),
+    })
+    if (!emAnalise) {
+      const newPago = (payModal.pago||0)+valor
+      await supabase.from('faturas').update({ pago:newPago, status:newPago>=payModal.valor?'pago':'parcial' }).eq('id',payModal.id)
+    }
+    setSaving(false); setPayModal(null); setPayForm({ valor:'', metodo:'Cash', notas:'', emAnalise:false }); load()
   }
   async function generateRyoshusho(fatura) {
     setSaving(true)
@@ -281,6 +297,8 @@ function InvoiceList() {
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {filtered.map(f => {
             const remaining = (f.total||0)-(f.pago||0)
+            const pendingPay = pagamentosPendentes(allPagamentos, f.id)
+            const pendingTotal = totalPagamentosPendentes(allPagamentos, f.id)
             const pct = f.valor>0?Math.round((f.pago||0)/f.total*100):0
             const isOverdue = f.status==='pendente'&&new Date(f.data_vencimento)<new Date()
             const periodStart = f.periodo_inicio || f.data_emissao
@@ -308,6 +326,14 @@ function InvoiceList() {
                     <span>Pago: {fmtYen(f.pago||0)} ({pct}%)</span>
                     {remaining>0&&<span style={{ color:'var(--red)', fontWeight:600 }}>Restante: {fmtYen(remaining)}</span>}
                   </div>
+                  {pendingPay.length>0 && (
+                    <div style={{ background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:8, padding:'8px 12px', marginBottom:10, fontSize:12 }}>
+                      ⏳ {fmtYen(pendingTotal)} em análise ({pendingPay.length} pagamento{pendingPay.length>1?'s':''})
+                      {pendingPay.map(p => (
+                        <div key={p.id} style={{ color:'var(--text2)', marginTop:4 }}>{p.metodo}{p.notas ? ` · ${p.notas}` : ''}</div>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                     {f.status!=='pago'&&<button onClick={()=>setPayModal(f)} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'var(--navy)', color:'white', cursor:'pointer', fontWeight:600 }}>Registrar pagamento</button>}
                     {f.status==='pago'&&!f.ryoshusho_id&&<button onClick={()=>generateRyoshusho(f)} disabled={saving} style={{ padding:'6px 14px', fontSize:12, borderRadius:8, border:'none', background:'var(--gold)', color:'white', cursor:'pointer', fontWeight:600 }}>Gerar 領収書</button>}
@@ -351,8 +377,14 @@ function InvoiceList() {
               Total: {fmtYen(payModal.total || payModal.valor)} · Restante: {fmtYen((+payModal.total || +payModal.valor || 0) - (+payModal.pago || 0))}
             </div>
             <div style={{ marginBottom:12 }}><label className="form-label">Valor (¥)</label><input type="number" value={payForm.valor} onChange={e=>setPayForm({...payForm,valor:e.target.value})} autoFocus /></div>
-            <div style={{ marginBottom:12 }}><label className="form-label">Forma</label><select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value})}>{['Dinheiro','Transferência','Cartão'].map(m=><option key={m}>{m}</option>)}</select></div>
-            <div style={{ marginBottom:20 }}><label className="form-label">Observações</label><input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} /></div>
+            <div style={{ marginBottom:12 }}><label className="form-label">Forma</label><select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value, emAnalise:/cart/i.test(e.target.value)?true:payForm.emAnalise})}>{['Dinheiro','Transferência','Cartão'].map(m=><option key={m}>{m}</option>)}</select></div>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer' }}>
+                <input type="checkbox" checked={payForm.emAnalise} onChange={e=>setPayForm({...payForm, emAnalise:e.target.checked})} />
+                Pagamento em análise (não abate a fatura até confirmar o crédito)
+              </label>
+            </div>
+            <div style={{ marginBottom:20 }}><label className="form-label">Observações</label><input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} placeholder="Ex.: crédito previsto 05/dez/2026" /></div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:8 }}>
               <button onClick={()=>setPayModal(null)} style={{ padding:'11px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancelar</button>
               <button className="btn-primary" onClick={registerPayment} disabled={saving||!payForm.valor} style={{ padding:'11px', borderRadius:12 }}>{saving?'Salvando...':'Registrar pagamento'}</button>
@@ -382,18 +414,20 @@ function PaymentList() {
       >
       {payments.length===0?<Empty text="Nenhum pagamento ainda" icon="💳" />:(
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {payments.map(p=>(
+          {payments.map(p=>{
+            const st = pagamentoStatus(p)
+            return (
             <div key={p.id} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'center', gap:14 }}>
-              <div style={{ width:40, height:40, borderRadius:10, background:'#f0fdf4', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
+              <div style={{ width:40, height:40, borderRadius:10, background: st.tone==='green'?'#f0fdf4':'#fffbeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
                 {/dinheiro|cash/i.test(p.metodo)?'💵':/cart/i.test(p.metodo)?'💳':'🏦'}
               </div>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:600 }}>{p.faturas?.bars?.nome}</div>
+                <div style={{ fontSize:13, fontWeight:600 }}>{p.faturas?.bars?.nome} <span style={{ fontSize:11, color: st.tone==='green'?'var(--green)':'var(--amber)', marginLeft:6 }}>{st.label}</span></div>
                 <div style={{ fontSize:11, color:'var(--text2)' }}>{fmtDate(p.data)} · {p.metodo} {p.notas?'· '+p.notas:''}</div>
               </div>
-              <div style={{ fontSize:16, fontWeight:800, color:'var(--green)' }}>{fmtYen(p.valor)}</div>
+              <div style={{ fontSize:16, fontWeight:800, color: st.tone==='green'?'var(--green)':'var(--amber)' }}>{fmtYen(p.valor)}</div>
             </div>
-          ))}
+          )})}
         </div>
       )}
       </PortalSurface>
