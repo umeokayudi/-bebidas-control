@@ -34,9 +34,9 @@ export function pedidoMonthKey(p) {
   return monthKey(p?.data_pedido || p?.data_entrega_prevista || p?.criado_em || '')
 }
 
-/** Jun/2026 — faturamento da fatura; custo proporcional à razão compras/faturamento de jul/2026 */
-function juneStats({ compras, faturas, faturamentoFaturas, aReceber }) {
-  const faturamento = faturamentoFaturas || 0
+/** Jun/2026 — faturamento dos pedidos/notas emitidas; custo proporcional à razão compras/faturamento de jul/2026 */
+function juneStats({ compras, faturas, faturamentoPedidos, aReceber, pedidos }) {
+  const faturamento = faturamentoPedidos || 0
   const julyCompras = (compras || [])
     .filter(c => compraMatchesMonth(c, JULY_MONTH))
     .reduce((a, c) => a + compraTotal(c), 0)
@@ -53,7 +53,7 @@ function juneStats({ compras, faturas, faturamentoFaturas, aReceber }) {
     lucro: lucroProjetado,
     lucroProjetado,
     margem: faturamento > 0 ? Math.round(lucroProjetado / faturamento * 100) : 0,
-    vendasCount: 0,
+    vendasCount: (pedidos || []).filter(p => pedidoMonthKey(p) === JUNE_MONTH && ['entregue', 'confirmado'].includes(p.status)).length,
     comprasCount: (compras || []).filter(c => compraMatchesMonth(c, JULY_MONTH)).length,
     aReceber,
     precoBase: JULY_MONTH,
@@ -75,7 +75,7 @@ export function monthDashboardStats(m, { vendas, compras, faturas, pedidos, prod
   const aReceber = aReceberForMonth(faturas, m)
 
   if (m === JUNE_MONTH) {
-    return juneStats({ compras, faturas, faturamentoFaturas, aReceber })
+    return juneStats({ compras, faturas, faturamentoPedidos, aReceber, pedidos })
   }
 
   const comprasMes = (compras || []).filter(c => compraMatchesMonth(c, m))

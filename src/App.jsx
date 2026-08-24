@@ -184,9 +184,11 @@ function Dashboard({ onNav }) {
         <PortalKpi
           label="Faturamento"
           value={fmtYen(m.faturamento ?? m.receita)}
-          sub={m.receita > 0 && m.faturamento !== m.receita
-            ? `${fmtYen(m.receita)} já recebido`
-            : `${m.vendasCount} entrega(s) · cobrança do mês`}
+          sub={m.comprasEstimadas
+            ? `${m.vendasCount} pedido(s) · notas emitidas`
+            : m.receita > 0 && m.faturamento !== m.receita
+              ? `${fmtYen(m.receita)} já recebido`
+              : `${m.vendasCount} entrega(s) · cobrança do mês`}
           color="var(--navy)"
           onClick={() => onNav('faturas')}
           hint="Ver faturas →"
