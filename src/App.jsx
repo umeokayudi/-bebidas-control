@@ -177,7 +177,7 @@ function Dashboard({ onNav }) {
           label={`Lucro projetado · ${monthLabel(selMonth)}`}
           value={fmtYen(m.lucroProjetado ?? m.lucro)}
           sub={m.comprasEstimadas
-            ? `Margem ${m.margem}% · fat. ${fmtYen(m.faturamento)} − custo ${fmtYen(m.compras)} (preços jul/2026)`
+            ? `Margem ${m.margem}% · fat. ${fmtYen(m.faturamento)} − custo ${fmtYen(m.compras)} (base jul/2026)`
             : `Margem ${m.margem}% · faturamento ${fmtYen(m.faturamento ?? m.receita)} − compras ${fmtYen(m.compras)}`}
           onClick={() => goToReport(onNav, selMonth)}
         />

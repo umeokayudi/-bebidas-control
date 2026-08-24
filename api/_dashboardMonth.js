@@ -34,58 +34,16 @@ export function pedidoMonthKey(p) {
   return monthKey(p?.data_pedido || p?.data_entrega_prevista || p?.criado_em || '')
 }
 
-function norm(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
-}
-
-function matchProductId(nome, produtos) {
-  if (!nome) return null
-  const n = norm(nome)
-  const exact = (produtos || []).find(p => norm(p.nome) === n)
-  if (exact) return exact.id
-  const partial = (produtos || []).find(p => norm(p.nome).includes(n) || n.includes(norm(p.nome)))
-  if (partial) return partial.id
-  const first = n.split(/\s+/)[0]
-  return (produtos || []).find(p => norm(p.nome).includes(first))?.id || null
-}
-
-function julyUnitPriceMap(compras, produtos = []) {
-  const map = {}
-  for (const c of compras || []) {
-    if (!compraMatchesMonth(c, JULY_MONTH)) continue
-    for (const it of c.compras_itens || []) {
-      const custo = +it.custo_unitario || 0
-      if (!custo) continue
-      const pid = it.produto_id || matchProductId(it.nome, produtos)
-      if (pid) map[pid] = custo
-    }
-  }
-  return map
-}
-
-function unitCost(pid, nome, priceMap, produtos) {
-  if (pid && priceMap[pid]) return priceMap[pid]
-  const matched = pid || matchProductId(nome, produtos)
-  if (matched && priceMap[matched]) return priceMap[matched]
-  return +(produtos || []).find(p => p.id === matched || p.id === pid)?.custo || 0
-}
-
-/** Jun/2026 — faturamento da fatura; custo = pedidos × preço unit. jul/2026 (sem escala/ratio) */
-function juneStats({ compras, pedidos, produtos, faturamentoFaturas, aReceber }) {
-  const priceMap = julyUnitPriceMap(compras, produtos)
-  let custo = 0
-  let itemCount = 0
-
-  for (const p of (pedidos || []).filter(p => pedidoMonthKey(p) === JUNE_MONTH)) {
-    for (const it of p.pedidos_itens || []) {
-      const qtd = +it.qtd || 0
-      if (!qtd) continue
-      custo += qtd * unitCost(it.produto_id, it.nome, priceMap, produtos)
-      itemCount++
-    }
-  }
-
+/** Jun/2026 — faturamento da fatura; custo proporcional à razão compras/faturamento de jul/2026 */
+function juneStats({ compras, faturas, faturamentoFaturas, aReceber }) {
   const faturamento = faturamentoFaturas || 0
+  const julyCompras = (compras || [])
+    .filter(c => compraMatchesMonth(c, JULY_MONTH))
+    .reduce((a, c) => a + compraTotal(c), 0)
+  const julyFat = faturamentoForMonth(faturas, JULY_MONTH)
+  const custo = faturamento > 0 && julyFat > 0 && julyCompras > 0
+    ? Math.round(faturamento * (julyCompras / julyFat))
+    : 0
   const lucroProjetado = faturamento - custo
 
   return {
@@ -96,7 +54,7 @@ function juneStats({ compras, pedidos, produtos, faturamentoFaturas, aReceber })
     lucroProjetado,
     margem: faturamento > 0 ? Math.round(lucroProjetado / faturamento * 100) : 0,
     vendasCount: 0,
-    comprasCount: itemCount,
+    comprasCount: (compras || []).filter(c => compraMatchesMonth(c, JULY_MONTH)).length,
     aReceber,
     precoBase: JULY_MONTH,
     comprasEstimadas: true,
@@ -117,7 +75,7 @@ export function monthDashboardStats(m, { vendas, compras, faturas, pedidos, prod
   const aReceber = aReceberForMonth(faturas, m)
 
   if (m === JUNE_MONTH) {
-    return juneStats({ compras, pedidos, produtos, faturamentoFaturas, aReceber })
+    return juneStats({ compras, faturas, faturamentoFaturas, aReceber })
   }
 
   const comprasMes = (compras || []).filter(c => compraMatchesMonth(c, m))

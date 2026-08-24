@@ -45,17 +45,18 @@ export default async function handler(req, res) {
 
     const chartMonths = lastMonths(6)
 
-    const [{ data: compras }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { data: produtos }, { count: pedidosPendentes }] = await Promise.all([
-      admin.from('compras').select('data, data_compra, data_pagamento, total_real, total_pago, compras_itens(produto_id, nome, qtd, custo_unitario)').order('data'),
+    const [{ data: compras, error: comprasErr }, { data: vendasRaw }, { data: faturas }, { data: pedidos }, { count: pedidosPendentes }] = await Promise.all([
+      admin.from('compras').select('data, data_compra, data_pagamento, total_real, total_pago, compras_itens(nome, qtd, custo_unitario)').order('data'),
       admin.from('vendas').select('data, data_venda, total, obs, origem, cast_id').order('data'),
       admin.from('faturas').select('total, valor, pago, status, periodo_inicio, periodo_fim, data_emissao, data_vencimento, obs'),
-      admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status, pedidos_itens(produto_id, nome, qtd, preco_unitario)'),
-      admin.from('produtos').select('id, nome, custo').eq('ativo', true),
+      admin.from('pedidos').select('data_pedido, data_entrega_prevista, criado_em, total_estimado, status'),
       admin.from('pedidos').select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
     ])
 
+    if (comprasErr) throw new Error('compras: ' + comprasErr.message)
+
     const vendas = (vendasRaw || []).filter(isSupplierVenda)
-    const ctx = { vendas, compras, faturas, pedidos, produtos }
+    const ctx = { vendas, compras, faturas, pedidos }
 
     const months = [...new Set([
       ...(compras || []).map(compraMonthKey),
