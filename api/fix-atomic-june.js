@@ -1,4 +1,4 @@
-import { fixAtomicReceivables, revertAtomicPedidosToJune, ATOMIC_BAR_ID } from './_atomicJuneFix.js'
+import { fixAtomicReceivables, revertAtomicPedidosToJune, markPedidosEntregue, ATOMIC_BAR_ID } from './_atomicJuneFix.js'
 import { fixVendaDatesFromPedidos, dedupePedidoVendas, syncMissingVendasFromPedidos, backfillVendaItensFromPedidos, fixSeikyushoCompraDates } from './_pedidoVendaFix.js'
 import { drinksAdminClient } from './_supabaseAdmin.js'
 
@@ -29,6 +29,16 @@ export default async function handler(req, res) {
     if (action === 'fixVendaDates') {
       const fix = await fixVendaDatesFromPedidos(sb, { barId: body.barId || ATOMIC_BAR_ID })
       return res.status(200).json({ ok: true, fix })
+    }
+
+    if (action === 'markEntregue') {
+      const entregue = await markPedidosEntregue(sb, {
+        dateFrom: body.dateFrom || '2026-06-01',
+        dateTo: body.dateTo || '2026-06-30',
+        statusFrom: body.statusFrom || 'confirmado',
+        barId: body.barId || ATOMIC_BAR_ID,
+      })
+      return res.status(200).json({ ok: true, entregue })
     }
 
     if (action === 'dedupeVendas') {
@@ -91,7 +101,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({
       error: 'action inválida',
-      actions: ['fix', 'revertPedidos', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas', 'syncMissingVendas', 'backfillVendaItens', 'fixSeikyushoCompraDates'],
+      actions: ['fix', 'revertPedidos', 'markEntregue', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas', 'syncMissingVendas', 'backfillVendaItens', 'fixSeikyushoCompraDates'],
     })
   } catch (e) {
     return res.status(500).json({ error: e.message })
