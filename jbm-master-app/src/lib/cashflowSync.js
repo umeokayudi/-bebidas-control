@@ -55,6 +55,8 @@ function normalizeSnapshot(raw) {
     projetado30d: f.projetado30d ?? 0,
     aReceber: f.aReceber ?? 0,
     aPagar: f.aPagar ?? 0,
+    aPagarAtrasado: f.aPagarAtrasado ?? 0,
+    aPagarFuturo: f.aPagarFuturo ?? 0,
     faturasVencidas: f.faturasVencidas ?? 0,
     entradas30d: f.entradas30d ?? 0,
     saidas30d: f.saidas30d ?? 0,

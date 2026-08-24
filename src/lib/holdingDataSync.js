@@ -1,7 +1,7 @@
 /**
  * Snapshot unificado dos dados do sistema para IA JBM Holding.
  */
-import { filterSupplierVendas } from '../components/utils'
+import { filterSupplierVendas, compraDueDate, isCompraOverdue } from '../components/utils'
 import { isSupplierVenda } from './supplierVenda'
 import { loadCashflowSnapshot } from './purchaseCashflowAdvisor'
 import { loadHoldingLocal, syncHoldingFromCloud, resolveOpportunityCostPct } from './jbmHolding'
@@ -20,7 +20,7 @@ export async function fetchHoldingSystemSnapshot(supabase, holdingProfile = null
     supabase.from('bars').select('id,nome'),
     supabase.from('produtos').select('id,nome,categoria,preco_venda,custo,ativo').eq('ativo', true),
     supabase.from('vendas').select('id,bar_id,data,total,obs,cast_id').order('data', { ascending: false }).limit(100),
-    supabase.from('compras').select('id,data,fornecedor,pagamento,total_real,total_pago,status_pagamento,data_pagamento').order('data', { ascending: false }).limit(50),
+    supabase.from('compras').select('id,data,fornecedor,pagamento,total_real,total_pago,status_pagamento,data_pagamento,foto_url').order('data', { ascending: false }).limit(50),
     supabase.from('faturas').select('id,bar_id,valor,total,pago,status,data_vencimento,periodo_inicio,periodo_fim').order('data_vencimento', { ascending: false }).limit(30),
     supabase.from('pedidos').select('id,bar_id,status,total_estimado,criado_em').order('criado_em', { ascending: false }).limit(20),
     supabase.from('fornecedores').select('nome,pagamento,prazo_entrega_dias,pontos_pct'),
@@ -47,7 +47,16 @@ export async function fetchHoldingSystemSnapshot(supabase, holdingProfile = null
   const aReceber = faturasPendentes.reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
 
   const comprasPendentes = compras.filter(c => c.status_pagamento === 'pendente')
-  const aPagar = comprasPendentes.reduce((a, c) => a + (+c.total_pago || +c.total_real || 0), 0)
+  const fornMap = Object.fromEntries((fornecedoresR.data || []).map(f => [f.nome, f.pagamento]))
+  let aPagarAtrasado = 0
+  let aPagarFuturo = 0
+  for (const c of comprasPendentes) {
+    const amt = +c.total_pago || +c.total_real || 0
+    const pag = fornMap[c.fornecedor]
+    if (isCompraOverdue(c, pag) || !compraDueDate(c, pag)) aPagarAtrasado += amt
+    else aPagarFuturo += amt
+  }
+  const aPagar = aPagarAtrasado + aPagarFuturo
 
   const pedidosAtivos = (pedidosR.data || []).filter(p => p.status === 'pendente' || p.status === 'confirmado')
 
@@ -82,6 +91,8 @@ export async function fetchHoldingSystemSnapshot(supabase, holdingProfile = null
       projetado30d: (cashflow.netCash ?? 0) + (cashflow.pendingIn30 ?? 0) - (cashflow.pendingOut30 ?? 0),
       aReceber,
       aPagar,
+      aPagarAtrasado,
+      aPagarFuturo,
       faturasVencidas: faturasVencidas.length,
       entradas30d: cashflow.pendingIn30 ?? 0,
       saidas30d: cashflow.pendingOut30 ?? 0,
@@ -173,7 +184,7 @@ Snapshot financeiro:
 - Caixa líquido: ¥${s.financeiro?.caixaLiquido ?? 0}
 - Projetado 30d: ¥${s.financeiro?.projetado30d ?? 0}
 - A receber bars: ¥${s.financeiro?.aReceber ?? 0}
-- A pagar fornecedores: ¥${s.financeiro?.aPagar ?? 0}
+- A pagar fornecedores: ¥${s.financeiro?.aPagar ?? 0} (atrasado ¥${s.financeiro?.aPagarAtrasado ?? 0}, futuro ¥${s.financeiro?.aPagarFuturo ?? 0})
 - Receita mês: ¥${s.financeiro?.receitaMes ?? 0}
 - Custo compras mês: ¥${s.financeiro?.custoMes ?? 0}
 

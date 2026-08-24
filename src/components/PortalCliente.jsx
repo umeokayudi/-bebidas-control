@@ -600,7 +600,7 @@ function OrdersTab({ bar }) {
   async function load() {
     const [pR, pedR] = await Promise.all([
       supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
-      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(*))').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
+      supabase.from('pedidos').select('*, pedidos_itens(*, produtos(nome,preco_venda,categoria,volume_ml))').eq('bar_id', bar.id).order('criado_em', { ascending:false }).limit(50),
     ])
     setProdutos((pR.data || []).filter(isSupplierProduct))
     setPedidos(pedR.data || [])
@@ -1854,7 +1854,7 @@ function FaturasTab({ bar }) {
 
   async function load() {
     const [fR, vR, pR] = await Promise.all([
-      supabase.from("faturas").select("*").eq("bar_id", bar.id).order("vencimento", { ascending:false }),
+      supabase.from("faturas").select("*").eq("bar_id", bar.id).order("data_vencimento", { ascending:false }),
       supabase.from("vendas").select("total,data").eq("bar_id", bar.id).order("data", { ascending:false }),
       supabase.from("fatura_pagamentos").select("*").order("criado_em", { ascending:false }),
     ])
@@ -1917,7 +1917,7 @@ function FaturasTab({ bar }) {
   const pending = filtered.filter(f=>f.status!=="pago")
   const totalPending = pending.reduce((a,f)=>a+(+f.valor||0)-(+f.pago||0),0)
   const overdue = pending.filter(f=>new Date(f.data_vencimento)<new Date())
-  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.vencimento))
+  const upcoming = pending.filter(f=>new Date(f.data_vencimento)>=new Date()).sort((a,b)=>new Date(a.data_vencimento)-new Date(b.data_vencimento))
   const monthlySpend = []
   const monthLabels = []
   for (let i=5; i>=0; i--) {
@@ -2168,7 +2168,7 @@ function CalendarioTab({ bar }) {
   })
 
   const upcoming = faturas.filter(f=>f.status!=='pago'&&f.data_vencimento>=today.toISOString().slice(0,10))
-    .sort((a,b)=>a.data_vencimento.localeCompare(b.vencimento))
+    .sort((a,b)=>a.data_vencimento.localeCompare(b.data_vencimento))
 
   if (loading) return <Spinner text="Loading..." />
 

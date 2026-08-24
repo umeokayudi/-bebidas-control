@@ -95,7 +95,7 @@ const CATALOG = {
   'White Wine 5L': { price: 3300, category: 'Wine' },
   'White Wine Bottle': { price: 3300, category: 'Wine' },
   'Wilkson Vodka 1800 Ml': { price: 1800, category: 'Vodka' },
-  'Yamazaki NV': { price: 11818, category: 'Japanese Whisky' },
+  'Yamazaki 12 Year': { price: 16000, category: 'Japanese Whisky' },
   'Beefeater': { price: 1980, category: 'Gin' },
   'Don Julio 1942': { price: 21980, category: 'Tequila' },
   'Champagne House': { price: 600, category: 'Champagne' },

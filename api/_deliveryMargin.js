@@ -41,7 +41,7 @@ export function calcItemMargin(qtd, precoVenda, custo) {
 }
 
 async function loadPurchaseCostIndex(sb, prods) {
-  const { data: compras } = await sb.from('compras').select('data, compras_itens(produto_id,nome,custo_unitario)').order('data')
+  const { data: compras } = await sb.from('compras').select('data, compras_itens(nome,qtd,custo_unitario)').order('data')
   return buildPurchaseCostIndex(compras || [], prods)
 }
 

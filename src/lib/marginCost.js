@@ -29,12 +29,17 @@ export function buildPedidoByVendaPrefix(pedidos) {
   return map
 }
 
+function compraDate(compra) {
+  const d = compra?.data_compra || compra?.data || ''
+  return d ? String(d).slice(0, 10) : ''
+}
+
 /** Histórico de custo unitário por produto (compras_itens) */
 export function buildPurchaseCostIndex(compras, produtos = []) {
   const index = {}
 
   for (const compra of compras || []) {
-    const date = compra.data
+    const date = compraDate(compra)
     if (!date) continue
     for (const it of compra.compras_itens || []) {
       const custo = +it.custo_unitario || 0
@@ -53,13 +58,13 @@ export function buildPurchaseCostIndex(compras, produtos = []) {
   return index
 }
 
-/** Custo unitário vigente na data da venda (última compra até essa data) */
-export function unitCostAtDate(index, produtoId, saleDateStr, fallback = 0) {
+/** Custo unitário vigente na data da venda — só preços de notas de compra (sem catálogo) */
+export function unitCostAtDate(index, produtoId, saleDateStr) {
   const history = index[produtoId] || []
-  if (!history.length) return +fallback || 0
+  if (!history.length) return 0
   if (!saleDateStr) return history[history.length - 1].custo
 
-  let cost = +fallback || 0
+  let cost = 0
   for (const h of history) {
     if (h.date <= saleDateStr) cost = h.custo
     else break
@@ -68,12 +73,60 @@ export function unitCostAtDate(index, produtoId, saleDateStr, fallback = 0) {
   return cost
 }
 
+/** Total pago nas notas de compra de um mês */
+export function comprasTotalForMonth(compras, monthKeyFn, month) {
+  return (compras || [])
+    .filter(c => monthKeyFn(c) === month)
+    .reduce((a, c) => a + (+c.total_real || 0), 0)
+}
+
+/** Rateia custo das notas proporcionalmente à receita (bar / venda / produto) */
+export function allocateInvoiceCost(totalCompras, receita, receitaTotal) {
+  if (!totalCompras || !receitaTotal) return 0
+  return totalCompras * (receita / receitaTotal)
+}
+
+/** Linhas item a item das notas de compra de um mês */
+export function flattenComprasItens(comprasMes) {
+  const rows = []
+  for (const c of [...(comprasMes || [])].sort((a, b) => (a.data || '').localeCompare(b.data || ''))) {
+    for (const it of c.compras_itens || []) {
+      const qtd = +it.qtd || 0
+      const custoUnit = +it.custo_unitario || 0
+      rows.push({
+        compraId: c.id,
+        data: c.data,
+        fornecedor: c.fornecedor,
+        pagamento: c.pagamento,
+        nome: it.nome || '—',
+        qtd,
+        custoUnit,
+        totalLinha: qtd * custoUnit,
+        notaTotal: +c.total_real || 0,
+        desconto: +c.desconto_pontos || 0,
+      })
+    }
+  }
+  return rows
+}
+
+/** Soma qtd/custo por produto nas notas do mês */
+export function aggregateComprasItens(comprasMes) {
+  const map = {}
+  for (const row of flattenComprasItens(comprasMes)) {
+    const key = row.nome
+    if (!map[key]) map[key] = { nome: key, qtd: 0, custoTotal: 0 }
+    map[key].qtd += row.qtd
+    map[key].custoTotal += row.totalLinha
+  }
+  return Object.values(map).sort((a, b) => b.custoTotal - a.custoTotal)
+}
+
 export function marginFromVendaItem(it, vendaDate, index, produtos) {
   const qtd = +it.qtd || 0
   const preco = +it.preco_unitario || 0
   const receita = preco * qtd
-  const fallback = it.produtos?.custo ?? produtos?.find(p => p.id === it.produto_id)?.custo ?? 0
-  const unitCost = unitCostAtDate(index, it.produto_id, vendaDate, fallback)
+  const unitCost = unitCostAtDate(index, it.produto_id, vendaDate)
   const custo = unitCost * qtd
   return { receita, custo, lucro: receita - custo, unitCost }
 }
@@ -85,8 +138,7 @@ function marginFromPedidoItems(itens, vendaDate, index, produtos) {
     const qtd = +it.qtd || 0
     const preco = +it.preco_unitario || 0
     receita += preco * qtd
-    const fallback = it.produtos?.custo ?? produtos?.find(p => p.id === it.produto_id)?.custo ?? 0
-    custo += unitCostAtDate(index, it.produto_id, vendaDate, fallback) * qtd
+    custo += unitCostAtDate(index, it.produto_id, vendaDate) * qtd
   }
   return { receita, custo, lucro: receita - custo }
 }
@@ -159,8 +211,7 @@ export function marginFromPedidoItens(itens, pedidoDate, index, produtos = []) {
     const qtd = +it.qtd || 0
     const preco = +it.preco_unitario || 0
     receita += preco * qtd
-    const fallback = it.produtos?.custo ?? produtos?.find(p => p.id === it.produto_id)?.custo ?? 0
-    custo += unitCostAtDate(index, it.produto_id, pedidoDate, fallback) * qtd
+    custo += unitCostAtDate(index, it.produto_id, pedidoDate) * qtd
   }
   return { receita, custo, lucro: receita - custo }
 }

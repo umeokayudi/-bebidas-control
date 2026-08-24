@@ -28,6 +28,23 @@ export async function findVendaForPedido(supabase, pedidoId) {
   return data?.[0] || null
 }
 
+/** Uma query para checar vendas faltantes em vários pedidos */
+export async function findVendaKeysForPedidos(supabase, pedidos) {
+  const keys = new Set((pedidos || []).map(p => String(p.id).slice(0, 8).toLowerCase()))
+  if (!keys.size) return new Set()
+
+  const { data } = await supabase.from('vendas')
+    .select('obs')
+    .ilike('obs', 'Auto: order%')
+
+  const found = new Set()
+  for (const v of data || []) {
+    const m = v.obs?.match(/order ([a-f0-9]{8})/i)
+    if (m && keys.has(m[1].toLowerCase())) found.add(m[1].toLowerCase())
+  }
+  return found
+}
+
 /** Período de faturamento com base na data da venda (não hoje) */
 export function billingPeriodForDate(isoDate) {
   const d = new Date(`${isoDate}T12:00:00`)

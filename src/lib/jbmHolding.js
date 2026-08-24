@@ -83,8 +83,10 @@ export function saveHoldingLocal(profile) {
   localStorage.setItem(HOLDING_STORAGE_KEY, JSON.stringify(profile))
 }
 
+import { staffFetch } from './apiAuth'
+
 export async function syncHoldingFromCloud() {
-  const res = await fetch('/api/holding')
+  const res = await staffFetch('/api/holding')
   if (!res.ok) return loadHoldingLocal()
   const data = await res.json()
   if (data.profile) {
@@ -96,7 +98,7 @@ export async function syncHoldingFromCloud() {
 
 export async function syncHoldingToCloud(profile) {
   saveHoldingLocal(profile)
-  const res = await fetch('/api/holding', {
+  const res = await staffFetch('/api/holding', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ profile }),

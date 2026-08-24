@@ -2,6 +2,8 @@ import { useState, useEffect, Component } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, Spinner, Empty } from './utils'
 import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
+import { fromZeikomi, parseSupplierPriceNotas, formatPriceChange } from '../lib/consumptionTax'
+import { AdminPage, PortalSurface, PortalPills } from './ui/PageLayout'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -19,20 +21,21 @@ class ErrorBoundary extends Component {
 function FornecedoresInner() {
   const [tab, setTab] = useState('list')
   return (
-    <div>
-      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
-        {[['list','Suppliers'],['pricing','Product Pricing'],['purchase','Smart Purchase']].map(([id,label]) => (
-          <button key={id} onClick={()=>setTab(id)} style={{
-            padding:'8px 18px', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer',
-            background: tab===id ? 'var(--navy)' : 'var(--bg3)',
-            color: tab===id ? 'white' : 'var(--text2)', border:'none'
-          }}>{label}</button>
-        ))}
-      </div>
+    <AdminPage
+      title="Fornecedores"
+      subtitle="Cadastro, preços e compra inteligente"
+      actions={
+        <PortalPills
+          options={[['list','Lista'],['pricing','Preços'],['purchase','Compra inteligente']]}
+          value={tab}
+          onChange={setTab}
+        />
+      }
+    >
       {tab==='list'     && <SupplierList />}
       {tab==='pricing'  && <SupplierPricing />}
       {tab==='purchase' && <SmartPurchase />}
-    </div>
+    </AdminPage>
   )
 }
 
@@ -57,7 +60,7 @@ function SupplierList() {
     setSaving(false); setShowForm(false); setEditId(null); setForm(empty); load()
   }
   async function del(id) {
-    if (!confirm('Delete supplier?')) return
+    if (!confirm('Excluir fornecedor?')) return
     await supabase.from('fornecedores').delete().eq('id', id); load()
   }
   function edit(s) {
@@ -66,38 +69,37 @@ function SupplierList() {
       pagamento:s.pagamento||'Cash', pontos_pct:s.pontos_pct||0, notas:s.notas||'' })
     setEditId(s.id); setShowForm(true)
   }
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontSize:16, fontWeight:700 }}>Suppliers ({suppliers.length})</div>
-        <button className="btn-primary" onClick={()=>{setShowForm(x=>!x);setEditId(null);setForm(empty)}}>{showForm?'Cancel':'+ Add supplier'}</button>
+        <div style={{ fontSize:16, fontWeight:700 }}>Fornecedores ({suppliers.length})</div>
+        <button className="btn-primary" onClick={()=>{setShowForm(x=>!x);setEditId(null);setForm(empty)}}>{showForm?'Cancelar':'+ Adicionar fornecedor'}</button>
       </div>
       {showForm && (
-        <div className="card" style={{ marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>{editId?'Edit':'New supplier'}</div>
+        <PortalSurface title={editId?'Editar fornecedor':'Novo fornecedor'} style={{ marginBottom:16 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-            <div><label className="form-label">Name *</label><input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder="e.g. Costco Japan" /></div>
-            <div><label className="form-label">Contact</label><input value={form.contato} onChange={e=>setForm({...form,contato:e.target.value})} /></div>
-            <div><label className="form-label">Phone</label><input value={form.telefone} onChange={e=>setForm({...form,telefone:e.target.value})} /></div>
+            <div><label className="form-label">Nome *</label><input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder="ex. Costco Japan" /></div>
+            <div><label className="form-label">Contato</label><input value={form.contato} onChange={e=>setForm({...form,contato:e.target.value})} /></div>
+            <div><label className="form-label">Telefone</label><input value={form.telefone} onChange={e=>setForm({...form,telefone:e.target.value})} /></div>
             <div><label className="form-label">Email</label><input value={form.email} onChange={e=>setForm({...form,email:e.target.value})} /></div>
-            <div><label className="form-label">Website</label><input value={form.website} onChange={e=>setForm({...form,website:e.target.value})} placeholder="https://" /></div>
-            <div><label className="form-label">Payment</label>
+            <div><label className="form-label">Site</label><input value={form.website} onChange={e=>setForm({...form,website:e.target.value})} placeholder="https://" /></div>
+            <div><label className="form-label">Pagamento</label>
               <select value={form.pagamento} onChange={e=>setForm({...form,pagamento:e.target.value})}>
                 {['Cash','Card','Bank Transfer','Invoice 30d','Invoice 60d','Online'].map(p=><option key={p}>{p}</option>)}
               </select>
             </div>
-            <div><label className="form-label">Delivery days</label><input type="number" min="0" value={form.prazo_entrega_dias} onChange={e=>setForm({...form,prazo_entrega_dias:+e.target.value})} /></div>
-            <div><label className="form-label">Points %</label><input type="number" min="0" step="0.1" value={form.pontos_pct} onChange={e=>setForm({...form,pontos_pct:+e.target.value})} /></div>
+            <div><label className="form-label">Prazo de entrega (dias)</label><input type="number" min="0" value={form.prazo_entrega_dias} onChange={e=>setForm({...form,prazo_entrega_dias:+e.target.value})} /></div>
+            <div><label className="form-label">Pontos %</label><input type="number" min="0" step="0.1" value={form.pontos_pct} onChange={e=>setForm({...form,pontos_pct:+e.target.value})} /></div>
           </div>
-          <div style={{ marginBottom:12 }}><label className="form-label">Notes</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} /></div>
+          <div style={{ marginBottom:12 }}><label className="form-label">Notas</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} /></div>
           <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
-            <button onClick={()=>{setShowForm(false);setEditId(null)}} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancel</button>
-            <button className="btn-primary" onClick={save} disabled={saving||!form.nome}>{saving?'Saving...':editId?'Save':'Add supplier'}</button>
+            <button onClick={()=>{setShowForm(false);setEditId(null)}} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancelar</button>
+            <button className="btn-primary" onClick={save} disabled={saving||!form.nome}>{saving?'Salvando...':editId?'Salvar':'Adicionar fornecedor'}</button>
           </div>
-        </div>
+        </PortalSurface>
       )}
-      {suppliers.length===0 ? <Empty text="No suppliers yet" icon="🏭" /> : (
+      {suppliers.length===0 ? <Empty text="Nenhum fornecedor ainda" icon="🏭" /> : (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {suppliers.map(s => (
             <div key={s.id} className="card" style={{ display:'flex', alignItems:'center', gap:16 }}>
@@ -172,14 +174,25 @@ function SupplierPricing() {
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             {produtos.filter(p=>p.categoria===cat).map(p => {
               const sp = supPrecos.find(x=>x.produto_id===p.id)
-              const diff = sp&&p.custo ? Math.round((sp.preco-p.custo)/p.custo*100) : null
+              const meta = sp ? parseSupplierPriceNotas(sp.notas) : {}
+              const zeibetsu = meta.zeibetsu ?? (sp ? fromZeikomi(sp.preco) : null)
+              const variacao = meta.variacao_pct
+              const diff = sp && p.custo ? Math.round((sp.preco - p.custo) / p.custo * 100) : null
               return (
                 <div key={p.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10 }}>
                   <div style={{ flex:1, fontSize:13, fontWeight:500 }}>{p.nome}</div>
                   <div style={{ fontSize:12, color:'var(--text2)' }}>JBM: {fmtYen(p.custo)}</div>
                   {sp ? <>
-                    <div style={{ fontSize:14, fontWeight:700, color:diff<0?'var(--green)':diff>0?'var(--red)':'var(--navy)' }}>{fmtYen(sp.preco)}</div>
-                    {diff!==null && <div style={{ fontSize:11, fontWeight:600, color:diff<0?'var(--green)':diff>0?'var(--red)':'var(--text2)' }}>{diff>0?'+':''}{diff}%</div>}
+                    {zeibetsu != null && <div style={{ fontSize:11, color:'var(--text3)' }}>税抜 {fmtYen(zeibetsu)}</div>}
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--navy)' }} title="税込 (+10%)">{fmtYen(sp.preco)}</div>
+                    {variacao != null && variacao !== 0 && (
+                      <div style={{ fontSize:11, fontWeight:700, color: variacao > 0 ? 'var(--red)' : 'var(--green)' }}>
+                        jul {formatPriceChange(variacao)}
+                      </div>
+                    )}
+                    {diff !== null && diff !== 0 && (
+                      <div style={{ fontSize:10, color: diff < 0 ? 'var(--green)' : 'var(--red)' }}>vs JBM {diff > 0 ? '+' : ''}{diff}%</div>
+                    )}
                     {sp.url_compra && <a href={sp.url_compra} target="_blank" rel="noreferrer" style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'var(--bg3)', color:'var(--navy)', textDecoration:'none', fontWeight:600 }}>🛒 Buy</a>}
                   </> : <div style={{ fontSize:12, color:'var(--text3)' }}>—</div>}
                   <button onClick={()=>setModal({ fornecedor_id:selSup, produto_id:p.id, preco:sp?.preco||'', url_compra:sp?.url_compra||'', notas:sp?.notas||'' })}
