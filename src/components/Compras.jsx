@@ -3,11 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import {
   fmtYen, fmtDate, monthKey, monthLabel, compraDate,
-  MetricCard, Badge, Spinner, Empty, SectionTitle, DelBtn,
+  Badge, Spinner, Empty, DelBtn,
   PAGAMENTOS, analyzeReceipt
 } from './utils'
 import { loadAllCompras } from '../lib/loadCompras'
 import { SupplierPricePanel } from './SupplierPriceCheck'
+import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
+import { AdminPage, PortalSurface, PortalKpi } from './ui/PageLayout'
 
 export default function ComprasTab() {
   const { user } = useAuth()
@@ -145,10 +147,8 @@ export default function ComprasTab() {
   }
 
   return (
-    <div className="fade-in">
-      {/* SCAN */}
-      <div className="card">
-        <SectionTitle>📷 Scan receipt</SectionTitle>
+    <AdminPage title="Compras" subtitle="Notas de fornecedor, custos e histórico">
+      <PortalSurface title="📷 Ler nota">
         <div
           onClick={() => document.getElementById('fileCompra').click()}
           style={{
@@ -163,9 +163,9 @@ export default function ComprasTab() {
             ? <img src={imgSrc} alt="nota" style={{ maxHeight: 160, maxWidth: '100%', borderRadius: 8 }} />
             : <>
                 <div style={{ fontSize: 40, marginBottom: 8 }}>📄</div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>Tap to select receipt photo</div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>Toque para selecionar foto da nota</div>
                 <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-                  AI extracts supplier, items, payment and points automatically
+                  A IA extrai fornecedor, itens, pagamento e pontos automaticamente
                 </div>
               </>
           }
@@ -183,17 +183,15 @@ export default function ComprasTab() {
             {scanned.desconto_pontos > 0 && ` · desconto pontos: ${fmtYen(scanned.desconto_pontos)}`}
           </div>
         )}
-      </div>
+      </PortalSurface>
 
-      {/* FORM */}
-      <div className="card">
-        <SectionTitle>Register purchase</SectionTitle>
+      <PortalSurface title="Registrar compra">
         <div className="grid3" style={{ marginBottom: 12 }}>
           <div><label className="form-label">Data</label>
             <input type="date" value={form.data} onChange={e=>setF('data',e.target.value)} /></div>
-          <div><label className="form-label">Supplier</label>
+          <div><label className="form-label">Fornecedor</label>
             <select value={form.fornecedor} onChange={e=>setF('fornecedor',e.target.value)}>
-              <option value="">— Select supplier —</option>
+              <option value="">— Selecionar fornecedor —</option>
               {fornecedores.map(f=><option key={f.id} value={f.nome}>{f.nome}</option>)}
             </select></div>
           <div><label className="form-label">Pagamento</label>
@@ -254,7 +252,7 @@ export default function ComprasTab() {
         </div>
         <div style={{ marginBottom: 12 }}>
           <label className="form-label">Observação</label>
-          <input type="text" value={form.obs} onChange={e=>setF('obs',e.target.value)} placeholder="Optional" />
+          <input type="text" value={form.obs} onChange={e=>setF('obs',e.target.value)} placeholder="Opcional" />
         </div>
 
         {/* Itens */}
@@ -295,38 +293,37 @@ export default function ComprasTab() {
 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16 }}>
           <div style={{ fontSize:14 }}>
-            Real cost: <strong style={{ color:'var(--blue)' }}>
+            Custo real: <strong style={{ color:'var(--blue)' }}>
               {fmtYen(purchaseTotal)}
             </strong>
           </div>
           <button className="btn-primary" onClick={saveCompra} disabled={saving}>
-            {saving ? <><span className="spinner" />Saving...</> : 'Save purchase'}
+            {saving ? <><span className="spinner" />Salvando...</> : 'Salvar compra'}
           </button>
         </div>
-      </div>
+      </PortalSurface>
 
-      {/* HISTÓRICO */}
-      <div className="card">
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-          <SectionTitle style={{ margin:0 }}>Purchase history</SectionTitle>
+      <PortalSurface
+        title="Histórico"
+        headerRight={
           <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{ width:'auto' }}>
-            <option value="">All months</option>
+            <option value="">Todos os meses</option>
             {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
           </select>
+        }
+      >
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:16 }}>
+          <PortalKpi label="Custo total" value={fmtYen(totalCusto)} color="var(--red)" />
+          <PortalKpi label="Desc. pontos" value={fmtYen(totalDesconto)} color="var(--green)" />
+          <PortalKpi label="Custo real" value={fmtYen(totalCusto)} color="var(--blue)" />
+          <PortalKpi label="Pts acumulados" value={totalPontos.toLocaleString()} />
         </div>
 
-        <div className="grid4" style={{ marginBottom:16 }}>
-          <MetricCard label="Custo total" value={fmtYen(totalCusto)} color="var(--red)" />
-          <MetricCard label="Desc. pontos" value={fmtYen(totalDesconto)} color="var(--green)" />
-          <MetricCard label="Custo real" value={fmtYen(totalCusto)} color="var(--blue)" />
-          <MetricCard label="Pts acumulados" value={totalPontos.toLocaleString()} />
-        </div>
-
-        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="No purchases registrada" /> : (
+        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="Nenhuma compra registrada" /> : (
           <table>
             <thead>
               <tr>
-                <th>Data</th><th>Supplier</th><th>Pagamento</th>
+                <th>Data</th><th>Fornecedor</th><th>Pagamento</th>
                 <th>Subtotal</th><th>Desc. Pontos</th><th>Custo Real</th>
                 <th>Pts</th><th>Itens</th><th></th>
               </tr>
@@ -352,7 +349,7 @@ export default function ComprasTab() {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
+      </PortalSurface>
+    </AdminPage>
   )
 }

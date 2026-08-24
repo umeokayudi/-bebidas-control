@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { fmtYen, fmtDate, Empty, SectionTitle } from './utils'
+import { fmtYen, fmtDate, Empty } from './utils'
+import { PortalSurface } from './ui/PageLayout'
 
 function NotaBlock({ compra }) {
   const [open, setOpen] = useState(false)
@@ -73,19 +74,14 @@ export default function ComprasNotasSection({ comprasMes, totalCompras, creditoB
 
   if (!sorted.length) {
     return (
-      <div className="card" style={{ marginBottom: 16 }}>
-        <SectionTitle>Notas de compra</SectionTitle>
+      <PortalSurface title="Notas de compra">
         <Empty text="Nenhuma compra neste mês" />
-      </div>
+      </PortalSurface>
     )
   }
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <SectionTitle>Notas de compra — {sorted.length} nota(s)</SectionTitle>
-      <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
-        Clique na nota para ver quantidade e custo de cada item.
-      </div>
+    <PortalSurface title={`Notas de compra — ${sorted.length} nota(s)`} sub="Clique na nota para ver quantidade e custo de cada item.">
 
       {creditoBar > 0 && (
         <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(26,107,74,0.08)', fontSize: 12, color: 'var(--text2)' }}>
@@ -102,6 +98,6 @@ export default function ComprasNotasSection({ comprasMes, totalCompras, creditoB
         <span>Total pago</span>
         <span style={{ color: 'var(--red)' }}>{fmtYen(totalCompras)}</span>
       </div>
-    </div>
+    </PortalSurface>
   )
 }

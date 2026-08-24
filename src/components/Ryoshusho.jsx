@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmtYen, fmtDate, Spinner, Empty, SectionTitle, filterSupplierVendas } from './utils'
+import { fmtYen, fmtDate, Spinner, Empty, filterSupplierVendas } from './utils'
+import { AdminPage, PortalSurface } from './ui/PageLayout'
 
 const TAX_RATE = 0.10
 
@@ -76,8 +77,8 @@ export default function RyoshushoTab() {
   const bar = bars.find(b => b.id === barId)
 
   async function saveAndDownload() {
-    if (!barId || !periodoIni || !periodoFim) return alert('Select bar and period first')
-    if (items.length === 0) return alert('No sales found for this period')
+    if (!barId || !periodoIni || !periodoFim) return alert('Selecione o bar e o período primeiro')
+    if (items.length === 0) return alert('Nenhuma venda encontrada neste período')
     setGenerating(true)
 
     try {
@@ -143,56 +144,55 @@ export default function RyoshushoTab() {
     loadAll()
   }
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text="Carregando..." />
 
   return (
-    <div className="fade-in">
-      <div className="card" style={{ marginBottom: 16 }}>
-        <SectionTitle>領収書 — Issue Receipt</SectionTitle>
+    <AdminPage title="領収書" subtitle="Emitir recibo de recebimento para o bar">
+      <PortalSurface title="Emitir 領収書">
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
           <div>
-            <label className="form-label">Bar / Client</label>
+            <label className="form-label">Bar / Cliente</label>
             <select value={barId} onChange={e => setBarId(e.target.value)}>
               {bars.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
           </div>
           <div>
-            <label className="form-label">Issue date</label>
+            <label className="form-label">Data de emissão</label>
             <input type="date" value={dataEmis} onChange={e => setDataEmis(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Document No.</label>
+            <label className="form-label">Nº do documento</label>
             <input type="text" value={numero} onChange={e => setNumero(e.target.value)} />
           </div>
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
           <div>
-            <label className="form-label">Period start</label>
+            <label className="form-label">Início do período</label>
             <input type="date" value={periodoIni} onChange={e => setPeriodoIni(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Period end</label>
+            <label className="form-label">Fim do período</label>
             <input type="date" value={periodoFim} onChange={e => setPeriodoFim(e.target.value)} />
           </div>
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12, marginBottom:12 }}>
           <div>
-            <label className="form-label">Company name</label>
+            <label className="form-label">Nome da empresa</label>
             <input type="text" value={emitNome} onChange={e => setEmitNome(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Reg. No.</label>
+            <label className="form-label">Nº de registro</label>
             <input type="text" value={emitReg} onChange={e => setEmitReg(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Address</label>
+            <label className="form-label">Endereço</label>
             <input type="text" value={emitEnd} onChange={e => setEmitEnd(e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Phone</label>
+            <label className="form-label">Telefone</label>
             <input type="text" value={emitTel} onChange={e => setEmitTel(e.target.value)} />
           </div>
         </div>
@@ -200,10 +200,10 @@ export default function RyoshushoTab() {
         {periodoIni && periodoFim && (
           <div style={{ background:'var(--bg3)', borderRadius:8, padding:'12px 14px', marginBottom:12, fontSize:13 }}>
             <div style={{ fontWeight:600, marginBottom:8, fontSize:11, color:'var(--text2)', textTransform:'uppercase' }}>
-              Items for period
+              Itens do período
             </div>
             {items.length === 0
-              ? <span style={{ color:'var(--text2)' }}>No sales found for this bar/period</span>
+              ? <span style={{ color:'var(--text2)' }}>Nenhuma venda neste bar/período</span>
               : items.map((it, i) => (
                 <div key={i} style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
                   <span>{it.nome} &times; {it.qtd}</span>
@@ -213,7 +213,7 @@ export default function RyoshushoTab() {
             }
             {items.length > 0 && (
               <div style={{ borderTop:'0.5px solid var(--border)', marginTop:8, paddingTop:8, fontWeight:700 }}>
-                Total (incl. 10% tax): {fmtYen(total)}
+                Total (incl. 10% imposto): {fmtYen(total)}
               </div>
             )}
           </div>
@@ -221,15 +221,14 @@ export default function RyoshushoTab() {
 
         <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
           <button className="btn-primary" onClick={saveAndDownload} disabled={generating}>
-            {generating ? <><span className="spinner"/> Saving...</> : '\uD83D\uDDA8 Save & Download'}
+            {generating ? <><span className="spinner"/> Salvando...</> : '🖨 Salvar e baixar'}
           </button>
         </div>
-      </div>
+      </PortalSurface>
 
-      <div className="card">
-        <SectionTitle>Issued receipts</SectionTitle>
+      <PortalSurface title="Recibos emitidos">
         {history.length === 0
-          ? <Empty text="No receipts issued yet" />
+          ? <Empty text="Nenhum recibo emitido" />
           : (
             <table>
               <thead>
@@ -248,7 +247,7 @@ export default function RyoshushoTab() {
                     </td>
                     <td style={{ fontWeight:700 }}>{fmtYen(r.total)}</td>
                     <td>
-                      <button onClick={async()=>{ if(!confirm('Delete this ryoshusho?'))return; await supabase.from('ryoshusho').delete().eq('id',r.id); setHistory(prev=>prev.filter(x=>x.id!==r.id)) }} style={{padding:'3px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',cursor:'pointer'}}>🗑</button>
+                      <button onClick={async()=>{ if(!confirm('Excluir este 領収書?'))return; await supabase.from('ryoshusho').delete().eq('id',r.id); setHistory(prev=>prev.filter(x=>x.id!==r.id)) }} style={{padding:'3px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',cursor:'pointer'}}>🗑</button>
                     </td>
                   </tr>
                 ))}
@@ -256,7 +255,7 @@ export default function RyoshushoTab() {
             </table>
           )
         }
-      </div>
-    </div>
+      </PortalSurface>
+    </AdminPage>
   )
 }
