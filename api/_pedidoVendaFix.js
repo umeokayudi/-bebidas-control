@@ -220,7 +220,7 @@ export async function fixSeikyushoCompraDates(sb, opts = {}) {
     .order('criado_em', { ascending: false })
   if (error) throw new Error(error.message)
 
-  const report = { checked: 0, updated: 0, itensLinked: 0, ids: [] }
+  const report = { checked: 0, updated: 0, itensMatched: 0, itensUnmatched: 0, ids: [] }
   const { data: prods } = await sb.from('produtos').select('id,nome').eq('ativo', true)
 
   for (const c of compras || []) {
@@ -232,17 +232,15 @@ export async function fixSeikyushoCompraDates(sb, opts = {}) {
       report.ids.push({ compraId: c.id, from: c.data, to: targetDate })
     }
 
-    const { data: itens } = await sb.from('compras_itens').select('id, nome, produto_id').eq('compra_id', c.id)
+    const { data: itens } = await sb.from('compras_itens').select('id, nome').eq('compra_id', c.id)
     for (const it of itens || []) {
-      if (it.produto_id) continue
       const nome = (it.nome || '').toLowerCase()
       const prod = (prods || []).find(p => {
         const n = (p.nome || '').toLowerCase()
         return n === nome || n.includes(nome) || nome.includes(n)
       })
-      if (!prod) continue
-      await sb.from('compras_itens').update({ produto_id: prod.id }).eq('id', it.id)
-      report.itensLinked++
+      if (prod) report.itensMatched++
+      else report.itensUnmatched++
     }
   }
 

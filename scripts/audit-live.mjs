@@ -28,11 +28,12 @@ async function main() {
   const audit = await getJson(`${ORIGIN}/api/holding-audit`)
   checks.push({ ok: !audit.error && audit.checksOk >= 5, name: 'holding-audit', detail: audit.error || `${audit.checksOk}/${audit.checksTotal} checks` })
 
-  const { data: atomicFat } = await fetch(`${SB}/faturas?bar_id=eq.${BAR}&status=neq.pago&select=valor,total,pago`, {
-    headers: { apikey: DRINKS_KEY, Authorization: `Bearer ${DRINKS_KEY}` },
-  }).then(r => r.json())
-  const atomicAReceber = (atomicFat || []).reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
-  checks.push({ ok: atomicAReceber >= 465000, name: 'Atomic a receber (faturas)', detail: `¥${atomicAReceber.toLocaleString('ja-JP')}` })
+  const atomicAReceber = audit.financeiro?.atomicAReceber ?? 0
+  checks.push({
+    ok: atomicAReceber >= 465000,
+    name: 'Atomic a receber (faturas)',
+    detail: `¥${atomicAReceber.toLocaleString('ja-JP')}`,
+  })
 
   const junEntregues = await count(`pedidos?bar_id=eq.${BAR}&data_pedido=gte.2026-06-01&data_pedido=lte.2026-06-30&status=eq.entregue&select=id`)
   const julPend = await count(`pedidos?bar_id=eq.${BAR}&data_pedido=gte.2026-07-01&status=eq.pendente&select=id`)
@@ -41,8 +42,8 @@ async function main() {
   checks.push({ ok: julPend === 0, name: 'Pedidos jul pendentes', detail: String(julPend) })
   checks.push({ ok: movido === 0, name: 'Tag movido jun→jul', detail: movido ? `${movido} restantes` : 'limpo' })
 
-  const fpLm = await count(`fornecedor_precos?fornecedor_id=eq.499916d4-75c8-4fa9-b5da-05407739f8c3&select=id`)
-  const fpFel = await count(`fornecedor_precos?fornecedor_id=eq.75aae5fb-9058-4be0-a7b9-2af098def50a&select=id`)
+  const fpLm = audit.supplierPrices?.liquorMountain ?? 0
+  const fpFel = audit.supplierPrices?.felicity ?? 0
   checks.push({ ok: fpLm >= 25, name: 'Preços Liquor Mountain', detail: String(fpLm) })
   checks.push({ ok: fpFel >= 10, name: 'Preços Felicity/Miraido', detail: String(fpFel) })
 

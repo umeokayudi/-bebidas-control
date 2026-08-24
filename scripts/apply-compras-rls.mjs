@@ -19,4 +19,6 @@ if (error) {
   process.exit(1)
 }
 console.log(`✅ Service role vê ${count} compras`)
-console.log('ℹ️  Para RLS permanente, cole COMPRAS_RLS_FIX.sql no Supabase SQL Editor')
+console.log('ℹ️  Para RLS permanente, cole no Supabase SQL Editor:')
+console.log('   - COMPRAS_RLS_FIX.sql')
+console.log('   - FORNECEDOR_PRECOS_RLS_FIX.sql')

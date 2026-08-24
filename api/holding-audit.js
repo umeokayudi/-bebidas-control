@@ -49,6 +49,8 @@ function adminClient() {
 }
 
 const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
+const LM_FORN_ID = '499916d4-75c8-4fa9-b5da-05407739f8c3'
+const FELICITY_FORN_ID = '75aae5fb-9058-4be0-a7b9-2af098def50a'
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -116,7 +118,7 @@ export default async function handler(req, res) {
       if (data) holding = JSON.parse(await data.text())
     } catch { /* default */ }
 
-    const [bars, produtos, vendas, compras, faturas, pedidos, fornecedores, perfis, barPricing] = await Promise.all([
+    const [bars, produtos, vendas, compras, faturas, pedidos, fornecedores, perfis, barPricing, fpLm, fpFel] = await Promise.all([
       sb.from('bars').select('id,nome'),
       sb.from('produtos').select('id', { count: 'exact' }).eq('ativo', true),
       sb.from('vendas').select('total,obs,cast_id,data,bar_id').order('data', { ascending: false }).limit(100),
@@ -126,6 +128,8 @@ export default async function handler(req, res) {
       sb.from('fornecedores').select('nome,pagamento,pontos_pct'),
       sb.from('perfis').select('role'),
       sb.from('bar_pricing').select('bar_id', { count: 'exact', head: true }),
+      sb.from('fornecedor_precos').select('id', { count: 'exact', head: true }).eq('fornecedor_id', LM_FORN_ID),
+      sb.from('fornecedor_precos').select('id', { count: 'exact', head: true }).eq('fornecedor_id', FELICITY_FORN_ID),
     ])
 
     const vendasSupplier = (vendas.data || []).filter(isSupplierVenda)
@@ -137,6 +141,13 @@ export default async function handler(req, res) {
     const paidIn = faturasData.filter(f => f.status === 'pago').reduce((a, f) => a + (+f.valor || +f.total || 0), 0)
     const paidOut = (compras.data || []).filter(c => c.status_pagamento === 'pago' || !c.status_pagamento).reduce((a, c) => a + (+c.total_real || +c.total_pago || 0), 0)
     const aReceber = faturasData.filter(f => f.status !== 'pago').reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
+    const atomicAReceber = faturasData
+      .filter(f => f.bar_id === ATOMIC_BAR_ID && f.status !== 'pago')
+      .reduce((a, f) => a + Math.max(0, (+f.valor || +f.total || 0) - (+f.pago || 0)), 0)
+    const supplierPrices = {
+      liquorMountain: fpLm.count || 0,
+      felicity: fpFel.count || 0,
+    }
 
     const today = new Date().toISOString().slice(0, 10)
     const faturasVencidas = faturasData.filter(f => f.status !== 'pago' && f.data_vencimento < today).length
@@ -153,7 +164,8 @@ export default async function handler(req, res) {
     const payload = {
       geradoEm: new Date().toISOString(),
       holding,
-      financeiro: { receitaMes, custoMes, caixaLiquido: paidIn - paidOut, aReceber, faturasVencidas },
+      financeiro: { receitaMes, custoMes, caixaLiquido: paidIn - paidOut, aReceber, atomicAReceber, faturasVencidas },
+      supplierPrices,
       operacao: {
         entregas: vendasSupplier.length,
         pedidosAtivos: (pedidos.data || []).filter(p => p.status === 'pendente' || p.status === 'confirmado').length,

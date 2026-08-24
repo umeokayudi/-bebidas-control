@@ -211,7 +211,7 @@ export async function registerSeikyusho(body) {
     report.margemPct = report.receita > 0 ? Math.round((report.lucro / report.receita) * 100) : 0
   } else if (extracted.entregas?.length || extracted.itens_venda?.length) {
     const { data: comprasHist } = await sb.from('compras')
-      .select('data, compras_itens(produto_id,nome,custo_unitario)')
+      .select('data, compras_itens(nome,qtd,custo_unitario)')
       .order('data')
     const costIndex = buildPurchaseCostIndex(comprasHist || [], prods)
 
