@@ -58,6 +58,7 @@ function SparkLine({ data, color='var(--navy)', height=40 }) {
 }
 
 function HomeTab({ bar, onTab }) {
+  const { t } = useI18n()
   const [vendas,      setVendas]      = useState([])
   const [pedidos,     setPedidos]     = useState([])
   const [itens,       setItens]       = useState([])
@@ -131,7 +132,25 @@ function HomeTab({ bar, onTab }) {
 
   const maxMonth = Math.max(...monthlyData, 1)
 
-  if (loading) return <Spinner text="Carregando painel..." />
+  if (loading) return <Spinner text={t('portal.home.loading')} />
+
+  const deliveriesLabel = account.deliveries === 1
+    ? t('portal.home.deliveriesThisMonth', { count: account.deliveries })
+    : t('portal.home.deliveriesThisMonthPlural', { count: account.deliveries })
+
+  const growthSub = growth !== null
+    ? (growth >= 0 ? t('portal.home.growthUp', { pct: growth }) : t('portal.home.growthDown', { pct: growth }))
+    : null
+
+  const tableHeaders = [
+    t('portal.home.tableProduct'),
+    t('portal.home.tableQty'),
+    t('portal.home.tableJbmCost'),
+    t('portal.home.tablePosPerUnit'),
+    t('portal.home.tableTotalMargin'),
+    t('portal.home.tableMarginPct'),
+    '',
+  ]
 
   return (
     <div className="fade-in portal-page" style={{ maxWidth:1000 }}>
@@ -139,7 +158,7 @@ function HomeTab({ bar, onTab }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
         <div>
           <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Portal do cliente · JBM Drinks</div>
+          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{t('portal.home.subtitle')}</div>
         </div>
         <div style={{ display:'flex', gap:6 }}>
           {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
@@ -160,36 +179,36 @@ function HomeTab({ bar, onTab }) {
           boxShadow:'0 12px 40px rgba(0,16,40,0.25)'
         }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', opacity:0.65, marginBottom:10, fontWeight:700 }}>
-            Conta JBM · {mes}
+            {t('portal.home.jbmAccount', { month: mes })}
           </div>
           <div style={{ fontSize:32, fontWeight:900, lineHeight:1, letterSpacing:-1 }}>{fmtYen(account.contaMes)}</div>
           <div style={{ fontSize:12, opacity:0.75, marginTop:10 }}>
-            {account.deliveries} entrega{account.deliveries !== 1 ? 's' : ''} este mês
+            {deliveriesLabel}
             {account.growth !== null && (
               <span style={{ marginLeft:8, color: account.growth >= 0 ? '#6ee7b7' : '#fca5a5', fontWeight:700 }}>
-                {account.growth >= 0 ? '↑' : '↓'} {Math.abs(account.growth)}% vs mês anterior
+                {t('portal.home.vsPrevMonth', { dir: account.growth >= 0 ? '↑' : '↓', pct: Math.abs(account.growth) })}
               </span>
             )}
           </div>
           {account.faturaPendente > 0 && (
             <div style={{ marginTop:14, padding:'10px 12px', background:'rgba(255,59,48,0.15)', borderRadius:10, fontSize:12, border:'1px solid rgba(255,59,48,0.3)' }}>
-              ⏳ Fatura pendente: <strong>{fmtYen(account.faturaPendente)}</strong>
+              {t('portal.home.pendingInvoice', { amount: fmtYen(account.faturaPendente) })}
             </div>
           )}
           {account.faturasCount === 0 && account.contaMes > 0 && (
-            <div style={{ marginTop:14, fontSize:11, opacity:0.55 }}>Valor das compras JBM registradas no mês</div>
+            <div style={{ marginTop:14, fontSize:11, opacity:0.55 }}>{t('portal.home.monthPurchasesNote')}</div>
           )}
         </div>
 
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:20, padding:'22px 24px' }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            Faturamento projetado (POS)
+            {t('portal.home.projectedRevenue')}
           </div>
           <div style={{ fontSize:30, fontWeight:900, color:'var(--navy)', lineHeight:1, letterSpacing:-0.5 }}>
             {fmtYen(monthProjection.posTotal)}
           </div>
           <div style={{ fontSize:12, color:'var(--text2)', marginTop:10, lineHeight:1.5 }}>
-            Se vender tudo pelo preço do bar ({monthProjection.posCoveragePct}% com preços POS cadastrados)
+            {t('portal.home.sellAtBarPrice', { pct: monthProjection.posCoveragePct })}
           </div>
           <div style={{ marginTop:12, display:'flex', gap:8, flexWrap:'wrap' }}>
             <span style={{ fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'#EAF0FA', color:'var(--navy)' }}>
@@ -197,7 +216,7 @@ function HomeTab({ bar, onTab }) {
             </span>
             {monthProjection.estimatedSharePct > 0 && (
               <span style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:20, background:'#fffbeb', color:'var(--amber)' }}>
-                ~{monthProjection.estimatedSharePct}% estimado
+                {t('portal.home.estimated', { pct: monthProjection.estimatedSharePct })}
               </span>
             )}
           </div>
@@ -205,13 +224,13 @@ function HomeTab({ bar, onTab }) {
 
         <div style={{ background:'var(--bg2)', border:'1px solid rgba(52,199,89,0.25)', borderRadius:20, padding:'22px 24px' }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            Lucro projetado (margem)
+            {t('portal.home.projectedProfit')}
           </div>
           <div style={{ fontSize:30, fontWeight:900, color:'var(--green)', lineHeight:1, letterSpacing:-0.5 }}>
             {fmtYen(monthProjection.margin)}
           </div>
           <div style={{ fontSize:12, color:'var(--text2)', marginTop:10 }}>
-            Margem {monthProjection.marginPct}% sobre faturamento POS
+            {t('portal.home.marginOnPos', { pct: monthProjection.marginPct })}
           </div>
           <div style={{ marginTop:14, height:6, background:'var(--bg3)', borderRadius:3, overflow:'hidden' }}>
             <div style={{ height:'100%', width:Math.min(monthProjection.marginPct,100)+'%', background:'var(--green)', borderRadius:3 }}/>
@@ -223,10 +242,15 @@ function HomeTab({ bar, onTab }) {
       {periodo !== '30' || monthProjection.jbmTotal !== periodProjection.jbmTotal ? (
         <div style={{ background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:14, padding:'12px 16px', marginBottom:16, fontSize:12, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
           <span>
-            <strong>Últimos {periodo} dias:</strong> compras {fmtYen(periodProjection.jbmTotal)} → projeção POS {fmtYen(periodProjection.posTotal)} (lucro {fmtYen(periodProjection.margin)})
+            <strong>{t('portal.home.periodStrip', {
+              days: periodo,
+              jbm: fmtYen(periodProjection.jbmTotal),
+              pos: fmtYen(periodProjection.posTotal),
+              margin: fmtYen(periodProjection.margin),
+            })}</strong>
           </span>
           <button onClick={()=>onTab('precos')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
-            Ajustar preços POS →
+            {t('portal.home.adjustPosPrices')}
           </button>
         </div>
       ) : null}
@@ -234,10 +258,10 @@ function HomeTab({ bar, onTab }) {
       {/* KPI row */}
       <div className="portal-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[
-          { label:'Gasto total', value:fmtYen(totalPeriod), sub: growth!==null?(growth>=0?'↑ +'+growth+'% vs anterior':'↓ '+growth+'% vs anterior'):null, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
-          { label:'Entregas', value:vendasPeriod.length, sub:'em '+periodo+' dias', color:'var(--blue)' },
-          { label:'Média/entrega', value:fmtYen(avgOrder), sub:'por entrega', color:'var(--green)' },
-          { label:'Pedidos ativos', value:ativos.length, sub:ativos.length>0?ativos.map(p=>p.status).join(', '):'tudo ok ✓', color:ativos.length>0?'var(--gold)':'var(--green)' },
+          { label:t('portal.home.totalSpend'), value:fmtYen(totalPeriod), sub: growthSub, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
+          { label:t('common.deliveries'), value:vendasPeriod.length, sub:t('portal.home.inDays', { days: periodo }), color:'var(--blue)' },
+          { label:t('portal.home.avgPerDelivery'), value:fmtYen(avgOrder), sub:t('portal.home.perDelivery'), color:'var(--green)' },
+          { label:t('portal.home.activeOrders'), value:ativos.length, sub:ativos.length>0?ativos.map(p=>t(`orderStatus.${p.status}`)).join(', '):t('portal.home.allOk'), color:ativos.length>0?'var(--gold)':'var(--green)' },
         ].map(k => (
           <div key={k.label} style={{
             background:'var(--bg2)', border:'1px solid var(--border)',
@@ -254,8 +278,8 @@ function HomeTab({ bar, onTab }) {
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:8 }}>
           <div>
-            <div style={{ fontSize:14, fontWeight:700 }}>Gasto mensal</div>
-            <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>Clique no mês · {chartMonthKey}</div>
+            <div style={{ fontSize:14, fontWeight:700 }}>{t('portal.home.monthlySpend')}</div>
+            <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>{t('portal.home.clickMonth', { month: chartMonthKey })}</div>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <div style={{ fontSize:13, fontWeight:800, color:'var(--navy)' }}>{fmtYen(chartMonthStats.jbmTotal)}</div>
@@ -289,8 +313,8 @@ function HomeTab({ bar, onTab }) {
         </div>
         {chartMonthStats.jbmTotal > 0 && (
           <div style={{ marginTop:16, padding:'12px 14px', background:'var(--bg3)', borderRadius:12, display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, fontSize:12 }}>
-            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>Projeção POS</span><strong style={{ color:'var(--navy)' }}>{fmtYen(chartMonthStats.posTotal)}</strong></div>
-            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>Lucro proj.</span><strong style={{ color:'var(--green)' }}>{fmtYen(chartMonthStats.margin)}</strong></div>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>{t('portal.home.posProjection')}</span><strong style={{ color:'var(--navy)' }}>{fmtYen(chartMonthStats.posTotal)}</strong></div>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>{t('portal.home.projProfit')}</span><strong style={{ color:'var(--green)' }}>{fmtYen(chartMonthStats.margin)}</strong></div>
             <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>ROI</span><strong>{chartMonthStats.roiPct}%</strong></div>
           </div>
         )}
@@ -300,10 +324,10 @@ function HomeTab({ bar, onTab }) {
       <div className="portal-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
         {/* By revenue */}
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Top by cost</div>
-          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>What you spent · Last {periodo} days</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.topByCost')}</div>
+          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>{t('portal.home.whatYouSpent', { days: periodo })}</div>
           {topRevenue.length === 0
-            ? <Empty text="No data" icon="📊" />
+            ? <Empty text={t('common.noData')} icon="📊" />
             : topRevenue.map(([nome,val], i) => {
               const pct = val/topRevenue[0][1]*100
               return (
@@ -325,10 +349,10 @@ function HomeTab({ bar, onTab }) {
 
         {/* By volume */}
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Top by volume</div>
-          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>Last {periodo} days</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.topByVolume')}</div>
+          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>{t('portal.home.lastDays', { days: periodo })}</div>
           {topVolume.length === 0
-            ? <Empty text="No data" icon="📊" />
+            ? <Empty text={t('common.noData')} icon="📊" />
             : topVolume.map(([nome,vol], i) => {
               const pct = vol/topVolume[0][1]*100
               return (
@@ -337,7 +361,7 @@ function HomeTab({ bar, onTab }) {
                     <span style={{ fontWeight:i===0?700:500, color:i===0?'var(--navy)':'var(--text)' }}>
                       {i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '} {nome}
                     </span>
-                    <span style={{ fontWeight:600, color:'var(--text2)' }}>{vol} units</span>
+                    <span style={{ fontWeight:600, color:'var(--text2)' }}>{vol} {t('portal.home.units')}</span>
                   </div>
                   <div style={{ height:4, background:'var(--bg3)', borderRadius:2, overflow:'hidden' }}>
                     <div style={{ height:'100%', width:pct+'%', background:'var(--gold)', borderRadius:2 }}/>
@@ -354,11 +378,11 @@ function HomeTab({ bar, onTab }) {
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🏆 Bebidas com mais margem (projeção POS)</div>
-              <div style={{ fontSize:11, color:'var(--text2)' }}>Compras JBM × preços do bar · Últimos {periodo} dias</div>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.topMarginTitle')}</div>
+              <div style={{ fontSize:11, color:'var(--text2)' }}>{t('portal.home.topMarginSub', { days: periodo })}</div>
             </div>
             <button onClick={()=>onTab('precos')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
-              Editar preços
+              {t('portal.home.editPrices')}
             </button>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:10 }}>
@@ -409,16 +433,16 @@ function HomeTab({ bar, onTab }) {
         if (rows.length === 0) return null
         return (
           <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>📊 Detalhe: compra JBM → projeção POS</div>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.detailTitle')}</div>
             <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>
-              Preços do bar (Pricing tab) · Últimos {periodo} dias · itens estimados marcados ~
+              {t('portal.home.detailSub', { days: periodo })}
             </div>
             <div style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr style={{ borderBottom:'2px solid var(--border)' }}>
-                    {['Produto','Qtd','Custo JBM','Proj. POS/un','Margem total','Margem %',''].map(h => (
-                      <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }}>{h}</th>
+                    {tableHeaders.map(h => (
+                      <th key={h || 'empty'} style={{ padding:'8px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -450,11 +474,11 @@ function HomeTab({ bar, onTab }) {
       {/* Quick actions + recent */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:12 }}>
         <div style={{ background:'var(--navy)', borderRadius:16, padding:'20px 24px', display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>Ações rápidas</div>
+          <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>{t('portal.home.quickActions')}</div>
           {[
-            { label:'+ Novo pedido', icon:'🛒', tab:'pedidos' },
-            { label:'Ver entregas', icon:'📦', tab:'entregas' },
-            { label:'Ver estoque', icon:'📊', tab:'estoque' },
+            { label:t('portal.home.newOrder'), icon:'🛒', tab:'pedidos' },
+            { label:t('portal.home.viewDeliveries'), icon:'📦', tab:'entregas' },
+            { label:t('portal.home.viewInventory'), icon:'📊', tab:'estoque' },
           ].map(a => (
             <button key={a.tab} onClick={()=>onTab(a.tab)} style={{
               background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)',
@@ -465,9 +489,9 @@ function HomeTab({ bar, onTab }) {
         </div>
 
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Entregas recentes</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{t('portal.home.recentDeliveries')}</div>
           {vendas.length === 0
-            ? <Empty text="Nenhuma entrega ainda" />
+            ? <Empty text={t('portal.home.noDeliveriesYet')} />
             : vendas.slice(-8).reverse().map(v => (
               <div key={v.id} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
                 <span style={{ color:'var(--text2)' }}>{fmtDate(v.data)}</span>
