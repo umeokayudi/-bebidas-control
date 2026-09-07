@@ -6,9 +6,11 @@ import { fmtYen, Badge, Spinner, Empty, DelBtn, CATEGORIAS, filterSupplierVendas
 import { SupplierCostHint } from './SupplierPriceCheck'
 import { staffFetch } from '../lib/apiAuth'
 import { AdminPage, PortalSurface } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 // ── PRODUTOS ─────────────────────────────────────────────────────────────────
 export function ProductsTab() {
+  const { t } = useI18n()
   const [produtos, setProducts] = useState([])
   const [loading, setLoading]   = useState(true)
   const [saving,  setSaving]    = useState(false)
@@ -51,7 +53,7 @@ export function ProductsTab() {
   }
 
   return (
-    <AdminPage title="Produtos" subtitle="Catálogo JBM — custo e preço ao bar">
+    <AdminPage title={t('nav.products')} subtitle={t('configs.productsSubtitle')}>
       <PortalSurface title={editId ? 'Editar produto' : 'Novo produto'} style={{ marginBottom: 16 }}>
         <div className="grid4" style={{ marginBottom:12, alignItems:'end' }}>
           <div style={{ gridColumn:'span 1' }}>
@@ -114,6 +116,7 @@ export function ProductsTab() {
 
 // ── BARES ─────────────────────────────────────────────────────────────────────
 export function BarsTab() {
+  const { t } = useI18n()
   const [bars,    setBars]    = useState([])
   const [vendas,  setSales]  = useState([])
   const [loading, setLoading] = useState(true)
@@ -144,7 +147,7 @@ export function BarsTab() {
   }
 
   return (
-    <AdminPage title="Bares" subtitle="Clientes e receita por bar">
+    <AdminPage title={t('nav.bars')} subtitle={t('configs.barsSubtitle')}>
       <PortalSurface title="Adicionar bar / cliente" style={{ marginBottom: 16 }}>
         <div style={{ display:'grid', gridTemplateColumns:'2fr 60px auto', gap:10, alignItems:'end' }}>
           <div><label className="form-label">Nome</label>
@@ -182,6 +185,7 @@ export function BarsTab() {
 
 // ── USUÁRIOS (admin only) ─────────────────────────────────────────────────────
 export function UsuariosTab() {
+  const { t } = useI18n()
   const [users, setUsers] = useState([])
   const [bars, setBars] = useState([])
   const [loading, setLoading] = useState(true)
@@ -281,8 +285,8 @@ export function UsuariosTab() {
 
   return (
     <AdminPage
-      title="Usuários"
-      subtitle="Acesso admin, staff e portal do cliente"
+      title={t('configs.usersTitle')}
+      subtitle={t('configs.usersSubtitle')}
       actions={
         <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>{ setShowNew(v=>!v); setErr('') }}>+ Novo usuário</button>
       }
@@ -419,6 +423,7 @@ export function UsuariosTab() {
 }
 
 export function PedidosAdminTab() {
+  const { t } = useI18n()
   const [pedidos,setPedidos]=useState([])
   const [loading,setLoading]=useState(true)
   const [filterStatus,setFilterStatus]=useState('')
@@ -612,8 +617,8 @@ export function PedidosAdminTab() {
 
   return(
     <AdminPage
-      title="Pedidos"
-      subtitle="Pedidos dos bars — confirmação e entrega"
+      title={t('configs.pedidosTitle')}
+      subtitle={t('configs.pedidosSubtitle')}
       actions={
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           {missingCount>0&&(

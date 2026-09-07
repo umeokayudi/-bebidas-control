@@ -9,8 +9,10 @@ import { loadAllCompras } from '../lib/loadCompras'
 import { loadDashboard } from '../lib/loadDashboard'
 import ComprasNotasSection from './ComprasNotasSection'
 import { AdminPage, PortalKpi, PortalSurface } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 export default function RelatorioTab() {
+  const { t } = useI18n()
   const [bars, setBars] = useState([])
   const [compras, setCompras] = useState([])
   const [vendas, setVendas] = useState([])
@@ -99,7 +101,7 @@ export default function RelatorioTab() {
     })
     .sort((a, b) => String(a.data).localeCompare(String(b.data)))
 
-  if (loading) return <Spinner text="Carregando relatório..." />
+  if (loading) return <Spinner text={t('report.loading')} />
 
   async function saveRyoshusho() {
     if (!editRyo) return
@@ -116,44 +118,44 @@ export default function RelatorioTab() {
   }
 
   async function deleteRyoshusho(r) {
-    if (!confirm(`Excluir 領収書 ${r.numero}?`)) return
+    if (!confirm(t('report.confirmDeleteRyoshusho', { num: r.numero }))) return
     await supabase.from('ryoshusho').delete().eq('id', r.id)
     loadAll()
   }
 
   return (
     <AdminPage
-      title="Relatório"
+      title={t('nav.report')}
       actions={
         <>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>Mês:</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{t('report.monthLabel')}</span>
           <select value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ width: 'auto' }}>
-            {allMonths.length === 0 && <option>Sem dados</option>}
+            {allMonths.length === 0 && <option>{t('report.noDataMonth')}</option>}
             {allMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
           </select>
         </>
       }
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
-        <PortalKpi label="Compras (notas)" value={fmtYen(custoCompras)} color="var(--red)"
-          sub={dash.comprasEstimadas ? `${comprasMes.length} ref. · custo est. jul/2026` : `${comprasMes.length} nota(s)`} />
-        <PortalKpi label="Faturamento" value={fmtYen(faturamento)} color="var(--navy)"
-          sub={`${vendasMes.length} entrega(s) · ${dash.comprasEstimadas ? 'pedidos/notas' : 'cobrança'}`} />
-        <PortalKpi label="Lucro projetado" value={fmtYen(lucroTotal)} color="var(--green)"
-          sub={`${margemGeral}% · fat. − custo`} />
-        <PortalKpi label="A receber" value={fmtYen(aReceber)} color={aReceber > 0 ? 'var(--amber)' : 'var(--green)'}
-          sub={faturasMes.length ? `${faturasMes.length} fatura(s) em aberto` : 'Nada pendente'} />
+        <PortalKpi label={t('report.purchasesNotes')} value={fmtYen(custoCompras)} color="var(--red)"
+          sub={dash.comprasEstimadas ? t('report.purchasesSubEst', { count: comprasMes.length }) : t('report.purchasesSub', { count: comprasMes.length })} />
+        <PortalKpi label={t('report.billing')} value={fmtYen(faturamento)} color="var(--navy)"
+          sub={t('report.billingSub', { count: vendasMes.length, type: dash.comprasEstimadas ? t('report.billingTypeOrders') : t('report.billingTypeCharge') })} />
+        <PortalKpi label={t('report.projectedProfit')} value={fmtYen(lucroTotal)} color="var(--green)"
+          sub={t('report.profitSub', { margin: margemGeral })} />
+        <PortalKpi label={t('report.toReceive')} value={fmtYen(aReceber)} color={aReceber > 0 ? 'var(--amber)' : 'var(--green)'}
+          sub={faturasMes.length ? t('report.openInvoices', { count: faturasMes.length }) : t('report.nothingPending')} />
       </div>
 
       {(creditoBar > 0 || descontoTotal > 0) && (
         <div style={{ display: 'grid', gridTemplateColumns: creditoBar > 0 && descontoTotal > 0 ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 18 }}>
           {creditoBar > 0 && (
-            <PortalKpi label="Pago direto pelo bar" value={fmtYen(creditoBar)} color="var(--navy)"
-              sub="Compra paga pelo cliente (ex.: LM) — abate na fatura, não é lucro" />
+            <PortalKpi label={t('report.barDirectPay')} value={fmtYen(creditoBar)} color="var(--navy)"
+              sub={t('report.barDirectPaySub')} />
           )}
           {descontoTotal > 0 && (
-            <PortalKpi label="Pontos" value={fmtYen(descontoTotal)} color="var(--gold)"
-              sub="desconto nas notas de compra" />
+            <PortalKpi label={t('report.points')} value={fmtYen(descontoTotal)} color="var(--gold)"
+              sub={t('report.pointsSub')} />
           )}
         </div>
       )}
@@ -166,11 +168,11 @@ export default function RelatorioTab() {
         onChanged={loadAll}
       />
 
-      <PortalSurface title="Vendas do mês">
-        {vendasDetalhe.length === 0 ? <Empty text="Nenhuma venda neste mês" /> : (
+      <PortalSurface title={t('report.monthSales')}>
+        {vendasDetalhe.length === 0 ? <Empty text={t('report.noSalesMonth')} /> : (
           <table>
             <thead>
-              <tr><th>Data</th><th>Bar</th><th>Obs</th><th style={{ textAlign: 'right' }}>Receita</th></tr>
+              <tr><th>{t('common.date')}</th><th>{t('common.bar')}</th><th>{t('common.obs')}</th><th style={{ textAlign: 'right' }}>{t('common.revenue')}</th></tr>
             </thead>
             <tbody>
               {vendasDetalhe.map(v => (
@@ -184,7 +186,7 @@ export default function RelatorioTab() {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} style={{ fontWeight: 700 }}>Total ({vendasDetalhe.length})</td>
+                <td colSpan={3} style={{ fontWeight: 700 }}>{t('common.total')} ({vendasDetalhe.length})</td>
                 <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--navy)' }}>{fmtYen(receitaTotal)}</td>
               </tr>
             </tfoot>
@@ -192,11 +194,11 @@ export default function RelatorioTab() {
         )}
       </PortalSurface>
 
-      <PortalSurface title="Itens comprados — resumo">
-        {porProdutoComprado.length === 0 ? <Empty text="Nenhum item nas notas" /> : (
+      <PortalSurface title={t('report.purchasedItems')}>
+        {porProdutoComprado.length === 0 ? <Empty text={t('report.noItems')} /> : (
           <table>
             <thead>
-              <tr><th>Produto</th><th style={{ textAlign: 'right' }}>Qtd</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Médio</th></tr>
+              <tr><th>{t('common.product')}</th><th style={{ textAlign: 'right' }}>{t('common.qty')}</th><th style={{ textAlign: 'right' }}>{t('common.total')}</th><th style={{ textAlign: 'right' }}>{t('report.avgPrice')}</th></tr>
             </thead>
             <tbody>
               {porProdutoComprado.map(p => (
@@ -212,17 +214,17 @@ export default function RelatorioTab() {
         )}
       </PortalSurface>
 
-      <PortalSurface title={`領収書 — ${monthLabel(selMonth)}`}>
+      <PortalSurface title={t('report.ryoshushoSection', { month: monthLabel(selMonth) })}>
         {ryoMes.length === 0 ? (
-          <Empty text={`Nenhum 領収書 com período em ${monthLabel(selMonth)}`} />
+          <Empty text={t('report.noRyoshusho', { month: monthLabel(selMonth) })} />
         ) : (
           <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 12, fontSize: 13 }}>
-              <span>Total recibos: <strong style={{ color: 'var(--gold)' }}>{fmtYen(ryoTotal)}</strong></span>
-              <span>Faturamento: <strong>{fmtYen(faturamento)}</strong></span>
+              <span>{t('report.totalReceipts', { amount: fmtYen(ryoTotal) })}</span>
+              <span>{t('report.billing')}: <strong>{fmtYen(faturamento)}</strong></span>
             </div>
             <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px', lineHeight: 1.55 }}>
-              領収書 = recibo de entregas recebidas. Faturamento = valor da fatura de cobrança do mês. Podem diferir se o recibo e a fatura forem de meses distintos.
+              {t('report.ryoshushoHint')}
             </p>
             {ryoMes.map(r => {
               const split = ryoshushoPeriodSplit(r, selMonth)
@@ -242,7 +244,7 @@ export default function RelatorioTab() {
                   <div style={{ color: 'var(--text2)', marginTop: 2 }}>
                     {fmtDate(r.periodo_inicio)} – {fmtDate(r.periodo_fim)}
                     {split.multiMonth && split.share !== split.total && (
-                      <> · total do recibo {fmtYen(split.total)} ({split.overlapDays}/{split.periodDays} dias neste mês)</>
+                      <> · {t('report.receiptTotal', { amount: fmtYen(split.total), overlap: split.overlapDays, total: split.periodDays })}</>
                     )}
                   </div>
                 </div>
@@ -255,18 +257,18 @@ export default function RelatorioTab() {
       {editRyo && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div style={{ background: 'var(--bg2)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Editar 領収書</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>{t('report.editRyoshusho')}</div>
             <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
-              <div><label className="form-label">Número</label><input value={ryoForm.numero} onChange={e => setRyoForm(f => ({ ...f, numero: e.target.value }))} /></div>
+              <div><label className="form-label">{t('common.number')}</label><input value={ryoForm.numero} onChange={e => setRyoForm(f => ({ ...f, numero: e.target.value }))} /></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div><label className="form-label">Início</label><input type="date" value={ryoForm.periodo_inicio} onChange={e => setRyoForm(f => ({ ...f, periodo_inicio: e.target.value }))} /></div>
-                <div><label className="form-label">Fim</label><input type="date" value={ryoForm.periodo_fim} onChange={e => setRyoForm(f => ({ ...f, periodo_fim: e.target.value }))} /></div>
+                <div><label className="form-label">{t('common.start')}</label><input type="date" value={ryoForm.periodo_inicio} onChange={e => setRyoForm(f => ({ ...f, periodo_inicio: e.target.value }))} /></div>
+                <div><label className="form-label">{t('common.end')}</label><input type="date" value={ryoForm.periodo_fim} onChange={e => setRyoForm(f => ({ ...f, periodo_fim: e.target.value }))} /></div>
               </div>
-              <div><label className="form-label">Total (¥)</label><input type="number" value={ryoForm.total} onChange={e => setRyoForm(f => ({ ...f, total: e.target.value }))} /></div>
+              <div><label className="form-label">{t('common.total')} (¥)</label><input type="number" value={ryoForm.total} onChange={e => setRyoForm(f => ({ ...f, total: e.target.value }))} /></div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setEditRyo(null)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>Cancelar</button>
-              <button className="btn-primary" onClick={saveRyoshusho} style={{ flex: 2, padding: 10, borderRadius: 10 }}>Salvar</button>
+              <button onClick={() => setEditRyo(null)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>{t('common.cancel')}</button>
+              <button className="btn-primary" onClick={saveRyoshusho} style={{ flex: 2, padding: 10, borderRadius: 10 }}>{t('common.save')}</button>
             </div>
           </div>
         </div>

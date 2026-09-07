@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Spinner, Empty, SectionTitle } from './utils'
+import { useI18n } from '../lib/i18n'
 import {
   filterJbmDrinksFaturas,
   faturaEmissao,
@@ -15,6 +16,7 @@ import {
 } from '../lib/ryoshushoPrint'
 
 export default function PortalRecibosTab({ bar }) {
+  const { t } = useI18n()
   const [faturas, setFaturas] = useState([])
   const [pagamentos, setPagamentos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -78,16 +80,16 @@ export default function PortalRecibosTab({ bar }) {
 
   const recibos = receiptableItems(faturas, pagamentos)
 
-  if (loading) return <Spinner text="Carregando recibos..." />
+  if (loading) return <Spinner text={t('portal.loadingReceipts')} />
 
   return (
     <div className="fade-in portal-page" style={{ maxWidth: 860 }}>
-      <SectionTitle sub="Pagamentos confirmados — emita 領収書 com valor e data escolhida">
-        Recibos (領収書)
+      <SectionTitle sub={t('portal.receiptsSub')}>
+        {t('portal.receiptsTitle')}
       </SectionTitle>
 
       {recibos.length === 0 ? (
-        <Empty text="Nenhum pagamento confirmado disponível para recibo" icon="🧾" />
+        <Empty text={t('portal.noReceipts')} icon="🧾" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {recibos.map(item => (
@@ -108,15 +110,15 @@ export default function PortalRecibosTab({ bar }) {
               <div style={{ flex: 1, minWidth: 180 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--navy)' }}>{fmtYen(item.valor)}</div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>
-                  Pagamento registrado em {fmtDate(item.data)} · {item.metodo}
+                  {t('portal.paidOn', { date: fmtDate(item.data), method: item.metodo })}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-                  Fatura {fmtDate(faturaEmissao(item.fatura))} a {fmtDate(faturaPeriodoFim(item.fatura))}
+                  {t('portal.invoicePeriod', { from: fmtDate(faturaEmissao(item.fatura)), to: fmtDate(faturaPeriodoFim(item.fatura)) })}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: 'var(--text2)' }}>
-                  Data do recibo (発行日)
+                  {t('portal.receiptDate')}
                   <input
                     type="date"
                     value={getReceiptDate(item)}
@@ -141,7 +143,7 @@ export default function PortalRecibosTab({ bar }) {
                     alignSelf: 'flex-end',
                   }}
                 >
-                  {emittingReceipt === item.key ? 'Gerando...' : 'Emitir 領収書'}
+                  {emittingReceipt === item.key ? t('portal.generating') : t('portal.issueReceipt')}
                 </button>
               </div>
             </div>

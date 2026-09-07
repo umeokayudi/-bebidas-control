@@ -10,8 +10,10 @@ import { loadAllCompras } from '../lib/loadCompras'
 import { SupplierPricePanel } from './SupplierPriceCheck'
 import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
 import { AdminPage, PortalSurface, PortalKpi } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 export default function ComprasTab() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [compras, setCompras] = useState([])
   const [loading, setLoading] = useState(true)
@@ -88,7 +90,7 @@ export default function ComprasTab() {
   }
 
   async function saveCompra() {
-    if (!form.fornecedor) return alert('Informe o fornecedor')
+    if (!form.fornecedor) return alert(t('purchases.enterSupplier'))
     setSaving(true)
     const total_real = (+form.total_pago || +form.subtotal) - (+form.desconto_pontos || 0)
     const { data: compra, error } = await supabase.from('compras').insert({
@@ -141,14 +143,14 @@ export default function ComprasTab() {
   }
 
   async function deleteCompra(id) {
-    if (!confirm('Remover esta compra?')) return
+    if (!confirm(t('purchases.confirmDelete'))) return
     await supabase.from('compras').delete().eq('id', id)
     load()
   }
 
   return (
-    <AdminPage title="Compras" subtitle="Notas de fornecedor, custos e histórico">
-      <PortalSurface title="📷 Ler nota">
+    <AdminPage title={t('nav.purchases')} subtitle={t('purchases.subtitle')}>
+      <PortalSurface title={t('purchases.scanReceipt')}>
         <div
           onClick={() => document.getElementById('fileCompra').click()}
           style={{
@@ -163,38 +165,38 @@ export default function ComprasTab() {
             ? <img src={imgSrc} alt="nota" style={{ maxHeight: 160, maxWidth: '100%', borderRadius: 8 }} />
             : <>
                 <div style={{ fontSize: 40, marginBottom: 8 }}>📄</div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>Toque para selecionar foto da nota</div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{t('purchases.tapToSelect')}</div>
                 <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
-                  A IA extrai fornecedor, itens, pagamento e pontos automaticamente
+                  {t('purchases.aiExtractHint')}
                 </div>
               </>
           }
           <input type="file" id="fileCompra" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }} onChange={handleFile} />
         </div>
-        {scanning && <div style={{ marginTop: 12 }}><Spinner text="Analisando com IA..." /></div>}
+        {scanning && <div style={{ marginTop: 12 }}><Spinner text={t('purchases.analyzing')} /></div>}
         {scanned && (
           <div style={{
             marginTop: 12, background: 'var(--bg3)', borderRadius: 8,
             padding: '10px 14px', fontSize: 13
           }}>
             ✅ <strong>{scanned.fornecedor}</strong>
-            {' · '}{scanned.itens?.length || 0} itens
-            {' · '}{fmtYen(scanned.total_pago || 0)} pago
-            {scanned.desconto_pontos > 0 && ` · desconto pontos: ${fmtYen(scanned.desconto_pontos)}`}
+            {' · '}{t('purchases.scannedItems', { count: scanned.itens?.length || 0 })}
+            {' · '}{t('purchases.scannedPaid', { amount: fmtYen(scanned.total_pago || 0) })}
+            {scanned.desconto_pontos > 0 && ` · ${t('purchases.pointsDiscountShort', { amount: fmtYen(scanned.desconto_pontos) })}`}
           </div>
         )}
       </PortalSurface>
 
-      <PortalSurface title="Registrar compra">
+      <PortalSurface title={t('purchases.registerPurchase')}>
         <div className="grid3" style={{ marginBottom: 12 }}>
-          <div><label className="form-label">Data</label>
+          <div><label className="form-label">{t('common.date')}</label>
             <input type="date" value={form.data} onChange={e=>setF('data',e.target.value)} /></div>
-          <div><label className="form-label">Fornecedor</label>
+          <div><label className="form-label">{t('common.supplier')}</label>
             <select value={form.fornecedor} onChange={e=>setF('fornecedor',e.target.value)}>
-              <option value="">— Selecionar fornecedor —</option>
+              <option value="">{t('common.selectSupplier')}</option>
               {fornecedores.map(f=><option key={f.id} value={f.nome}>{f.nome}</option>)}
             </select></div>
-          <div><label className="form-label">Pagamento</label>
+          <div><label className="form-label">{t('common.payment')}</label>
             <select value={form.pagamento} onChange={e=>setF('pagamento',e.target.value)}>
               {PAGAMENTOS.map(p => <option key={p}>{p}</option>)}
             </select></div>
@@ -218,29 +220,29 @@ export default function ComprasTab() {
           />
         )}
         <div className="grid4" style={{ marginBottom: 12 }}>
-          <div><label className="form-label">Subtotal (¥)</label>
+          <div><label className="form-label">{t('common.subtotal')} (¥)</label>
             <input type="number" value={form.subtotal} onChange={e=>setF('subtotal',e.target.value)} /></div>
-          <div><label className="form-label">Desconto pontos (¥)</label>
+          <div><label className="form-label">{t('common.pointsDiscount')} (¥)</label>
             <input type="number" value={form.desconto_pontos} onChange={e=>setF('desconto_pontos',e.target.value)} /></div>
-          <div><label className="form-label">Total pago (¥)</label>
+          <div><label className="form-label">{t('common.totalPaid')} (¥)</label>
             <input type="number" value={form.total_pago} onChange={e=>setF('total_pago',e.target.value)} /></div>
-          <div><label className="form-label">Pontos ganhos</label>
+          <div><label className="form-label">{t('common.pointsEarned')}</label>
             <input type="number" value={form.pontos_ganhos} onChange={e=>setF('pontos_ganhos',e.target.value)} /></div>
-          <div><label className="form-label">Tipo de ponto</label>
+          <div><label className="form-label">{t('common.pointType')}</label>
             <select value={form.tipo_ponto} onChange={e=>setF('tipo_ponto',e.target.value)}>
-              <option value="">Nenhum</option>
+              <option value="">{t('common.none')}</option>
               <option value="T-Point">T-Point</option>
               <option value="Rakuten">Rakuten</option>
               <option value="Waon">Waon</option>
               <option value="Nanaco">Nanaco</option>
               <option value="PayPay">PayPay</option>
-              <option value="Outro">Outro</option>
+              <option value="Outro">{t('common.other')}</option>
             </select></div>
-          <div><label className="form-label">Data de pagamento</label>
+          <div><label className="form-label">{t('common.paymentDate')}</label>
             <input type="date" value={form.data_pagamento} onChange={e=>setF('data_pagamento',e.target.value)} /></div>
         </div>
         <div style={{marginBottom:12}}>
-          <label className="form-label">Foto do recibo</label>
+          <label className="form-label">{t('common.receiptPhoto')}</label>
           <input type="file" accept="image/*,.pdf,application/pdf" onChange={async e=>{
             const file = e.target.files[0]
             if (!file) return
@@ -251,28 +253,28 @@ export default function ComprasTab() {
           {form.foto_url && <img src={form.foto_url} style={{marginTop:8,maxWidth:200,borderRadius:8}} alt="recibo"/>}
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label className="form-label">Observação</label>
-          <input type="text" value={form.obs} onChange={e=>setF('obs',e.target.value)} placeholder="Opcional" />
+          <label className="form-label">{t('common.observation')}</label>
+          <input type="text" value={form.obs} onChange={e=>setF('obs',e.target.value)} placeholder={t('common.optional')} />
         </div>
 
         {/* Itens */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-            <label className="form-label" style={{ margin:0 }}>Itens da nota</label>
+            <label className="form-label" style={{ margin:0 }}>{t('common.invoiceItems')}</label>
             <button style={{ padding:'4px 10px', fontSize:11 }}
               onClick={() => setF('itens', [...form.itens, { nome:'', qtd:1, custo_unitario:0 }])}>
-              + Item
+              {t('common.addItem')}
             </button>
           </div>
           {form.itens.map((it, i) => (
             <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 80px 120px 36px', gap:6, marginBottom:6 }}>
-              <input type="text" value={it.nome} placeholder="Produto" onChange={e=>{
+              <input type="text" value={it.nome} placeholder={t('common.product')} onChange={e=>{
                 const a=[...form.itens]; a[i]={...a[i],nome:e.target.value}; setF('itens',a)
               }}/>
-              <input type="number" value={it.qtd} placeholder="Qtd" onChange={e=>{
+              <input type="number" value={it.qtd} placeholder={t('common.qty')} onChange={e=>{
                 const a=[...form.itens]; a[i]={...a[i],qtd:+e.target.value}; setF('itens',a)
               }}/>
-              <input type="number" value={it.custo_unitario} placeholder="Custo unit." onChange={e=>{
+              <input type="number" value={it.custo_unitario} placeholder={t('common.unitCost')} onChange={e=>{
                 const a=[...form.itens]; a[i]={...a[i],custo_unitario:+e.target.value}; setF('itens',a)
               }}/>
               <button onClick={()=>setF('itens',form.itens.filter((_,j)=>j!==i))}
@@ -293,39 +295,39 @@ export default function ComprasTab() {
 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16 }}>
           <div style={{ fontSize:14 }}>
-            Custo real: <strong style={{ color:'var(--blue)' }}>
+            {t('common.realCost')}: <strong style={{ color:'var(--blue)' }}>
               {fmtYen(purchaseTotal)}
             </strong>
           </div>
           <button className="btn-primary" onClick={saveCompra} disabled={saving}>
-            {saving ? <><span className="spinner" />Salvando...</> : 'Salvar compra'}
+            {saving ? <><span className="spinner" />{t('common.saving')}</> : t('purchases.savePurchase')}
           </button>
         </div>
       </PortalSurface>
 
       <PortalSurface
-        title="Histórico"
+        title={t('common.history')}
         headerRight={
           <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{ width:'auto' }}>
-            <option value="">Todos os meses</option>
+            <option value="">{t('common.allMonths')}</option>
             {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
           </select>
         }
       >
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:16 }}>
-          <PortalKpi label="Custo total" value={fmtYen(totalCusto)} color="var(--red)" />
-          <PortalKpi label="Desc. pontos" value={fmtYen(totalDesconto)} color="var(--green)" />
-          <PortalKpi label="Custo real" value={fmtYen(totalCusto)} color="var(--blue)" />
-          <PortalKpi label="Pts acumulados" value={totalPontos.toLocaleString()} />
+          <PortalKpi label={t('purchases.totalCost')} value={fmtYen(totalCusto)} color="var(--red)" />
+          <PortalKpi label={t('purchases.descPontos')} value={fmtYen(totalDesconto)} color="var(--green)" />
+          <PortalKpi label={t('purchases.custoReal')} value={fmtYen(totalCusto)} color="var(--blue)" />
+          <PortalKpi label={t('common.ptsAccumulated')} value={totalPontos.toLocaleString()} />
         </div>
 
-        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="Nenhuma compra registrada" /> : (
+        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text={t('purchases.noPurchases')} /> : (
           <table>
             <thead>
               <tr>
-                <th>Data</th><th>Fornecedor</th><th>Pagamento</th>
-                <th>Subtotal</th><th>Desc. Pontos</th><th>Custo Real</th>
-                <th>Pts</th><th>Itens</th><th></th>
+                <th>{t('common.date')}</th><th>{t('common.supplier')}</th><th>{t('common.payment')}</th>
+                <th>{t('common.subtotal')}</th><th>{t('purchases.descPontos')}</th><th>{t('purchases.custoReal')}</th>
+                <th>Pts</th><th>{t('common.items')}</th><th></th>
               </tr>
             </thead>
             <tbody>

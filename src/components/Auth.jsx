@@ -1,6 +1,7 @@
 import { LogoLogin } from './Logo'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useI18n, LANGS } from '../lib/i18n'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -26,7 +27,6 @@ export function AuthProvider({ children }) {
 
   async function loadPerfil(uid) {
     let { data } = await supabase.from('perfis').select('*').eq('id', uid).single()
-    // Sem auto-promoção a staff — perfil deve ser criado pelo admin
     setPerfil(data)
     setLoading(false)
   }
@@ -43,8 +43,36 @@ export function AuthProvider({ children }) {
   )
 }
 
+function LoginLanguagePicker() {
+  const { lang, setLang } = useI18n()
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+      {Object.values(LANGS).map(opt => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => setLang(opt.id)}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 20,
+            border: lang === opt.id ? '1px solid var(--gold)' : '1px solid rgba(193,156,86,0.25)',
+            background: lang === opt.id ? 'rgba(193,156,86,0.15)' : 'transparent',
+            color: lang === opt.id ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function LoginPage() {
   const { signIn, signUp } = useAuth()
+  const { t } = useI18n()
   const [mode,  setMode]  = useState('login')
   const [nome,  setName]  = useState('')
   const [email, setEmail] = useState('')
@@ -57,12 +85,12 @@ export function LoginPage() {
     try {
       if (mode === 'login') {
         const { error } = await signIn(email, pass)
-        if (error) setErr('Email ou senha incorretos')
+        if (error) setErr(t('auth.wrongCredentials'))
       } else {
-        if (!nome) return setErr('Please enter your name')
+        if (!nome) return setErr(t('auth.enterName'))
         const { error } = await signUp(email, pass, nome)
         if (error) setErr(error.message)
-        else setErr('✅ ✅ Check your email to confirm.')
+        else setErr(`✅ ${t('auth.checkEmail')}`)
       }
     } finally { setBusy(false) }
   }
@@ -72,7 +100,6 @@ export function LoginPage() {
       minHeight:'100vh', display:'flex', background:'var(--navy)',
       alignItems:'center', justifyContent:'center', padding:20
     }}>
-      {/* Background pattern */}
       <div style={{
         position:'fixed', inset:0, opacity:0.03,
         backgroundImage:'repeating-linear-gradient(45deg,#c19c56 0,#c19c56 1px,transparent 0,transparent 50%)',
@@ -80,7 +107,6 @@ export function LoginPage() {
       }}/>
 
       <div style={{width:'100%',maxWidth:400,position:'relative'}}>
-        {/* Logo */}
         <div style={{textAlign:'center',marginBottom:36}}>
           <LogoLogin />
         </div>
@@ -91,27 +117,28 @@ export function LoginPage() {
           borderRadius:20, padding:'32px 28px',
           backdropFilter:'blur(10px)'
         }}>
+          <LoginLanguagePicker />
           <div style={{fontSize:14,fontWeight:600,color:'rgba(255,255,255,0.6)',
             marginBottom:24,textAlign:'center',letterSpacing:'0.05em',textTransform:'uppercase'}}>
-            {mode==='login'?'Acesso ao sistema':'Criar conta'}
+            {mode==='login'?t('auth.systemAccess'):t('auth.createAccount')}
           </div>
 
           {mode==='signup'&&(
             <div style={{marginBottom:14}}>
-              <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Nome</label>
+              <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>{t('auth.name')}</label>
               <input type="text" value={nome} onChange={e=>setName(e.target.value)}
-                placeholder="Seu nome"
+                placeholder={t('auth.yourName')}
                 style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}/>
             </div>
           )}
           <div style={{marginBottom:14}}>
-            <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Email</label>
+            <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>{t('auth.email')}</label>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
               placeholder="seu@email.com"
               style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}/>
           </div>
           <div style={{marginBottom:24}}>
-            <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>Senha</label>
+            <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>{t('auth.password')}</label>
             <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
               placeholder="••••••••"
               style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}
@@ -129,19 +156,19 @@ export function LoginPage() {
 
           <button className="btn-gold" onClick={submit} disabled={busy}
             style={{width:'100%',padding:'13px',fontSize:14,borderRadius:10,letterSpacing:'0.05em',textTransform:'uppercase'}}>
-            {busy?<><span className="spinner"/>Aguarde...</>:mode==='login'?'Entrar':'Criar conta'}
+            {busy?<><span className="spinner"/>{t('common.wait')}</>:mode==='login'?t('auth.enter'):t('auth.create')}
           </button>
 
           <div style={{textAlign:'center',marginTop:20,fontSize:12,color:'rgba(255,255,255,0.35)'}}>
             {mode==='login'
-              ?<>Sem acesso? <button onClick={()=>setMode('signup')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>Solicitar acesso</button></>
-              :<>Já tem conta? <button onClick={()=>setMode('login')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>Entrar</button></>
+              ?<>{t('auth.noAccess')} <button onClick={()=>setMode('signup')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>{t('auth.requestAccess')}</button></>
+              :<>{t('auth.haveAccount')} <button onClick={()=>setMode('login')} style={{border:'none',background:'none',color:'var(--gold)',fontWeight:600,padding:0,cursor:'pointer',fontSize:12}}>{t('auth.enter')}</button></>
             }
           </div>
         </div>
 
         <div style={{textAlign:'center',marginTop:20,fontSize:10,color:'rgba(255,255,255,0.2)',letterSpacing:'0.1em',textTransform:'uppercase'}}>
-          Painel JBM Drinks
+          {t('auth.panelTitle')}
         </div>
       </div>
     </div>

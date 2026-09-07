@@ -25,7 +25,8 @@ import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
 import { PedidosAdminTab } from './components/Configs'
-import { fmtYen, fmtDate, monthLabel, roleLabel } from './components/utils'
+import { fmtYen, fmtDate, roleLabel } from './components/utils'
+import { I18nProvider, useI18n } from './lib/i18n'
 import UiPrefsPanel from './components/UiPrefsPanel'
 import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
 import { loadDashboard } from './lib/loadDashboard'
@@ -34,27 +35,27 @@ import DashboardMetricModal from './components/DashboardMetricModal'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
-  { id:'dashboard', label:'Dashboard', icon:'📊' },
-  { id:'purchases', label:'Compras', icon:'🛒' },
-  { id:'sales',    label:'Vendas', icon:'💴' },
-  { id:'pedidos',   label:'Pedidos', icon:'📋' },
-  { id:'relatorio', label:'Relatório', icon:'📈' },
-  { id:'ryoshusho', label:'領収書', icon:'🧾' },
-  { id:'seikyusho', label:'Leitor de cobrança', icon:'📄' },
-  { id:'products',  label:'Produtos', icon:'🍾' },
-  { id:'bars',      label:'Bares', icon:'🏪' },
-  { id:'usuarios',  label:'Usuários', icon:'👥' },
-  { id:'faturas',    label:'Faturas', icon:'💰' },
-  { id:'suppliers',  label:'Fornecedores', icon:'🏭' },
-  { id:'cashflow',   label:'Fluxo de caixa', icon:'💸' },
+  { id:'dashboard', labelKey:'nav.dashboard', icon:'📊' },
+  { id:'purchases', labelKey:'nav.purchases', icon:'🛒' },
+  { id:'sales',    labelKey:'nav.sales', icon:'💴' },
+  { id:'pedidos',   labelKey:'nav.orders', icon:'📋' },
+  { id:'relatorio', labelKey:'nav.report', icon:'📈' },
+  { id:'ryoshusho', labelKey:'nav.ryoshusho', icon:'🧾' },
+  { id:'seikyusho', labelKey:'nav.seikyusho', icon:'📄' },
+  { id:'products',  labelKey:'nav.products', icon:'🍾' },
+  { id:'bars',      labelKey:'nav.bars', icon:'🏪' },
+  { id:'usuarios',  labelKey:'nav.users', icon:'👥' },
+  { id:'faturas',    labelKey:'nav.invoices', icon:'💰' },
+  { id:'suppliers',  labelKey:'nav.suppliers', icon:'🏭' },
+  { id:'cashflow',   labelKey:'nav.cashflow', icon:'💸' },
 ]
 
 const STAFF_TABS = [
-  { id:'purchases', label:'Compras', icon:'🛒' },
-  { id:'sales',    label:'Vendas', icon:'💴' },
-  { id:'relatorio', label:'Relatório', icon:'📈' },
-  { id:'ryoshusho', label:'領収書', icon:'🧾' },
-  { id:'products',  label:'Produtos', icon:'🍾' },
+  { id:'purchases', labelKey:'nav.purchases', icon:'🛒' },
+  { id:'sales',    labelKey:'nav.sales', icon:'💴' },
+  { id:'relatorio', labelKey:'nav.report', icon:'📈' },
+  { id:'ryoshusho', labelKey:'nav.ryoshusho', icon:'🧾' },
+  { id:'products',  labelKey:'nav.products', icon:'🍾' },
 ]
 
 // ── MINI BAR CHART ────────────────────────────────────────────────────────────
@@ -116,6 +117,7 @@ function goToReport(onNav, month) {
 
 function Dashboard({ onNav }) {
   const { user } = useAuth()
+  const { t, monthLabel } = useI18n()
   const [data, setData] = useState(null)
   const [selMonth, setSelMonth] = useState('')
   const [loading, setLoading] = useState(true)
@@ -134,7 +136,7 @@ function Dashboard({ onNav }) {
       setSelMonth(prev => prev || (payload.months?.includes(mesAtual) ? mesAtual : payload.months?.[0]) || mesAtual)
     } catch (e) {
       console.error('loadStats error', e)
-      setLoadErr(e.message || 'Erro ao carregar dashboard')
+      setLoadErr(e.message || t('dashboard.loadError'))
     } finally {
       setLoading(false)
     }
@@ -145,25 +147,30 @@ function Dashboard({ onNav }) {
     label: monthLabel(row.month).split('/')[0],
     month: monthLabel(row.month),
     value: row.lucro,
-    tip: `${monthLabel(row.month)} · Lucro proj. ${fmtYen(row.lucro)} · Fat. ${fmtYen(row.faturamento || row.receita)} · Compras ${fmtYen(row.compras)}`,
+    tip: t('dashboard.chartTip', {
+      month: monthLabel(row.month),
+      profit: fmtYen(row.lucro),
+      revenue: fmtYen(row.faturamento || row.receita),
+      purchases: fmtYen(row.compras),
+    }),
   }))
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text2)' }}><span className="spinner" />Carregando...</div>
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text2)' }}><span className="spinner" />{t('common.loading')}</div>
   if (loadErr) {
     return (
       <div style={{ maxWidth: 520, padding: 24 }}>
         <PortalAlert variant="red">
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Não foi possível carregar o dashboard</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{t('dashboard.loadError')}</div>
           <div style={{ fontSize: 13, opacity: 0.9 }}>{loadErr}</div>
         </PortalAlert>
-        <button className="btn-primary" onClick={loadStats} style={{ marginTop: 16 }}>Tentar novamente</button>
+        <button className="btn-primary" onClick={loadStats} style={{ marginTop: 16 }}>{t('common.retry')}</button>
       </div>
     )
   }
   if (!m) {
     return (
       <div style={{ maxWidth: 520, padding: 24, color: 'var(--text2)' }}>
-        Sem dados para exibir. Verifique compras e vendas no sistema.
+        {t('dashboard.noData')}
       </div>
     )
   }
@@ -182,11 +189,11 @@ function Dashboard({ onNav }) {
   return (
     <div className="fade-in" style={{ maxWidth: 1000 }}>
       <PageHeader
-        title="Dashboard"
-        subtitle={`${isCurrentMonth ? 'Mês atual' : 'Histórico'} · ${monthLabel(selMonth)}`}
+        title={t('dashboard.title')}
+        subtitle={`${isCurrentMonth ? t('dashboard.currentMonth') : t('dashboard.history')} · ${monthLabel(selMonth)}`}
         actions={(
           <div className="page-header-actions">
-            <span className="page-header-actions-label">Mês</span>
+            <span className="page-header-actions-label">{t('common.month')}</span>
             <select value={selMonth} onChange={e => setSelMonth(e.target.value)} className="page-header-select">
               {(data?.months || []).map(mon => <option key={mon} value={mon}>{monthLabel(mon)}</option>)}
             </select>
@@ -197,8 +204,8 @@ function Dashboard({ onNav }) {
       {data.pedidosPendentes > 0 && (
         <PortalAlert variant="navy" onClick={() => onNav('pedidos')}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>{data.pedidosPendentes} pedido(s) aguardando confirmação</span>
-            <span style={{ color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>Ver →</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{t('dashboard.pendingOrders', { count: data.pedidosPendentes })}</span>
+            <span style={{ color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>{t('dashboard.see')}</span>
           </div>
         </PortalAlert>
       )}
@@ -210,7 +217,7 @@ function Dashboard({ onNav }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
-                    {data.alertas.faturasAtrasadas.length} fatura(s) em atraso — cobrar dos bars
+                    {t('dashboard.overdueInvoices', { count: data.alertas.faturasAtrasadas.length })}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.95 }}>
                     Total {fmtYen(data.alertas.faturasAtrasadasTotal)}
@@ -219,7 +226,7 @@ function Dashboard({ onNav }) {
                     ))}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>Ver faturas →</span>
+                <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, whiteSpace: 'nowrap' }}>{t('dashboard.seeInvoices')}</span>
               </div>
             </PortalAlert>
           )}
@@ -228,7 +235,7 @@ function Dashboard({ onNav }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: 'var(--red)' }}>
-                    {data.alertas.comprasAtrasadas.length} pagamento(s) atrasado(s)
+                    {t('dashboard.overduePayments', { count: data.alertas.comprasAtrasadas.length })}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text2)' }}>
                     Total {fmtYen(data.alertas.comprasAtrasadasTotal)}
@@ -237,7 +244,7 @@ function Dashboard({ onNav }) {
                     ))}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', whiteSpace: 'nowrap' }}>Fluxo de caixa →</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', whiteSpace: 'nowrap' }}>{t('dashboard.seeCashflow')}</span>
               </div>
             </PortalAlert>
           )}
@@ -246,59 +253,59 @@ function Dashboard({ onNav }) {
 
       <div className="portal-hero-grid">
         <PortalHero
-          label={`Lucro projetado · ${monthLabel(selMonth)}`}
+          label={t('dashboard.projectedProfit', { month: monthLabel(selMonth) })}
           value={fmtYen(m.lucroProjetado ?? m.lucro)}
           sub={m.comprasEstimadas
-            ? `Margem ${m.margem}% · fat. ${fmtYen(m.faturamento)} − custo ${fmtYen(m.compras)} (base jul/2026)`
-            : `Margem ${m.margem}% · faturamento ${fmtYen(m.faturamento ?? m.receita)} − compras ${fmtYen(m.compras)}`}
+            ? t('dashboard.marginSubEst', { margin: m.margem, revenue: fmtYen(m.faturamento), cost: fmtYen(m.compras) })
+            : t('dashboard.marginSub', { margin: m.margem, revenue: fmtYen(m.faturamento ?? m.receita), purchases: fmtYen(m.compras) })}
           onClick={() => goToReport(onNav, selMonth)}
         />
         <PortalKpi
-          label="Faturamento"
+          label={t('dashboard.billing')}
           value={fmtYen(m.faturamento ?? m.receita)}
           sub={m.comprasEstimadas
-            ? `${entregasCount} pedido(s) · notas emitidas`
+            ? t('dashboard.billingSubOrders', { count: entregasCount })
             : m.receita > 0 && m.faturamento !== m.receita
-              ? `${fmtYen(m.receita)} já recebido · ${entregasCount} entrega(s)`
-              : `${entregasCount} entrega(s) · cobrança do mês`}
+              ? t('dashboard.billingSubPaid', { paid: fmtYen(m.receita), count: entregasCount })
+              : t('dashboard.billingSub', { count: entregasCount })}
           color="var(--navy)"
           onClick={() => setDetailModal('receita')}
-          hint="Clique para ver entregas →"
+          hint={t('dashboard.clickDeliveries')}
         />
         <PortalKpi
-          label="A receber"
+          label={t('dashboard.receivable')}
           value={fmtYen(m.aReceber || 0)}
-          sub="Saldo pendente nas faturas do mês"
+          sub={t('dashboard.receivableSub')}
           color={(m.aReceber || 0) > 0 ? 'var(--amber)' : 'var(--green)'}
           onClick={() => onNav('faturas')}
-          hint="Ver faturas →"
+          hint={t('dashboard.seeInvoicesHint')}
         />
         <PortalKpi
-          label="Margem projetada"
+          label={t('dashboard.projectedMargin')}
           value={`${m.margem}%`}
           sub={m.comprasEstimadas
-            ? `Custo ${fmtYen(m.compras)} · preços jul/2026`
-            : `Compras ${fmtYen(m.compras)} · ${m.comprasCount} nota(s)`}
+            ? t('dashboard.marginDetailEst', { amount: fmtYen(m.compras) })
+            : t('dashboard.marginDetail', { amount: fmtYen(m.compras), count: m.comprasCount })}
           color={m.margem >= 20 ? 'var(--green)' : m.margem > 0 ? 'var(--amber)' : 'var(--red)'}
           onClick={() => goToReport(onNav, selMonth)}
-          hint="Detalhe no Relatório →"
+          hint={t('dashboard.reportDetail')}
         />
       </div>
 
-      <PortalSurface title="Lucro projetado — últimos 6 meses" sub="Faturamento do mês − compras do mês (notas)">
+      <PortalSurface title={t('dashboard.chartTitle')} sub={t('dashboard.chartSub')}>
         <BarChart data={lucroChart} color="#1a6b4a" height={72} />
       </PortalSurface>
 
-      <PortalSurface title="Ações rápidas">
+      <PortalSurface title={t('dashboard.quickActions')}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {[
-            { label: 'Nova compra', tab: 'purchases' },
-            { label: 'Registrar venda', tab: 'sales' },
-            { label: 'Pedidos', tab: 'pedidos' },
-            { label: 'Leitor de cobrança', tab: 'seikyusho' },
-            { label: 'Faturas', tab: 'faturas' },
+            { labelKey: 'dashboard.newPurchase', tab: 'purchases' },
+            { labelKey: 'dashboard.registerSale', tab: 'sales' },
+            { labelKey: 'nav.orders', tab: 'pedidos' },
+            { labelKey: 'dashboard.invoiceReader', tab: 'seikyusho' },
+            { labelKey: 'nav.invoices', tab: 'faturas' },
           ].map(a => (
-            <button key={a.tab} onClick={() => onNav(a.tab)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>{a.label}</button>
+            <button key={a.tab} onClick={() => onNav(a.tab)} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12 }}>{t(a.labelKey)}</button>
           ))}
         </div>
       </PortalSurface>
@@ -318,6 +325,7 @@ function Dashboard({ onNav }) {
 function Shell() {
   const { user, perfil, loading, signOut } = useAuth()
   const { layout } = useUiPrefs()
+  const { t } = useI18n()
   const [tab, setTab] = useState('dashboard')
   const [bar, setBar] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -362,15 +370,15 @@ function Shell() {
       return (
         <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--navy)', color:'white', flexDirection:'column', gap:16, padding:24, textAlign:'center' }}>
           <LogoSidebar />
-          <div style={{ fontSize:16, fontWeight:700 }}>Account not linked to a bar</div>
+          <div style={{ fontSize:16, fontWeight:700 }}>{t('auth.accountNotLinked')}</div>
           <div style={{ fontSize:13, color:'rgba(255,255,255,0.55)', maxWidth:360, lineHeight:1.6 }}>
-            Ask JBM admin to open <strong>Users</strong>, edit your account, set role <strong>Client</strong> and select your bar (e.g. Atomic Bar).
+            {t('auth.accountNotLinkedHint')}
           </div>
-          <button onClick={signOut} style={{ marginTop:8, padding:'10px 20px', borderRadius:8, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', color:'white', cursor:'pointer' }}>Sign out</button>
+          <button onClick={signOut} style={{ marginTop:8, padding:'10px 20px', borderRadius:8, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', color:'white', cursor:'pointer' }}>{t('common.signOut')}</button>
         </div>
       )
     }
-    if (!bar) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--navy)',color:'white',flexDirection:'column',gap:16}}><LogoSidebar /><div style={{color:'rgba(255,255,255,0.5)',fontSize:13}}>Loading portal...</div></div>
+    if (!bar) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--navy)',color:'white',flexDirection:'column',gap:16}}><LogoSidebar /><div style={{color:'rgba(255,255,255,0.5)',fontSize:13}}>{t('auth.loadingPortal')}</div></div>
     return <PortalCliente bar={bar} signOut={signOut} notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll}/>
   }
 
@@ -396,7 +404,7 @@ function Shell() {
           {tabs.map(t=>(
             <button key={t.id} onClick={()=>selectTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
               <span>{t.icon}</span>
-              <span style={{fontSize:13}}>{t.label}</span>
+              <span style={{fontSize:13}}>{t(tab.labelKey)}</span>
               {t.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
               )}
@@ -417,7 +425,7 @@ function Shell() {
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="sidebar"/>
           </div>
           <UiPrefsPanel />
-          <button onClick={signOut} className="sidebar-signout">Sair</button>
+          <button onClick={signOut} className="sidebar-signout">{t('common.signOut')}</button>
         </div>
       </aside>
 
@@ -445,7 +453,9 @@ function Shell() {
 function AppInner() {
   return (
     <UiPrefsProvider>
-      <AuthProvider><Shell/></AuthProvider>
+      <I18nProvider>
+        <AuthProvider><Shell/></AuthProvider>
+      </I18nProvider>
     </UiPrefsProvider>
   )
 }

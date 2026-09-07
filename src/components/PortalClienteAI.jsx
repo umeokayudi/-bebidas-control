@@ -2,28 +2,23 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { callGeminiChat } from '../lib/ai'
 import { Spinner, SectionTitle } from './utils'
+import { useI18n } from '../lib/i18n'
 import { fetchClientPortalSnapshot, buildClientChatSystem } from '../lib/clientPortalSnapshot'
 
-const QUICK_PROMPTS = [
-  'Quanto gastei com bebidas este mês?',
-  'Quais produtos dão mais margem no meu cardápio?',
-  'Tenho faturas pendentes ou em atraso?',
-  'Como estão minhas compras nos últimos meses?',
-  'O que devo repor no estoque?',
-]
+const QUICK_PROMPT_KEYS = ['portal.aiQ1', 'portal.aiQ2', 'portal.aiQ3', 'portal.aiQ4', 'portal.aiQ5']
 
 export default function PortalClienteAI({ bar }) {
+  const { t } = useI18n()
   const [snapshot, setSnapshot] = useState(null)
   const [loadingSnap, setLoadingSnap] = useState(true)
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: `Olá! Sou o assistente IA do portal JBM Drinks para ${bar.nome}. Pergunte sobre compras, faturas, margem POS ou estoque — uso os dados reais do seu bar.`,
-    },
-  ])
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const bottomRef = useRef(null)
+
+  useEffect(() => {
+    setMessages([{ role: 'assistant', content: t('portal.aiIntro', { bar: bar.nome }) }])
+  }, [bar.nome, t])
 
   useEffect(() => {
     refreshSnapshot()
@@ -68,13 +63,13 @@ export default function PortalClienteAI({ bar }) {
 
   return (
     <div className="fade-in portal-page" style={{ maxWidth: 860 }}>
-      <SectionTitle sub="Pergunte sobre compras, relatórios, faturas e margem — com dados do seu bar">
-        Assistente IA
+      <SectionTitle sub={t('portal.aiSub')}>
+        {t('portal.aiTitle')}
       </SectionTitle>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-          Conectada às compras, pedidos, faturas JBM, preços POS e estoque de {bar.nome}.
+          {t('portal.aiConnected', { bar: bar.nome })}
         </div>
         <button
           type="button"
@@ -82,17 +77,17 @@ export default function PortalClienteAI({ bar }) {
           disabled={loadingSnap}
           style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'white', fontSize: 12, cursor: 'pointer' }}
         >
-          {loadingSnap ? '...' : '🔄 Atualizar dados'}
+          {loadingSnap ? '...' : `🔄 ${t('portal.refreshData')}`}
         </button>
       </div>
 
       {snapshot && !snapshot.erro && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, marginBottom: 16 }}>
           {[
-            { label: 'Compras mês', value: `¥${Math.round(snapshot.comprasMes || 0).toLocaleString('ja-JP')}`, color: 'var(--navy)' },
-            { label: 'Margem POS', value: `${snapshot.margemPct || 0}%`, color: 'var(--green)' },
-            { label: 'Pendente', value: `¥${Math.round(snapshot.totalPendente || 0).toLocaleString('ja-JP')}`, color: snapshot.totalPendente > 0 ? 'var(--amber)' : 'var(--green)' },
-            { label: 'Em atraso', value: snapshot.faturasAtraso || 0, color: snapshot.faturasAtraso > 0 ? 'var(--red)' : 'var(--green)' },
+            { label: t('portal.purchasesMonth'), value: `¥${Math.round(snapshot.comprasMes || 0).toLocaleString('ja-JP')}`, color: 'var(--navy)' },
+            { label: t('portal.posMargin'), value: `${snapshot.margemPct || 0}%`, color: 'var(--green)' },
+            { label: t('portal.pending'), value: `¥${Math.round(snapshot.totalPendente || 0).toLocaleString('ja-JP')}`, color: snapshot.totalPendente > 0 ? 'var(--amber)' : 'var(--green)' },
+            { label: t('portal.overdue'), value: snapshot.faturasAtraso || 0, color: snapshot.faturasAtraso > 0 ? 'var(--red)' : 'var(--green)' },
           ].map(k => (
             <div key={k.label} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
               <div style={{ fontSize: 10, color: 'var(--text2)', textTransform: 'uppercase' }}>{k.label}</div>
@@ -103,14 +98,14 @@ export default function PortalClienteAI({ bar }) {
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-        {QUICK_PROMPTS.map(p => (
+        {QUICK_PROMPT_KEYS.map(key => (
           <button
-            key={p}
+            key={key}
             type="button"
-            onClick={() => sendChat(p)}
+            onClick={() => sendChat(t(key))}
             style={{ fontSize: 11, padding: '6px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg3)', cursor: 'pointer' }}
           >
-            {p}
+            {t(key)}
           </button>
         ))}
       </div>
@@ -136,7 +131,7 @@ export default function PortalClienteAI({ bar }) {
               </div>
             </div>
           ))}
-          {chatLoading && <Spinner text="Analisando dados do seu bar..." />}
+          {chatLoading && <Spinner text={t('portal.aiThinking')} />}
           <div ref={bottomRef} />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -144,7 +139,7 @@ export default function PortalClienteAI({ bar }) {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendChat()}
-            placeholder="Ex.: quanto gastei em julho? qual produto rende mais?"
+            placeholder={t('portal.aiPlaceholder')}
             style={{ flex: 1, padding: '10px 14px', borderRadius: 10, fontSize: 13 }}
           />
           <button
@@ -154,7 +149,7 @@ export default function PortalClienteAI({ bar }) {
             className="btn-primary"
             style={{ padding: '10px 16px', borderRadius: 10, fontSize: 12 }}
           >
-            Enviar
+            {t('portal.send')}
           </button>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { fmtYen, fmtDate } from './utils'
 import { splitPendingCompras, splitPendingFaturas } from '../lib/compraPagamentos'
+import { useI18n } from '../lib/i18n'
 
 export function useNotifications() {
   const { user } = useAuth()
@@ -90,15 +91,15 @@ const TIPO_ICON = {
   pedido_cancelado:  { icon: '❌', color: '#C0392B', bg: '#FBEAEA' },
 }
 
-function timeAgo(iso) {
+function timeAgo(iso, t) {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
   const h = Math.floor(m / 60)
   const d = Math.floor(h / 24)
-  if (d > 0) return `${d}d atrás`
-  if (h > 0) return `${h}h atrás`
-  if (m > 0) return `${m}min atrás`
-  return 'agora'
+  if (d > 0) return t('common.daysAgo', { count: d })
+  if (h > 0) return t('common.hoursAgo', { count: h })
+  if (m > 0) return t('common.minsAgo', { count: m })
+  return t('common.justNow')
 }
 
 export function NotificationBell({
@@ -112,6 +113,7 @@ export function NotificationBell({
   overdueAlerts,
   placement = 'sidebar',
 }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const [panelStyle, setPanelStyle] = useState(null)
@@ -153,17 +155,17 @@ export function NotificationBell({
 
   const panel = open && panelStyle && createPortal(
     <>
-      <button type="button" className="notif-backdrop" onClick={() => setOpen(false)} aria-label="Fechar notificações" />
-      <div className="notif-panel" style={panelStyle} role="dialog" aria-label="Notificações">
+      <button type="button" className="notif-backdrop" onClick={() => setOpen(false)} aria-label={t('notifications.close')} />
+      <div className="notif-panel" style={panelStyle} role="dialog" aria-label={t('notifications.title')}>
         <div className="notif-panel-header">
-          <span className="notif-panel-title">Notificações</span>
+          <span className="notif-panel-title">{t('notifications.title')}</span>
           <div className="notif-panel-actions">
             {notifs.some(n => n.lida) && deleteAll && (
-              <button type="button" className="notif-panel-link" onClick={deleteAll}>Limpar lidas</button>
+              <button type="button" className="notif-panel-link" onClick={deleteAll}>{t('notifications.clearRead')}</button>
             )}
             {unread > 0 && (
               <button type="button" className="notif-panel-link notif-panel-link-primary" onClick={markAllRead}>
-                Marcar lidas
+                {t('notifications.markRead')}
               </button>
             )}
           </div>
@@ -172,7 +174,7 @@ export function NotificationBell({
         <div className="notif-panel-body">
           {overdueCount > 0 && (
             <div className="notif-overdue-block">
-              <div className="notif-overdue-title">⚠️ Vencimentos atrasados</div>
+              <div className="notif-overdue-title">{t('notifications.overdueAlert')}</div>
               {overdueAlerts.faturas?.map(f => (
                 <button
                   key={`f-${f.id}`}
@@ -180,10 +182,10 @@ export function NotificationBell({
                   className="notif-overdue-row"
                   onClick={() => { setOpen(false); onNavigate?.('faturas') }}
                 >
-                  <span className="notif-overdue-kind">Fatura</span>
+                  <span className="notif-overdue-kind">{t('notifications.invoiceKind')}</span>
                   <span className="notif-overdue-label">{f.label}</span>
                   <span className="notif-overdue-amount">{fmtYen(f.amount)}</span>
-                  <span className="notif-overdue-date">venceu {fmtDate(f.date)}</span>
+                  <span className="notif-overdue-date">{t('notifications.expiredOn', { date: fmtDate(f.date) })}</span>
                 </button>
               ))}
               {overdueAlerts.compras?.map(c => (
@@ -193,19 +195,19 @@ export function NotificationBell({
                   className="notif-overdue-row"
                   onClick={() => { setOpen(false); onNavigate?.('cashflow') }}
                 >
-                  <span className="notif-overdue-kind">Compra</span>
+                  <span className="notif-overdue-kind">{t('notifications.purchaseKind')}</span>
                   <span className="notif-overdue-label">{c.label}</span>
                   <span className="notif-overdue-amount">{fmtYen(c.amount)}</span>
-                  <span className="notif-overdue-date">venceu {fmtDate(c.date)}</span>
+                  <span className="notif-overdue-date">{t('notifications.expiredOn', { date: fmtDate(c.date) })}</span>
                 </button>
               ))}
             </div>
           )}
 
           {notifs.length === 0 && overdueCount === 0 ? (
-            <div className="notif-empty">Nenhuma notificação</div>
+            <div className="notif-empty">{t('notifications.none')}</div>
           ) : notifs.map(n => {
-            const t = TIPO_ICON[n.tipo] || { icon: '🔔', color: 'var(--text2)', bg: 'var(--bg3)' }
+            const tipo = TIPO_ICON[n.tipo] || { icon: '🔔', color: 'var(--text2)', bg: 'var(--bg3)' }
             return (
               <div
                 key={n.id}
@@ -214,10 +216,10 @@ export function NotificationBell({
                 <button
                   type="button"
                   className="notif-row-icon"
-                  style={{ background: t.bg }}
+                  style={{ background: tipo.bg }}
                   onClick={() => { markRead(n.id); if (onNavigate && n.link) { setOpen(false); onNavigate(n.link) } }}
                 >
-                  {t.icon}
+                  {tipo.icon}
                 </button>
                 <button
                   type="button"
@@ -226,7 +228,7 @@ export function NotificationBell({
                 >
                   <div className="notif-row-title">{n.titulo}</div>
                   {n.mensagem && <div className="notif-row-msg">{n.mensagem}</div>}
-                  <div className="notif-row-time">{timeAgo(n.criado_em)}</div>
+                  <div className="notif-row-time">{timeAgo(n.criado_em, t)}</div>
                 </button>
                 {!n.lida && <span className="notif-unread-dot" aria-hidden />}
               </div>
@@ -246,7 +248,7 @@ export function NotificationBell({
         className="notif-bell-btn"
         onClick={() => setOpen(x => !x)}
         aria-expanded={open}
-        aria-label={badgeCount > 0 ? `${badgeCount} notificações` : 'Notificações'}
+        aria-label={badgeCount > 0 ? t('notifications.badgeCount', { count: badgeCount }) : t('notifications.title')}
       >
         🔔
         {badgeCount > 0 && (

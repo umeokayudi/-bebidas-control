@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { fmtYen, fmtDate, monthKey, monthLabel, Badge, Spinner, Empty, DelBtn, isSupplierProduct, filterSupplierVendas } from './utils'
 import { AdminPage, PortalSurface, PortalKpi } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 export default function VendasTab() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [vendas,   setVendas]   = useState([])
   const [produtos, setProdutos] = useState([])
@@ -47,12 +49,12 @@ export default function VendasTab() {
   }, 0)
 
   async function saveVenda() {
-    if (!form.itens.length) return alert('Adicione pelo menos um item')
-    if (!form.bar_id) return alert('Selecione o bar')
+    if (!form.itens.length) return alert(t('sales.addOneItem'))
+    if (!form.bar_id) return alert(t('sales.selectBar'))
     setSaving(true)
     const { data: venda, error } = await supabase.from('vendas').insert({
       data: form.data, bar_id: form.bar_id,
-      total: totalVendaForm, obs: form.obs || 'Entrega fornecedor', criado_por: user.id,
+      total: totalVendaForm, obs: form.obs || t('sales.defaultObs'), criado_por: user.id,
     }).select().single()
     if (!error) {
       await supabase.from('vendas_itens').insert(
@@ -68,31 +70,31 @@ export default function VendasTab() {
   }
 
   async function deleteVenda(id) {
-    if (!confirm('Remover esta venda?')) return
+    if (!confirm(t('sales.confirmDelete'))) return
     await supabase.from('vendas').delete().eq('id', id)
     loadAll()
   }
 
   return (
-    <AdminPage title="Vendas" subtitle="Entregas e receita dos bars">
-      <PortalSurface title="Registrar venda">
+    <AdminPage title={t('nav.sales')} subtitle={t('sales.subtitle')}>
+      <PortalSurface title={t('sales.registerSale')}>
         <div className="grid3" style={{ marginBottom: 12 }}>
-          <div><label className="form-label">Data</label>
+          <div><label className="form-label">{t('common.date')}</label>
             <input type="date" value={form.data} onChange={e=>setF('data',e.target.value)} /></div>
-          <div><label className="form-label">Bar</label>
+          <div><label className="form-label">{t('common.bar')}</label>
             <select value={form.bar_id} onChange={e=>setF('bar_id',e.target.value)}>
               {bars.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
             </select></div>
-          <div><label className="form-label">Observação</label>
+          <div><label className="form-label">{t('common.observation')}</label>
             <input type="text" value={form.obs} onChange={e=>setF('obs',e.target.value)} /></div>
         </div>
 
         <div style={{ marginBottom: 14 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <label className="form-label" style={{ margin:0 }}>Itens vendidos</label>
+            <label className="form-label" style={{ margin:0 }}>{t('sales.itemsSold')}</label>
             <button style={{ padding:'4px 10px', fontSize:11 }}
               onClick={() => setF('itens', [...form.itens, { produto_id: produtos[0]?.id || '', qtd: 1 }])}>
-              + Item
+              {t('common.addItem')}
             </button>
           </div>
           {form.itens.map((it, i) => {
@@ -118,36 +120,36 @@ export default function VendasTab() {
         </div>
 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ fontSize:14 }}>Total: <strong>{fmtYen(totalVendaForm)}</strong></div>
+          <div style={{ fontSize:14 }}>{t('common.total')}: <strong>{fmtYen(totalVendaForm)}</strong></div>
           <button className="btn-primary" onClick={saveVenda} disabled={saving}>
-            {saving ? <><span className="spinner" />Salvando...</> : 'Salvar venda'}
+            {saving ? <><span className="spinner" />{t('common.saving')}</> : t('sales.saveSale')}
           </button>
         </div>
       </PortalSurface>
 
       <PortalSurface
-        title="Histórico"
+        title={t('common.history')}
         headerRight={
           <div style={{ display:'flex', gap:8 }}>
             <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} style={{ width:'auto' }}>
-              <option value="">Todos os meses</option>
+              <option value="">{t('common.allMonths')}</option>
               {months.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
             <select value={filterBar} onChange={e=>setFilterBar(e.target.value)} style={{ width:'auto' }}>
-              <option value="">Todos os bars</option>
+              <option value="">{t('common.allBars')}</option>
               {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
           </div>
         }
       >
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:14 }}>
-          <PortalKpi label="Total vendido" value={fmtYen(totalReceita)} color="var(--blue)" />
+          <PortalKpi label={t('sales.totalSold')} value={fmtYen(totalReceita)} color="var(--blue)" />
         </div>
 
-        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text="Nenhuma venda registrada" /> : (
+        {loading ? <Spinner /> : filtered.length === 0 ? <Empty text={t('sales.noSales')} /> : (
           <table>
             <thead>
-              <tr><th>Data</th><th>Bar</th><th>Itens</th><th>Total</th><th>Obs</th><th></th></tr>
+              <tr><th>{t('common.date')}</th><th>{t('common.bar')}</th><th>{t('common.items')}</th><th>{t('common.total')}</th><th>{t('common.obs')}</th><th></th></tr>
             </thead>
             <tbody>
               {filtered.map(v => {

@@ -23,17 +23,20 @@ import {
 import ClientAnalyticsTab from './ClientAnalyticsTab'
 import PortalRecibosTab from './PortalRecibosTab'
 import PortalClienteAI from './PortalClienteAI'
+import UiPrefsPanel from './UiPrefsPanel'
+import { useI18n } from '../lib/i18n'
 
 const STATUS_PEDIDO = {
-  pendente:   { label:'Pendente',   color:'#8A5A00', bg:'#FDF3E0' },
-  confirmado: { label:'Confirmado', color:'#1A4E8A', bg:'#EAF0FA' },
-  entregue:   { label:'Entregue',   color:'#1A7A5E', bg:'#EAF5F0' },
-  cancelado:  { label:'Cancelado',  color:'#C0392B', bg:'#FBEAEA' },
+  pendente:   { labelKey:'orderStatus.pendente',   color:'#8A5A00', bg:'#FDF3E0' },
+  confirmado: { labelKey:'orderStatus.confirmado', color:'#1A4E8A', bg:'#EAF0FA' },
+  entregue:   { labelKey:'orderStatus.entregue',   color:'#1A7A5E', bg:'#EAF5F0' },
+  cancelado:  { labelKey:'orderStatus.cancelado',  color:'#C0392B', bg:'#FBEAEA' },
 }
 
 function Badge({ status }) {
+  const { t } = useI18n()
   const s = STATUS_PEDIDO[status] || STATUS_PEDIDO.pendente
-  return <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:s.bg, color:s.color }}>{s.label}</span>
+  return <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:s.bg, color:s.color }}>{t(s.labelKey)}</span>
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
@@ -2195,6 +2198,7 @@ import { NotificationBell } from './Notifications'
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
   const [tab, setTab] = useState('inicio')
   const [menuOpen, setMenuOpen] = useState(false)
+  const { t } = useI18n()
 
   useMobileMenuLock(menuOpen)
 
@@ -2204,14 +2208,14 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   }
 
   const NAV = [
-    { id:'inicio',    label:'Início',           icon:'🏠' },
-    { id:'pedidos',   label:'Pedidos',          icon:'🛒' },
-    { id:'entregas',  label:'Entregas',         icon:'📦' },
-    { id:'estoque',   label:'Estoque',          icon:'📊' },
-    { id:'precos',    label:'Preços & Cardápio', icon:'💰' },
-    { id:'faturas',   label:'Faturas JBM',      icon:'💳' },
-    { id:'recibos',   label:'Recibos',          icon:'🧾' },
-    { id:'ia',        label:'Assistente IA',    icon:'🤖' },
+    { id:'inicio',    labelKey:'nav.portalHome', icon:'🏠' },
+    { id:'pedidos',   labelKey:'nav.portalOrders', icon:'🛒' },
+    { id:'entregas',  labelKey:'nav.portalDeliveries', icon:'📦' },
+    { id:'estoque',   labelKey:'nav.portalInventory', icon:'📊' },
+    { id:'precos',    labelKey:'nav.portalPrices', icon:'💰' },
+    { id:'faturas',   labelKey:'nav.portalInvoices', icon:'💳' },
+    { id:'recibos',   labelKey:'nav.portalReceipts', icon:'🧾' },
+    { id:'ia',        labelKey:'nav.portalAi', icon:'🤖' },
   ]
 
   return (
@@ -2233,20 +2237,21 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           {NAV.map(n => (
             <button key={n.id} onClick={() => selectTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
               <span>{n.icon}</span>
-              <span>{n.label}</span>
+              <span>{t(n.labelKey)}</span>
             </button>
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Portal do cliente</div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>{t('shell.clientPortal')}</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>
-            Compras, estoque, faturas, recibos e assistente IA — tudo em um só lugar.
+            {t('portal.footerHint')}
           </div>
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
           </div>
-          <button onClick={signOut} className="sidebar-signout">Sair</button>
+          <UiPrefsPanel />
+          <button onClick={signOut} className="sidebar-signout">{t('common.signOut')}</button>
         </div>
       </aside>
       <main className="app-main app-main-wide">

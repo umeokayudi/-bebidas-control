@@ -1,4 +1,4 @@
-// ── Formatters ────────────────────────────────────────────────────────────────
+import { t as translate } from '../lib/i18n'
 export const fmtYen   = n => `¥${Math.round(+n || 0).toLocaleString('ja-JP')}`
 export const fmtDate  = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) : '—'
 export const monthKey = iso => iso ? String(iso).slice(0, 7) : ''
@@ -67,10 +67,10 @@ export function filterSupplierVendas(list) {
 }
 
 export function roleLabel(role) {
-  if (role === 'admin') return 'Administrador'
-  if (role === 'cliente') return 'Cliente'
-  if (role === 'funcionario') return 'Funcionário'
-  return 'Staff'
+  if (role === 'admin') return translate('shell.roles.admin')
+  if (role === 'cliente') return translate('shell.roles.cliente')
+  if (role === 'funcionario') return translate('shell.roles.funcionario')
+  return translate('shell.roles.staff')
 }
 
 // ── Metric Card ───────────────────────────────────────────────────────────────
@@ -166,10 +166,10 @@ export function CatBadge({ cat }) {
 }
 
 // ── Spinner ───────────────────────────────────────────────────────────────────
-export function Spinner({ text = 'Loading...' }) {
+export function Spinner({ text }) {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--text2)', fontSize:13, padding:'20px 0' }}>
-      <span className="spinner" />{text}
+      <span className="spinner" />{text ?? translate('common.loading')}
     </div>
   )
 }
@@ -179,7 +179,7 @@ export function Empty({ text, icon = '📭' }) {
   return (
     <div style={{ textAlign:'center', padding:'40px 0', color:'var(--text3)' }}>
       <div style={{ fontSize:32, marginBottom:8 }}>{icon}</div>
-      <div style={{ fontSize:13 }}>{text}</div>
+      <div style={{ fontSize:13 }}>{text ?? translate('common.empty')}</div>
     </div>
   )
 }

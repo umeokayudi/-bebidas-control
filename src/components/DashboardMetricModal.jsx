@@ -1,5 +1,6 @@
 import ModalShell from './ModalShell'
 import { fmtYen, fmtDate } from './utils'
+import { useI18n } from '../lib/i18n'
 
 function VendaRow({ v }) {
   return (
@@ -34,6 +35,7 @@ function VendaRow({ v }) {
 }
 
 export default function DashboardMetricModal({ open, onClose, type, monthLabel: monthLbl, stats }) {
+  const { t } = useI18n()
   if (!open || !stats || type !== 'receita') return null
 
   const entregas = stats.entregasDetalhe || stats.vendasDetalhe || []
@@ -43,11 +45,11 @@ export default function DashboardMetricModal({ open, onClose, type, monthLabel: 
     <ModalShell
       open={open}
       onClose={onClose}
-      title={`Entregas — ${monthLbl}`}
-      subtitle={`${entregas.length} entrega(s) · Faturamento ${fmtYen(total)}`}
+      title={t('dashboardModal.deliveriesTitle', { month: monthLbl })}
+      subtitle={t('dashboardModal.deliveriesSubtitle', { count: entregas.length, amount: fmtYen(total) })}
     >
       {entregas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 13 }}>Nenhuma entrega neste mês</div>
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 13 }}>{t('dashboardModal.noDeliveries')}</div>
       ) : entregas.map(v => (
         <VendaRow key={v.id} v={v} />
       ))}

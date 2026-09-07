@@ -4,6 +4,7 @@ import { fmtYen, Spinner, Empty } from './utils'
 import PurchaseCashflowAdvisor from './PurchaseCashflowAdvisor'
 import { fromZeikomi, parseSupplierPriceNotas, formatPriceChange } from '../lib/consumptionTax'
 import { AdminPage, PortalSurface, PortalPills } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -19,14 +20,15 @@ class ErrorBoundary extends Component {
 }
 
 function FornecedoresInner() {
+  const { t } = useI18n()
   const [tab, setTab] = useState('list')
   return (
     <AdminPage
-      title="Fornecedores"
-      subtitle="Cadastro, preços e compra inteligente"
+      title={t('nav.suppliers')}
+      subtitle={t('suppliers.subtitle')}
       actions={
         <PortalPills
-          options={[['list','Lista'],['pricing','Preços'],['purchase','Compra inteligente']]}
+          options={[['list', t('suppliers.tabList')],['pricing', t('suppliers.tabPricing')],['purchase', t('suppliers.tabPurchase')]]}
           value={tab}
           onChange={setTab}
         />
@@ -40,6 +42,7 @@ function FornecedoresInner() {
 }
 
 function SupplierList() {
+  const { t } = useI18n()
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -60,7 +63,7 @@ function SupplierList() {
     setSaving(false); setShowForm(false); setEditId(null); setForm(empty); load()
   }
   async function del(id) {
-    if (!confirm('Excluir fornecedor?')) return
+    if (!confirm(t('suppliers.confirmDelete'))) return
     await supabase.from('fornecedores').delete().eq('id', id); load()
   }
   function edit(s) {
@@ -69,37 +72,37 @@ function SupplierList() {
       pagamento:s.pagamento||'Cash', pontos_pct:s.pontos_pct||0, notas:s.notas||'' })
     setEditId(s.id); setShowForm(true)
   }
-  if (loading) return <Spinner text="Carregando..." />
+  if (loading) return <Spinner text={t('common.loading')} />
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontSize:16, fontWeight:700 }}>Fornecedores ({suppliers.length})</div>
-        <button className="btn-primary" onClick={()=>{setShowForm(x=>!x);setEditId(null);setForm(empty)}}>{showForm?'Cancelar':'+ Adicionar fornecedor'}</button>
+        <div style={{ fontSize:16, fontWeight:700 }}>{t('suppliers.supplierCount', { count: suppliers.length })}</div>
+        <button className="btn-primary" onClick={()=>{setShowForm(x=>!x);setEditId(null);setForm(empty)}}>{showForm ? t('common.cancel') : t('suppliers.addSupplier')}</button>
       </div>
       {showForm && (
-        <PortalSurface title={editId?'Editar fornecedor':'Novo fornecedor'} style={{ marginBottom:16 }}>
+        <PortalSurface title={editId ? t('suppliers.editSupplier') : t('suppliers.newSupplier')} style={{ marginBottom:16 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-            <div><label className="form-label">Nome *</label><input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder="ex. Costco Japan" /></div>
-            <div><label className="form-label">Contato</label><input value={form.contato} onChange={e=>setForm({...form,contato:e.target.value})} /></div>
-            <div><label className="form-label">Telefone</label><input value={form.telefone} onChange={e=>setForm({...form,telefone:e.target.value})} /></div>
-            <div><label className="form-label">Email</label><input value={form.email} onChange={e=>setForm({...form,email:e.target.value})} /></div>
-            <div><label className="form-label">Site</label><input value={form.website} onChange={e=>setForm({...form,website:e.target.value})} placeholder="https://" /></div>
-            <div><label className="form-label">Pagamento</label>
+            <div><label className="form-label">{t('common.name')} *</label><input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder="ex. Costco Japan" /></div>
+            <div><label className="form-label">{t('common.contact')}</label><input value={form.contato} onChange={e=>setForm({...form,contato:e.target.value})} /></div>
+            <div><label className="form-label">{t('common.phone')}</label><input value={form.telefone} onChange={e=>setForm({...form,telefone:e.target.value})} /></div>
+            <div><label className="form-label">{t('common.email')}</label><input value={form.email} onChange={e=>setForm({...form,email:e.target.value})} /></div>
+            <div><label className="form-label">{t('common.website')}</label><input value={form.website} onChange={e=>setForm({...form,website:e.target.value})} placeholder="https://" /></div>
+            <div><label className="form-label">{t('common.payment')}</label>
               <select value={form.pagamento} onChange={e=>setForm({...form,pagamento:e.target.value})}>
                 {['Cash','Card','Bank Transfer','Invoice 30d','Invoice 60d','Online'].map(p=><option key={p}>{p}</option>)}
               </select>
             </div>
-            <div><label className="form-label">Prazo de entrega (dias)</label><input type="number" min="0" value={form.prazo_entrega_dias} onChange={e=>setForm({...form,prazo_entrega_dias:+e.target.value})} /></div>
-            <div><label className="form-label">Pontos %</label><input type="number" min="0" step="0.1" value={form.pontos_pct} onChange={e=>setForm({...form,pontos_pct:+e.target.value})} /></div>
+            <div><label className="form-label">{t('suppliers.deliveryDays')}</label><input type="number" min="0" value={form.prazo_entrega_dias} onChange={e=>setForm({...form,prazo_entrega_dias:+e.target.value})} /></div>
+            <div><label className="form-label">{t('suppliers.pointsPct')}</label><input type="number" min="0" step="0.1" value={form.pontos_pct} onChange={e=>setForm({...form,pontos_pct:+e.target.value})} /></div>
           </div>
-          <div style={{ marginBottom:12 }}><label className="form-label">Notas</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} /></div>
+          <div style={{ marginBottom:12 }}><label className="form-label">{t('common.notes')}</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} /></div>
           <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
-            <button onClick={()=>{setShowForm(false);setEditId(null)}} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancelar</button>
-            <button className="btn-primary" onClick={save} disabled={saving||!form.nome}>{saving?'Salvando...':editId?'Salvar':'Adicionar fornecedor'}</button>
+            <button onClick={()=>{setShowForm(false);setEditId(null)}} style={{ padding:'8px 16px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>{t('common.cancel')}</button>
+            <button className="btn-primary" onClick={save} disabled={saving||!form.nome}>{saving ? t('common.saving') : editId ? t('common.save') : t('suppliers.addSupplier')}</button>
           </div>
         </PortalSurface>
       )}
-      {suppliers.length===0 ? <Empty text="Nenhum fornecedor ainda" icon="🏭" /> : (
+      {suppliers.length===0 ? <Empty text={t('suppliers.noSuppliers')} icon="🏭" /> : (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {suppliers.map(s => (
             <div key={s.id} className="card" style={{ display:'flex', alignItems:'center', gap:16 }}>
@@ -116,7 +119,7 @@ function SupplierList() {
                 {s.notas && <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>📝 {s.notas}</div>}
               </div>
               <div style={{ display:'flex', gap:6 }}>
-                {s.website && <a href={s.website} target="_blank" rel="noreferrer" style={{ fontSize:11, padding:'5px 10px', borderRadius:8, background:'var(--bg3)', color:'var(--navy)', textDecoration:'none', fontWeight:600 }}>🌐 Visit</a>}
+                {s.website && <a href={s.website} target="_blank" rel="noreferrer" style={{ fontSize:11, padding:'5px 10px', borderRadius:8, background:'var(--bg3)', color:'var(--navy)', textDecoration:'none', fontWeight:600 }}>🌐 {t('common.visit')}</a>}
                 <button onClick={()=>edit(s)} style={{ padding:'5px 10px', fontSize:11, borderRadius:8, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>✏️</button>
                 <button onClick={()=>del(s.id)} style={{ padding:'5px 10px', fontSize:11, borderRadius:8, border:'none', background:'#fef2f2', color:'var(--red)', cursor:'pointer' }}>🗑</button>
               </div>
@@ -129,6 +132,7 @@ function SupplierList() {
 }
 
 function SupplierPricing() {
+  const { t } = useI18n()
   const [suppliers, setSuppliers] = useState([])
   const [produtos, setProdutos] = useState([])
   const [precos, setPrecos] = useState([])
@@ -158,12 +162,12 @@ function SupplierPricing() {
   }
   const supPrecos = precos.filter(p=>p.fornecedor_id===selSup)
   const cats = [...new Set(produtos.map(p=>p.categoria))]
-  if (loading) return <Spinner text="Loading..." />
-  if (suppliers.length===0) return <Empty text="Add suppliers first" icon="🏭" />
+  if (loading) return <Spinner text={t('common.loading')} />
+  if (suppliers.length===0) return <Empty text={t('suppliers.addFirst')} icon="🏭" />
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontSize:16, fontWeight:700 }}>Supplier Pricing</div>
+        <div style={{ fontSize:16, fontWeight:700 }}>{t('suppliers.supplierPricing')}</div>
         <select value={selSup} onChange={e=>setSelSup(e.target.value)} style={{ width:'auto' }}>
           {suppliers.map(s=><option key={s.id} value={s.id}>{s.nome}</option>)}
         </select>
@@ -193,11 +197,11 @@ function SupplierPricing() {
                     {diff !== null && diff !== 0 && (
                       <div style={{ fontSize:10, color: diff < 0 ? 'var(--green)' : 'var(--red)' }}>vs JBM {diff > 0 ? '+' : ''}{diff}%</div>
                     )}
-                    {sp.url_compra && <a href={sp.url_compra} target="_blank" rel="noreferrer" style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'var(--bg3)', color:'var(--navy)', textDecoration:'none', fontWeight:600 }}>🛒 Buy</a>}
+                    {sp.url_compra && <a href={sp.url_compra} target="_blank" rel="noreferrer" style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'var(--bg3)', color:'var(--navy)', textDecoration:'none', fontWeight:600 }}>{t('suppliers.buy')}</a>}
                   </> : <div style={{ fontSize:12, color:'var(--text3)' }}>—</div>}
                   <button onClick={()=>setModal({ fornecedor_id:selSup, produto_id:p.id, preco:sp?.preco||'', url_compra:sp?.url_compra||'', notas:sp?.notas||'' })}
                     style={{ padding:'4px 10px', fontSize:11, borderRadius:6, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>
-                    {sp?'✏️':'+ Price'}
+                    {sp ? '✏️' : t('suppliers.addPrice')}
                   </button>
                 </div>
               )
@@ -211,11 +215,11 @@ function SupplierPricing() {
             <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>{produtos.find(p=>p.id===modal.produto_id)?.nome}</div>
             <div style={{ fontSize:12, color:'var(--text2)', marginBottom:20 }}>{suppliers.find(s=>s.id===modal.fornecedor_id)?.nome}</div>
             <div style={{ marginBottom:12 }}><label className="form-label">Price (¥) *</label><input type="number" value={modal.preco} onChange={e=>setModal({...modal,preco:e.target.value})} autoFocus /></div>
-            <div style={{ marginBottom:12 }}><label className="form-label">Buy link (URL)</label><input type="url" value={modal.url_compra} onChange={e=>setModal({...modal,url_compra:e.target.value})} placeholder="https://..." /></div>
-            <div style={{ marginBottom:20 }}><label className="form-label">Notes</label><input value={modal.notas} onChange={e=>setModal({...modal,notas:e.target.value})} /></div>
+            <div style={{ marginBottom:12 }}><label className="form-label">{t('suppliers.buyLink')}</label><input type="url" value={modal.url_compra} onChange={e=>setModal({...modal,url_compra:e.target.value})} placeholder="https://..." /></div>
+            <div style={{ marginBottom:20 }}><label className="form-label">{t('common.notes')}</label><input value={modal.notas} onChange={e=>setModal({...modal,notas:e.target.value})} /></div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:8 }}>
-              <button onClick={()=>setModal(null)} style={{ padding:'11px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>Cancel</button>
-              <button className="btn-primary" onClick={savePreco} disabled={saving||!modal.preco} style={{ padding:'11px', borderRadius:12 }}>{saving?'Saving...':'Save price'}</button>
+              <button onClick={()=>setModal(null)} style={{ padding:'11px', borderRadius:12, border:'1px solid var(--border)', background:'transparent', cursor:'pointer' }}>{t('common.cancel')}</button>
+              <button className="btn-primary" onClick={savePreco} disabled={saving||!modal.preco} style={{ padding:'11px', borderRadius:12 }}>{saving ? t('common.saving') : t('suppliers.savePrice')}</button>
             </div>
           </div>
         </div>
@@ -225,6 +229,7 @@ function SupplierPricing() {
 }
 
 function SmartPurchase() {
+  const { t } = useI18n()
   const [produtos, setProdutos] = useState([])
   const [precos, setPrecos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -241,14 +246,14 @@ function SmartPurchase() {
   }
   const filtered = produtos.filter(p => !search || p.nome.toLowerCase().includes(search.toLowerCase()) || p.categoria.toLowerCase().includes(search.toLowerCase()))
   const getPrices = id => precos.filter(p=>p.produto_id===id).sort((a,b)=>a.preco-b.preco)
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text={t('common.loading')} />
   return (
     <div>
-      <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>Smart Purchase</div>
-      <div style={{ fontSize:13, color:'var(--text2)', marginBottom:16 }}>Compare prices across all suppliers</div>
+      <div style={{ fontSize:16, fontWeight:700, marginBottom:4 }}>{t('suppliers.smartPurchase')}</div>
+      <div style={{ fontSize:13, color:'var(--text2)', marginBottom:16 }}>{t('suppliers.compareHint')}</div>
       <div style={{ position:'relative', marginBottom:20 }}>
         <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text3)' }}>🔍</span>
-        <input type="text" placeholder="Search product..." value={search} onChange={e=>setSearch(e.target.value)}
+        <input type="text" placeholder={t('suppliers.searchProduct')} value={search} onChange={e=>setSearch(e.target.value)}
           style={{ width:'100%', padding:'11px 14px 11px 36px', borderRadius:12, fontSize:14 }} />
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -263,8 +268,8 @@ function SmartPurchase() {
                   <div style={{ fontSize:11, color:'var(--text2)' }}>{p.categoria} · JBM: {fmtYen(p.custo)}</div>
                 </div>
                 {prices.length>0
-                  ? <div style={{ textAlign:'right' }}><div style={{ fontSize:14, fontWeight:800, color:'var(--green)' }}>From {fmtYen(best.preco)}</div><div style={{ fontSize:11, color:'var(--text2)' }}>{prices.length} supplier{prices.length>1?'s':''}</div></div>
-                  : <div style={{ fontSize:12, color:'var(--text3)' }}>No prices</div>}
+                  ? <div style={{ textAlign:'right' }}><div style={{ fontSize:14, fontWeight:800, color:'var(--green)' }}>{t('suppliers.fromPrice', { price: fmtYen(best.preco) })}</div><div style={{ fontSize:11, color:'var(--text2)' }}>{t('suppliers.supplierCountShort', { count: prices.length })}</div></div>
+                  : <div style={{ fontSize:12, color:'var(--text3)' }}>{t('suppliers.noPrices')}</div>}
                 <span style={{ color:'var(--text3)', fontSize:12 }}>{selected===p.id?'▲':'▼'}</span>
               </div>
               {selected===p.id && prices.length>0 && (
@@ -286,15 +291,15 @@ function SmartPurchase() {
                       <div style={{ textAlign:'right' }}>
                         <div style={{ fontSize:16, fontWeight:800, color:i===0?'var(--green)':'var(--navy)' }}>{fmtYen(pr.preco)}</div>
                         {p.custo>0 && <div style={{ fontSize:10, color:pr.preco<p.custo?'var(--green)':pr.preco>p.custo?'var(--red)':'var(--text2)', fontWeight:600 }}>
-                          {pr.preco<p.custo?'↓ cheaper':pr.preco>p.custo?'↑ more expensive':'= same as JBM'}
+                          {pr.preco<p.custo ? t('suppliers.cheaper') : pr.preco>p.custo ? t('suppliers.moreExpensive') : t('suppliers.sameAsJbm')}
                         </div>}
                       </div>
                       <button type="button" onClick={()=>setAdvisorOffer({ product: p, offer: pr })}
                         style={{ padding:'8px 14px', borderRadius:10, background:advisorOffer?.offer?.id===pr.id?'var(--gold)':'var(--bg3)', color:advisorOffer?.offer?.id===pr.id?'var(--navy)':'var(--text)', border:'1px solid var(--border)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>
-                        💰 Fluxo de caixa
+                        {t('suppliers.cashflowBtn')}
                       </button>
                       {pr.url_compra && <a href={pr.url_compra} target="_blank" rel="noreferrer"
-                        style={{ padding:'8px 14px', borderRadius:10, background:'var(--navy)', color:'white', textDecoration:'none', fontSize:12, fontWeight:700, whiteSpace:'nowrap' }}>🛒 Buy</a>}
+                        style={{ padding:'8px 14px', borderRadius:10, background:'var(--navy)', color:'white', textDecoration:'none', fontSize:12, fontWeight:700, whiteSpace:'nowrap' }}>{t('suppliers.buy')}</a>}
                     </div>
                   ))}
                   {advisorOffer?.product?.id === p.id && (
