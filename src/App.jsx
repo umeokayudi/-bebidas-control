@@ -401,11 +401,11 @@ function Shell() {
           <LogoSidebar />
         </div>
         <nav className="sidebar-nav">
-          {tabs.map(t=>(
-            <button key={t.id} onClick={()=>selectTab(t.id)} className={`nav-item ${tab===t.id?'active':''}`}>
-              <span>{t.icon}</span>
-              <span style={{fontSize:13}}>{t(tab.labelKey)}</span>
-              {t.id==='pedidos'&&pedidosPendentes>0&&(
+          {tabs.map(nav => (
+            <button key={nav.id} onClick={()=>selectTab(nav.id)} className={`nav-item ${tab===nav.id?'active':''}`}>
+              <span>{nav.icon}</span>
+              <span style={{fontSize:13}}>{t(nav.labelKey)}</span>
+              {nav.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
               )}
             </button>
