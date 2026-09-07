@@ -1,8 +1,14 @@
 import { supabase } from './supabase'
 
 export async function loadDashboard() {
-  const { data: { session } } = await supabase.auth.getSession()
+  let { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) throw new Error('Não autenticado')
+
+  const expiresAt = session.expires_at ? session.expires_at * 1000 : 0
+  if (expiresAt && expiresAt < Date.now() + 60_000) {
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    if (refreshed?.session?.access_token) session = refreshed.session
+  }
 
   const res = await fetch('/api/dashboard', {
     headers: { Authorization: `Bearer ${session.access_token}` },

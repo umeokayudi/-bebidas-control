@@ -1,5 +1,7 @@
 /** Auth compartilhado — staff JWT ou secret interno (cron / holding sync). */
 
+import { createStaffUserClient, drinksAuthClient } from './_supabaseAdmin.js'
+
 export function bearerToken(req) {
   return (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim()
 }
@@ -28,23 +30,25 @@ export function isInternalService(req) {
 }
 
 /**
- * @param {import('@supabase/supabase-js').SupabaseClient} admin
+ * @param {import('@supabase/supabase-js').SupabaseClient} [_admin] legacy — não usado; auth via anon + JWT
  * @param {{ roles?: string[], adminOnly?: boolean }} opts
  */
-export async function requireStaff(req, admin, opts = {}) {
+export async function requireStaff(req, _admin, opts = {}) {
   const { roles = ['staff', 'admin'], adminOnly = false } = opts
 
   if (isInternalService(req)) {
-    return { user: null, perfil: { role: 'service' }, service: true }
+    return { user: null, perfil: { role: 'service' }, service: true, token: null }
   }
 
   const token = bearerToken(req)
   if (!token) return { error: 'Não autenticado', status: 401 }
 
-  const { data: { user }, error } = await admin.auth.getUser(token)
+  const authClient = drinksAuthClient()
+  const { data: { user }, error } = await authClient.auth.getUser(token)
   if (error || !user) return { error: 'Sessão inválida', status: 401 }
 
-  const { data: perfil } = await admin.from('perfis').select('role').eq('id', user.id).single()
+  const userDb = createStaffUserClient(token)
+  const { data: perfil } = await userDb.from('perfis').select('role').eq('id', user.id).single()
   if (!perfil || perfil.role === 'cliente') return { error: 'Sem permissão', status: 403 }
   if (adminOnly && perfil.role !== 'admin' && perfil.role !== 'staff') {
     return { error: 'Sem permissão', status: 403 }
@@ -53,17 +57,16 @@ export async function requireStaff(req, admin, opts = {}) {
     return { error: 'Sem permissão', status: 403 }
   }
 
-  return { user, perfil }
+  return { user, perfil, token }
 }
 
 /** Staff JWT, service secret, ou origem permitida (jbm-master / bebidas SPA). */
 export async function requireStaffOrTrustedOrigin(req, admin, opts = {}) {
-  if (isInternalService(req)) return { user: null, perfil: { role: 'service' }, service: true }
+  if (isInternalService(req)) return { user: null, perfil: { role: 'service' }, service: true, token: null }
   if (isAllowedOrigin(req)) {
     const auth = await requireStaff(req, admin, opts)
     if (!auth.error) return auth
-    // Origem confiável sem login — só leitura/IA holding (não expõe service role)
-    return { user: null, perfil: { role: 'origin' }, originTrusted: true }
+    return { user: null, perfil: { role: 'origin' }, originTrusted: true, token: null }
   }
   return requireStaff(req, admin, opts)
 }
