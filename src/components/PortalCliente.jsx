@@ -1878,7 +1878,12 @@ function FaturasTab({ bar }) {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [payModal, setPayModal] = useState(null)
-  const [payForm, setPayForm] = useState({ valor:"", metodo:"Transferência", notas:"" })
+  const PAY_METHODS = [
+    { value: 'transfer', label: t('portal.invoices.payMethodTransfer') },
+    { value: 'card', label: t('portal.invoices.payMethodCard') },
+    { value: 'cash', label: t('portal.invoices.payMethodCash') },
+  ]
+  const [payForm, setPayForm] = useState({ valor:"", metodo:"transfer", notas:"" })
   const [image, setImage] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -1943,7 +1948,7 @@ function FaturasTab({ bar }) {
       notas:payForm.notas, data:new Date().toISOString().slice(0,10),
       comprovante_url, confirmado:false, submetido_por:user?.id
     })
-    setSaving(false); setPayModal(null); setPayForm({ valor:"", metodo:"Transferência", notas:"" }); setImage(null); setScannedData(null); load()
+    setSaving(false); setPayModal(null); setPayForm({ valor:"", metodo:"transfer", notas:"" }); setImage(null); setScannedData(null); load()
   }
 
   const filtered = faturas.filter(f => {
@@ -2136,13 +2141,13 @@ function FaturasTab({ bar }) {
                     ) : (
                       <img src={image} alt="comprovante" style={{ maxHeight:150, maxWidth:"100%", borderRadius:8, marginBottom:8 }} />
                     )}
-                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>Arquivo enviado ✓</div>
+                    <div style={{ fontSize:12, color:"var(--text2)", marginTop:4 }}>{t('portal.invoices.fileUploaded')}</div>
                   </div>
                 ):(
                   <div>
                     <div style={{ fontSize:24, marginBottom:4 }}>📷</div>
-                    <div style={{ fontSize:13, fontWeight:600 }}>Enviar foto ou PDF</div>
-                    <div style={{ fontSize:11, color:"var(--text2)" }}>A IA extrai o valor automaticamente</div>
+                    <div style={{ fontSize:13, fontWeight:600 }}>{t('portal.invoices.uploadPhotoPdf')}</div>
+                    <div style={{ fontSize:11, color:"var(--text2)" }}>{t('portal.invoices.aiExtractHint')}</div>
                   </div>
                 )}
                 <input id="receipt-upload" type="file" accept="image/*,.pdf,application/pdf" style={{ display:"none" }}
@@ -2160,29 +2165,29 @@ function FaturasTab({ bar }) {
               </div>
             </div>
             <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Valor (¥)</div>
-              {scanning && <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>🤖 Extraindo valor...</div>}
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>{t('portal.invoices.amountYen')}</div>
+              {scanning && <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>{t('portal.invoices.extracting')}</div>}
               {scannedData?.valor && !scanning && (
                 <div style={{ fontSize:12, color:"var(--green)", marginBottom:8, fontWeight:600 }}>
-                  ✅ Detectado: {fmtYen(scannedData.valor)}{scannedData.metodo ? ` · ${scannedData.metodo}` : ''}
+                  {t('portal.invoices.detected', { amount: fmtYen(scannedData.valor) })}{scannedData.metodo ? ` · ${scannedData.metodo}` : ''}
                 </div>
               )}
               <input type="number" value={payForm.valor} onChange={e=>setPayForm({...payForm,valor:e.target.value})} style={{ width:"100%", padding:"12px 14px", fontSize:18, borderRadius:12, fontWeight:700 }} />
             </div>
             <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Forma de pagamento</div>
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>{t('portal.invoices.paymentMethod')}</div>
               <select value={payForm.metodo} onChange={e=>setPayForm({...payForm,metodo:e.target.value})} style={{ width:"100%" }}>
-                {["Transferência","Cartão","Dinheiro"].map(m=><option key={m}>{m}</option>)}
+                {PAY_METHODS.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
             <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Observações</div>
-              <input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} placeholder="Ref. transferência..." style={{ width:"100%" }} />
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>{t('common.notes')}</div>
+              <input value={payForm.notas} onChange={e=>setPayForm({...payForm,notas:e.target.value})} placeholder={t('portal.invoices.transferRef')} style={{ width:"100%" }} />
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:8 }}>
-              <button onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}} style={{ padding:"13px", borderRadius:14, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Cancelar</button>
+              <button onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}} style={{ padding:"13px", borderRadius:14, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>{t('common.cancel')}</button>
               <button onClick={submitPayment} disabled={saving||!payForm.valor||scanning} style={{ padding:"13px", borderRadius:14, border:"none", background:"var(--navy)", color:"white", fontWeight:700, fontSize:14, cursor:"pointer" }}>
-                {saving?"Enviando...":"Enviar comprovante →"}
+                {saving ? t('portal.invoices.submitting') : t('portal.invoices.submitProof')}
               </button>
             </div>
           </div>

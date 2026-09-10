@@ -12,32 +12,34 @@ import {
   todayKey,
   validateDiscountCode,
 } from '../lib/atomicPos'
+import { useI18n } from '../lib/i18n'
 
-const SUB_TABS = [
-  { id: 'checkout', label: 'Balcão', icon: '🧾' },
-  { id: 'vip', label: 'VIP', icon: '⭐' },
-  { id: 'prices', label: 'Preços', icon: '💴' },
-  { id: 'discounts', label: 'Descontos', icon: '🏷️' },
+const SUB_TAB_IDS = [
+  { id: 'checkout', key: 'tabCheckout', icon: '🧾' },
+  { id: 'vip', key: 'tabVip', icon: '⭐' },
+  { id: 'prices', key: 'tabPrices', icon: '💴' },
+  { id: 'discounts', key: 'tabDiscounts', icon: '🏷️' },
 ]
 
 function SetupBanner({ onRefresh }) {
+  const { t } = useI18n()
   const [setup, setSetup] = useState(null)
   useEffect(() => { fetchPosSetupStatus().then(setSetup) }, [])
   if (setup?.ready || setup?.tables?.pos_vendas === 'ok') return null
   return (
     <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 16, marginBottom: 20, fontSize: 13 }}>
-      <strong>⚙️ Setup POS necessário</strong>
+      <strong>{t('atomicPos.setupRequired')}</strong>
       <p style={{ margin: '8px 0', color: '#92400e' }}>
-        Execute <code>ATOMIC_POS_SCHEMA.sql</code> no Supabase SQL Editor ou rode{' '}
-        <code>POST /api/fix-atomic-june</code> com <code>action: setupPos</code> e <code>confirm: atomic-pos-2026</code>
+        {t('atomicPos.setupHint')}
       </p>
-      <button onClick={onRefresh} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12 }}>Verificar novamente</button>
+      <button onClick={onRefresh} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12 }}>{t('atomicPos.checkAgain')}</button>
     </div>
   )
 }
 
 // ── CHECKOUT ──────────────────────────────────────────────────────────────────
 function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [cart, setCart] = useState([])
   const [search, setSearch] = useState('')
@@ -79,7 +81,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
 
   function applyCode() {
     const code = discountCodes.find(c => c.codigo.toUpperCase() === codeInput.trim().toUpperCase())
-    if (!code) return alert('Código não encontrado')
+    if (!code) return alert(t('atomicPos.codeNotFound'))
     const v = validateDiscountCode(code)
     if (!v.ok) return alert(v.error)
     setActiveCode(code)
@@ -173,42 +175,42 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
     setCodeInput('')
     setSaving(false)
     onSale?.()
-    alert(`Venda registrada: ${fmtYen(total)}`)
+    alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }))
   }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
       <div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          {['regular', 'vip', 'codigo'].map(t => (
-            <button key={t} onClick={() => { setPriceType(t); if (t !== 'codigo') setActiveCode(null) }} style={{
+          {['regular', 'vip', 'codigo'].map(pt => (
+            <button key={pt} onClick={() => { setPriceType(pt); if (pt !== 'codigo') setActiveCode(null) }} style={{
               padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: priceType === t ? 'var(--navy)' : 'var(--bg3)',
-              color: priceType === t ? '#fff' : 'var(--text2)', border: 'none',
+              background: priceType === pt ? 'var(--navy)' : 'var(--bg3)',
+              color: priceType === pt ? '#fff' : 'var(--text2)', border: 'none',
             }}>
-              {t === 'regular' ? 'Preço normal' : t === 'vip' ? 'Preço VIP' : 'Código desconto'}
+              {pt === 'regular' ? t('atomicPos.regularPrice') : pt === 'vip' ? t('atomicPos.vipPrice') : t('atomicPos.discountCode')}
             </button>
           ))}
         </div>
 
         {priceType === 'codigo' && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <input placeholder="Código ex: ATOMIC-XXXXXX" value={codeInput} onChange={e => setCodeInput(e.target.value.toUpperCase())} style={{ flex: 1 }} />
-            <button className="btn-primary" onClick={applyCode} style={{ padding: '8px 16px' }}>Aplicar</button>
+            <input placeholder={t('atomicPos.codePlaceholder')} value={codeInput} onChange={e => setCodeInput(e.target.value.toUpperCase())} style={{ flex: 1 }} />
+            <button className="btn-primary" onClick={applyCode} style={{ padding: '8px 16px' }}>{t('atomicPos.apply')}</button>
             {activeCode && <span style={{ fontSize: 12, color: 'var(--green)', alignSelf: 'center' }}>✓ {activeCode.codigo}</span>}
           </div>
         )}
 
         {priceType === 'vip' && (
           <select value={vipId} onChange={e => setVipId(e.target.value)} style={{ width: '100%', marginBottom: 12 }}>
-            <option value="">Membro VIP (opcional)</option>
+            <option value="">{t('atomicPos.vipMemberOptional')}</option>
             {(vipMembers || []).filter(v => v.ativo).map(v => (
               <option key={v.id} value={v.id}>{v.nome}{v.codigo ? ` · ${v.codigo}` : ''}</option>
             ))}
           </select>
         )}
 
-        <input placeholder="Buscar drink ou shot..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', marginBottom: 12 }} />
+        <input placeholder={t('atomicPos.searchDrinks')} value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', marginBottom: 12 }} />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
           {filtered.map(item => {
@@ -229,8 +231,8 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
       </div>
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 16, position: 'sticky', top: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Carrinho</div>
-        {cart.length === 0 ? <div style={{ color: 'var(--text3)', fontSize: 13 }}>Toque nos itens para adicionar</div> : (
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>{t('atomicPos.cart')}</div>
+        {cart.length === 0 ? <div style={{ color: 'var(--text3)', fontSize: 13 }}>{t('atomicPos.tapToAdd')}</div> : (
           <>
             {cart.map((it, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
@@ -252,7 +254,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
               {['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer'].map(m => <option key={m}>{m}</option>)}
             </select>
             <button className="btn-primary" onClick={completeSale} disabled={saving} style={{ width: '100%', marginTop: 12, padding: 12, borderRadius: 12 }}>
-              {saving ? 'Salvando...' : '✓ Registrar venda POS'}
+              {saving ? t('common.saving') : t('atomicPos.registerPosSale')}
             </button>
           </>
         )}
@@ -622,6 +624,7 @@ function StatCard({ label, value }) {
 
 // ── MAIN PANEL ────────────────────────────────────────────────────────────────
 export default function AtomicPosPanel({ bar }) {
+  const { t } = useI18n()
   const [subTab, setSubTab] = useState('checkout')
   const [ready, setReady] = useState(null)
   const [drinks, setDrinks] = useState([])
@@ -654,7 +657,7 @@ export default function AtomicPosPanel({ bar }) {
     setLoading(false)
   }
 
-  if (loading) return <Spinner text="Carregando POS..." />
+  if (loading) return <Spinner text={t('atomicPos.loading')} />
 
   return (
     <div className="fade-in">
@@ -662,27 +665,27 @@ export default function AtomicPosPanel({ bar }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>POS Atomic</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{t('atomicPos.title')}</div>
           <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
-            Balcão, VIP, preços e códigos de desconto
+            {t('atomicPos.subtitle')}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase' }}>Hoje</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase' }}>{t('atomicPos.today')}</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>{fmtYen(todaySales.total)}</div>
-          <div style={{ fontSize: 11, color: 'var(--text2)' }}>{todaySales.count} vendas</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)' }}>{t('atomicPos.salesCount', { count: todaySales.count })}</div>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {SUB_TABS.map(t => (
-          <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+        {SUB_TAB_IDS.map(tab => (
+          <button key={tab.id} onClick={() => setSubTab(tab.id)} style={{
             padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            background: subTab === t.id ? 'var(--navy)' : 'var(--bg2)',
-            color: subTab === t.id ? '#fff' : 'var(--text2)',
-            border: subTab === t.id ? 'none' : '1px solid var(--border)',
+            background: subTab === tab.id ? 'var(--navy)' : 'var(--bg2)',
+            color: subTab === tab.id ? '#fff' : 'var(--text2)',
+            border: subTab === tab.id ? 'none' : '1px solid var(--border)',
           }}>
-            {t.icon} {t.label}
+            {tab.icon} {t(`atomicPos.${tab.key}`)}
           </button>
         ))}
       </div>
