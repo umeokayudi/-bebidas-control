@@ -24,6 +24,7 @@ import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
+import ReportsBilling from './components/ReportsBilling'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, fmtDate, roleLabel } from './components/utils'
 import { I18nProvider, useI18n } from './lib/i18n'
@@ -36,6 +37,7 @@ import DashboardMetricModal from './components/DashboardMetricModal'
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
   { id:'dashboard', labelKey:'nav.dashboard', icon:'📊' },
+  { id:'billingHub', labelKey:'nav.billingHub', icon:'📱' },
   { id:'purchases', labelKey:'nav.purchases', icon:'🛒' },
   { id:'sales',    labelKey:'nav.sales', icon:'💴' },
   { id:'pedidos',   labelKey:'nav.orders', icon:'📋' },
@@ -392,7 +394,23 @@ function Shell() {
       <MobileTopBar
         open={menuOpen}
         onToggle={() => setMenuOpen(o => !o)}
+        title={tab === 'billingHub' ? (
+          <span style={{ fontSize: 14, fontWeight: 800, color: 'white', letterSpacing: '-0.02em' }}>{t('billingHub.mobileTitle')}</span>
+        ) : undefined}
       >
+        {perfil?.role === 'admin' && tab !== 'billingHub' && (
+          <button
+            type="button"
+            className="mobile-hub-btn"
+            onClick={() => selectTab('billingHub')}
+            aria-label={t('billingHub.mobileTitle')}
+          >
+            📊
+            {(overdueAlerts?.faturas?.length ?? 0) > 0 && (
+              <span className="mobile-hub-badge">{overdueAlerts.faturas.length}</span>
+            )}
+          </button>
+        )}
         <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="header"/>
       </MobileTopBar>
 
@@ -407,6 +425,9 @@ function Shell() {
               <span style={{fontSize:13}}>{t(nav.labelKey)}</span>
               {nav.id==='pedidos'&&pedidosPendentes>0&&(
                 <span style={{marginLeft:'auto',background:'var(--gold)',color:'var(--navy)',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{pedidosPendentes}</span>
+              )}
+              {nav.id==='billingHub'&&(overdueAlerts?.faturas?.length ?? 0)>0&&(
+                <span style={{marginLeft:'auto',background:'var(--red)',color:'white',fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:10}}>{overdueAlerts.faturas.length}</span>
               )}
             </button>
           ))}
@@ -432,6 +453,7 @@ function Shell() {
       <main className="app-main app-main-wide">
         <div className="fade-in" key={tab}>
           {tab==='dashboard' && <Dashboard onNav={selectTab}/>}
+          {tab==='billingHub' && <ReportsBilling onNav={selectTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
           {tab==='sales'    && <VendasTab/>}
           {tab==='pedidos'   && <PedidosAdminTab/>}
