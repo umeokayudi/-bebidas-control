@@ -13,6 +13,7 @@ import {
   simulatePurchase,
   weeklySpendSeries,
 } from '../lib/clientAnalytics'
+import { useI18n } from '../lib/i18n'
 
 const CAT_COLORS = ['#001028', '#2563eb', '#c19c56', '#1a6b4a', '#8b5cf6', '#dc2626', '#0891b2', '#ea580c']
 
@@ -82,6 +83,7 @@ function Tooltip({ children, text }) {
 }
 
 export default function ClientAnalyticsTab({ bar, onTab }) {
+  const { t } = useI18n()
   const [vendas, setVendas] = useState([])
   const [itens, setItens] = useState([])
   const [barPricing, setBarPricing] = useState([])
@@ -175,21 +177,21 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
     downloadCsv(
       `analytics-${bar.nome}-${activeMonthKey}.csv`,
       [
-        { label: 'Produto', get: r => r.nome },
-        { label: 'Categoria', get: r => r.categoria },
-        { label: 'Qtd', get: r => r.qtd },
-        { label: 'Custo JBM', get: r => r.jbmTotal },
-        { label: 'Proj POS', get: r => r.posTotal },
-        { label: 'Margem', get: r => r.margin },
-        { label: 'Margem %', get: r => r.marginPct },
-        { label: 'ROI %', get: r => r.roiPct },
-        { label: 'Fonte', get: r => r.source },
+        { label: t('portal.analytics.csvProduct'), get: r => r.nome },
+        { label: t('portal.analytics.csvCategory'), get: r => r.categoria },
+        { label: t('portal.analytics.csvQty'), get: r => r.qtd },
+        { label: t('portal.analytics.csvJbmCost'), get: r => r.jbmTotal },
+        { label: t('portal.analytics.csvPosProj'), get: r => r.posTotal },
+        { label: t('portal.analytics.csvMargin'), get: r => r.margin },
+        { label: t('portal.analytics.csvMarginPct'), get: r => r.marginPct },
+        { label: t('portal.analytics.csvRoi'), get: r => r.roiPct },
+        { label: t('portal.analytics.csvSource'), get: r => r.source },
       ],
       products
     )
   }
 
-  if (loading) return <Spinner text="Carregando analytics..." />
+  if (loading) return <Spinner text={t('portal.analytics.loading')} />
 
   const maxWeek = Math.max(...weekSeries.values, 1)
 
@@ -199,7 +201,7 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
         <div>
           <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Analytics</div>
           <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>
-            Dados profundos · projeção POS · drill-down interativo
+            {t('portal.analytics.subtitle')}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -213,20 +215,20 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
               <option key={m} value={m}>{m}</option>
             ))}
             {monthSeries.keys.filter(k => !availableMonths.includes(k)).slice(-3).map(m => (
-              <option key={m} value={m}>{m} (sem compras)</option>
+              <option key={m} value={m}>{m} {t('portal.analytics.noPurchases')}</option>
             ))}
           </select>
           <button type="button" onClick={exportProducts} style={{
             padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)',
             background: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}>
-            Exportar CSV
+            {t('portal.analytics.exportCsv')}
           </button>
           <button type="button" onClick={() => onTab?.('pos')} style={{
             padding: '8px 14px', borderRadius: 10, border: 'none',
             background: 'var(--navy)', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}>
-            Preços POS
+            {t('portal.analytics.posPrices')}
           </button>
         </div>
       </div>
@@ -235,27 +237,33 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
           {
-            label: 'Conta JBM',
+            label: t('portal.analytics.jbmAccount'),
             value: fmtYen(monthStats.jbmTotal),
-            sub: jbmMom !== null ? `${jbmMom >= 0 ? '↑' : '↓'} ${Math.abs(jbmMom)}% vs mês ant.` : `${monthStats.itemCount} itens`,
+            sub: jbmMom !== null
+              ? t('portal.analytics.vsPrevMonth', { dir: jbmMom >= 0 ? '↑' : '↓', pct: Math.abs(jbmMom) })
+              : t('portal.analytics.itemsCount', { count: monthStats.itemCount }),
             color: 'var(--navy)',
           },
           {
-            label: 'Faturamento POS',
+            label: t('portal.analytics.posRevenue'),
             value: fmtYen(monthStats.posTotal),
-            sub: posMom !== null ? `${posMom >= 0 ? '↑' : '↓'} ${Math.abs(posMom)}% vs mês ant.` : `${monthStats.posCoveragePct}% preços reais`,
+            sub: posMom !== null
+              ? t('portal.analytics.vsPrevMonth', { dir: posMom >= 0 ? '↑' : '↓', pct: Math.abs(posMom) })
+              : t('portal.analytics.realPricesPct', { pct: monthStats.posCoveragePct }),
             color: 'var(--blue)',
           },
           {
-            label: 'Lucro projetado',
+            label: t('portal.analytics.projectedProfit'),
             value: fmtYen(monthStats.margin),
-            sub: `Margem ${monthStats.marginPct}%`,
+            sub: t('portal.analytics.marginPct', { pct: monthStats.marginPct }),
             color: 'var(--green)',
           },
           {
             label: 'ROI',
             value: `${monthStats.roiPct}%`,
-            sub: monthStats.estimatedSharePct > 0 ? `~${monthStats.estimatedSharePct}% estimado` : 'sobre custo JBM',
+            sub: monthStats.estimatedSharePct > 0
+              ? t('portal.home.estimated', { pct: monthStats.estimatedSharePct })
+              : t('portal.analytics.onJbmCost'),
             color: 'var(--gold)',
           },
         ].map(k => (
@@ -271,9 +279,9 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>Comparativo mensal · clique na barra</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{t('portal.analytics.monthlyCompare')}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>
-              Azul = compras JBM · Verde = projeção POS · Mês: <strong>{activeMonthKey}</strong>
+              {t('portal.analytics.chartLegend', { month: activeMonthKey })}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
@@ -298,10 +306,10 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
       {/* Categories + weekly */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, marginBottom: 16 }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>ROI por categoria</div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16 }}>Clique para filtrar produtos · {activeMonthKey}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t('portal.analytics.roiByCategory')}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16 }}>{t('portal.analytics.clickToFilter', { month: activeMonthKey })}</div>
           {categories.length === 0 ? (
-            <Empty text="Sem dados neste mês" icon="📊" />
+            <Empty text={t('portal.analytics.noDataThisMonth')} icon="📊" />
           ) : categories.map((c, i) => (
             <button
               key={c.categoria}
@@ -316,7 +324,7 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
                 <span style={{ fontWeight: 700 }}>{c.categoria}</span>
-                <span>{c.sharePct}% do spend</span>
+                <span>{t('portal.analytics.shareOfSpend', { pct: c.sharePct })}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text2)', marginBottom: 6 }}>
                 <span>{fmtYen(c.jbmTotal)} → {fmtYen(c.posTotal)}</span>
@@ -330,8 +338,8 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
         </div>
 
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Gasto semanal</div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16 }}>Últimas 8 semanas</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t('portal.analytics.weeklySpend')}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16 }}>{t('portal.analytics.last8Weeks')}</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100 }}>
             {weekSeries.values.map((v, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -353,13 +361,13 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
         background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
         border: '1px solid #fcd34d', borderRadius: 16, padding: '20px 24px', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Simulador de compra</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t('portal.analytics.purchaseSimulator')}</div>
         <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 16 }}>
-          Se comprar X unidades, quanto fatura no POS e qual margem?
+          {t('portal.analytics.simulatorSub')}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, alignItems: 'end' }}>
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>Produto</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>{t('portal.analytics.product')}</label>
             <select value={simItem?.produto_id || ''} onChange={e => setSimProductId(e.target.value)} style={{ width: '100%', marginTop: 4 }}>
               {simCatalog.map(p => (
                 <option key={p.produto_id} value={p.produto_id}>{p.nome}</option>
@@ -367,15 +375,19 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>Quantidade: {simQty}</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)' }}>{t('portal.analytics.quantity', { qty: simQty })}</label>
             <input type="range" min={1} max={48} value={simQty} onChange={e => setSimQty(+e.target.value)} style={{ width: '100%', marginTop: 8 }} />
           </div>
           {simResult && (
             <div style={{ background: 'white', borderRadius: 12, padding: '12px 14px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text2)' }}>Projeção</div>
+              <div style={{ fontSize: 11, color: 'var(--text2)' }}>{t('portal.analytics.projection')}</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--green)' }}>{fmtYen(simResult.posTotal)}</div>
               <div style={{ fontSize: 11, marginTop: 4 }}>
-                Custo {fmtYen(simResult.jbmTotal)} · Lucro {fmtYen(simResult.margin)} · ROI {simResult.jbmTotal > 0 ? Math.round(simResult.margin / simResult.jbmTotal * 100) : 0}%
+                {t('portal.analytics.costProfitRoi', {
+                  cost: fmtYen(simResult.jbmTotal),
+                  profit: fmtYen(simResult.margin),
+                  roi: simResult.jbmTotal > 0 ? Math.round(simResult.margin / simResult.jbmTotal * 100) : 0,
+                })}
                 {simResult.source === 'estimate' ? ' · ~' : ''}
               </div>
             </div>
@@ -386,10 +398,12 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
       {/* Missing pricing alert */}
       {missingPricing.length > 0 && (
         <div style={{ background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 14, padding: '14px 16px', marginBottom: 16, fontSize: 12 }}>
-          <strong>{missingPricing.length} produto(s)</strong> comprados sem preço POS cadastrado
-          ({fmtYen(missingPricing.reduce((a, p) => a + p.jbmTotal, 0))} em compras).
+          <strong>{t('portal.analytics.missingPricing', {
+            count: missingPricing.length,
+            amount: fmtYen(missingPricing.reduce((a, p) => a + p.jbmTotal, 0)),
+          })}</strong>
           <button type="button" onClick={() => onTab?.('pos')} style={{ marginLeft: 8, border: 'none', background: 'transparent', color: 'var(--navy)', fontWeight: 700, cursor: 'pointer' }}>
-            Cadastrar preços →
+            {t('portal.analytics.registerPrices')}
           </button>
         </div>
       )}
@@ -398,26 +412,26 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>Drill-down por produto</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{t('portal.analytics.drillDown')}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-              {catFilter ? `Categoria: ${catFilter} · ` : ''}{products.length} produtos · clique na linha
+              {catFilter ? t('portal.analytics.categoryFilter', { cat: catFilter }) : ''}{t('portal.analytics.productsCount', { count: products.length })}
             </div>
           </div>
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: 12 }}>
-            <option value="margin">Ordenar: margem</option>
-            <option value="roi">Ordenar: ROI</option>
-            <option value="jbm">Ordenar: custo JBM</option>
-            <option value="qtd">Ordenar: quantidade</option>
+            <option value="margin">{t('portal.analytics.sortMargin')}</option>
+            <option value="roi">{t('portal.analytics.sortRoi')}</option>
+            <option value="jbm">{t('portal.analytics.sortJbm')}</option>
+            <option value="qtd">{t('portal.analytics.sortQty')}</option>
           </select>
         </div>
         {products.length === 0 ? (
-          <Empty text="Nenhum produto neste filtro" />
+          <Empty text={t('portal.analytics.noProductsFilter')} />
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                  {['Produto', 'Cat.', 'Qtd', 'JBM', 'POS proj.', 'Margem', 'ROI', ''].map(h => (
+                  {[t('portal.home.tableProduct'), t('portal.analytics.tableCat'), t('portal.home.tableQty'), 'JBM', t('portal.analytics.tablePosProj'), t('portal.analytics.csvMargin'), 'ROI', ''].map(h => (
                     <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase' }}>{h}</th>
                   ))}
                 </tr>
@@ -441,7 +455,11 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
                       <td style={{ padding: '10px' }}>{fmtYen(p.posTotal)}</td>
                       <td style={{ padding: '10px', color: 'var(--green)', fontWeight: 700 }}>{fmtYen(p.margin)}</td>
                       <td style={{ padding: '10px' }}>
-                        <Tooltip text={`Margem ${p.marginPct}% sobre POS\n${p.qtd} un × ${fmtYen(p.posPerUnit)}/un proj.`}>
+                        <Tooltip text={t('portal.analytics.marginTooltip', {
+                          pct: p.marginPct,
+                          qty: p.qtd,
+                          unit: fmtYen(p.posPerUnit),
+                        })}>
                           <span style={{
                             padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                             background: p.roiPct > 150 ? '#f0fdf4' : '#fffbeb',
@@ -457,12 +475,12 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
                       <tr key={`${p.nome}-detail`}>
                         <td colSpan={8} style={{ padding: '12px 16px 16px', background: 'var(--bg3)' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, fontSize: 12 }}>
-                            <div><div style={{ color: 'var(--text2)', fontSize: 10 }}>Custo/un JBM</div><strong>{fmtYen(p.jbmPerUnit)}</strong></div>
-                            <div><div style={{ color: 'var(--text2)', fontSize: 10 }}>Proj./un POS</div><strong>{fmtYen(p.posPerUnit)}</strong></div>
-                            <div><div style={{ color: 'var(--text2)', fontSize: 10 }}>Margem %</div><strong>{p.marginPct}%</strong></div>
+                            <div><div style={{ color: 'var(--text2)', fontSize: 10 }}>{t('portal.analytics.costPerUnitJbm')}</div><strong>{fmtYen(p.jbmPerUnit)}</strong></div>
+                            <div><div style={{ color: 'var(--text2)', fontSize: 10 }}>{t('portal.analytics.projPerUnitPos')}</div><strong>{fmtYen(p.posPerUnit)}</strong></div>
+                            <div><div style={{ color: 'var(--text2)', fontSize: 10 }}>{t('portal.analytics.marginPctLabel')}</div><strong>{p.marginPct}%</strong></div>
                             <div>
-                              <div style={{ color: 'var(--text2)', fontSize: 10 }}>Simular +6 un</div>
-                              <strong>{fmtYen(simulatePurchase(pricingMap, { produto_id: p.produto_id, preco_unitario: p.jbmPerUnit, qtd: 6, produtos: { preco_venda: p.jbmPerUnit } }).margin)}</strong> lucro
+                              <div style={{ color: 'var(--text2)', fontSize: 10 }}>{t('portal.analytics.simulate6Units')}</div>
+                              <strong>{fmtYen(simulatePurchase(pricingMap, { produto_id: p.produto_id, preco_unitario: p.jbmPerUnit, qtd: 6, produtos: { preco_venda: p.jbmPerUnit } }).margin)}</strong> {t('portal.analytics.profit')}
                             </div>
                           </div>
                         </td>

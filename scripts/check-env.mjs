@@ -2,6 +2,17 @@
  * Verifica variáveis necessárias para produção (local + Vercel).
  * Uso: node scripts/check-env.mjs
  */
+const DRINKS_REF = 'ojirgkqtqvugqktyuhem'
+
+function serviceRoleRef(key) {
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString())
+    return payload.ref || null
+  } catch {
+    return null
+  }
+}
+
 const checks = [
   { name: 'VITE_SUPABASE_URL', scope: 'client', required: true },
   { name: 'VITE_SUPABASE_ANON_KEY', scope: 'client', required: true },
@@ -27,6 +38,16 @@ for (const c of checks) {
 }
 
 console.log(`\n${ok}/${checks.length} configured`)
+
+const srKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (srKey && srKey.length > 3) {
+  const ref = serviceRoleRef(srKey)
+  if (ref && ref !== DRINKS_REF) {
+    console.log(`\n❌ SUPABASE_SERVICE_ROLE_KEY is for project "${ref}", expected "${DRINKS_REF}" (Drinks)`)
+    console.log('   Vercel → bebidas-control → use service_role from ojirgkqtqvugqktyuhem, NOT Holding\n')
+    process.exit(1)
+  }
+}
 
 if (missing.length) {
   console.log('\nConfigure no Vercel → Settings → Environment Variables:')

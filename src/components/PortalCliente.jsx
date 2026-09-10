@@ -58,6 +58,7 @@ function SparkLine({ data, color='var(--navy)', height=40 }) {
 }
 
 function HomeTab({ bar, onTab }) {
+  const { t } = useI18n()
   const [vendas,      setVendas]      = useState([])
   const [pedidos,     setPedidos]     = useState([])
   const [itens,       setItens]       = useState([])
@@ -131,7 +132,25 @@ function HomeTab({ bar, onTab }) {
 
   const maxMonth = Math.max(...monthlyData, 1)
 
-  if (loading) return <Spinner text="Carregando painel..." />
+  if (loading) return <Spinner text={t('portal.home.loading')} />
+
+  const deliveriesLabel = account.deliveries === 1
+    ? t('portal.home.deliveriesThisMonth', { count: account.deliveries })
+    : t('portal.home.deliveriesThisMonthPlural', { count: account.deliveries })
+
+  const growthSub = growth !== null
+    ? (growth >= 0 ? t('portal.home.growthUp', { pct: growth }) : t('portal.home.growthDown', { pct: growth }))
+    : null
+
+  const tableHeaders = [
+    t('portal.home.tableProduct'),
+    t('portal.home.tableQty'),
+    t('portal.home.tableJbmCost'),
+    t('portal.home.tablePosPerUnit'),
+    t('portal.home.tableTotalMargin'),
+    t('portal.home.tableMarginPct'),
+    '',
+  ]
 
   return (
     <div className="fade-in portal-page" style={{ maxWidth:1000 }}>
@@ -139,7 +158,7 @@ function HomeTab({ bar, onTab }) {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
         <div>
           <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>Portal do cliente · JBM Drinks</div>
+          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{t('portal.home.subtitle')}</div>
         </div>
         <div style={{ display:'flex', gap:6 }}>
           {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
@@ -160,36 +179,36 @@ function HomeTab({ bar, onTab }) {
           boxShadow:'0 12px 40px rgba(0,16,40,0.25)'
         }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', opacity:0.65, marginBottom:10, fontWeight:700 }}>
-            Conta JBM · {mes}
+            {t('portal.home.jbmAccount', { month: mes })}
           </div>
           <div style={{ fontSize:32, fontWeight:900, lineHeight:1, letterSpacing:-1 }}>{fmtYen(account.contaMes)}</div>
           <div style={{ fontSize:12, opacity:0.75, marginTop:10 }}>
-            {account.deliveries} entrega{account.deliveries !== 1 ? 's' : ''} este mês
+            {deliveriesLabel}
             {account.growth !== null && (
               <span style={{ marginLeft:8, color: account.growth >= 0 ? '#6ee7b7' : '#fca5a5', fontWeight:700 }}>
-                {account.growth >= 0 ? '↑' : '↓'} {Math.abs(account.growth)}% vs mês anterior
+                {t('portal.home.vsPrevMonth', { dir: account.growth >= 0 ? '↑' : '↓', pct: Math.abs(account.growth) })}
               </span>
             )}
           </div>
           {account.faturaPendente > 0 && (
             <div style={{ marginTop:14, padding:'10px 12px', background:'rgba(255,59,48,0.15)', borderRadius:10, fontSize:12, border:'1px solid rgba(255,59,48,0.3)' }}>
-              ⏳ Fatura pendente: <strong>{fmtYen(account.faturaPendente)}</strong>
+              {t('portal.home.pendingInvoice', { amount: fmtYen(account.faturaPendente) })}
             </div>
           )}
           {account.faturasCount === 0 && account.contaMes > 0 && (
-            <div style={{ marginTop:14, fontSize:11, opacity:0.55 }}>Valor das compras JBM registradas no mês</div>
+            <div style={{ marginTop:14, fontSize:11, opacity:0.55 }}>{t('portal.home.monthPurchasesNote')}</div>
           )}
         </div>
 
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:20, padding:'22px 24px' }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            Faturamento projetado (POS)
+            {t('portal.home.projectedRevenue')}
           </div>
           <div style={{ fontSize:30, fontWeight:900, color:'var(--navy)', lineHeight:1, letterSpacing:-0.5 }}>
             {fmtYen(monthProjection.posTotal)}
           </div>
           <div style={{ fontSize:12, color:'var(--text2)', marginTop:10, lineHeight:1.5 }}>
-            Se vender tudo pelo preço do bar ({monthProjection.posCoveragePct}% com preços POS cadastrados)
+            {t('portal.home.sellAtBarPrice', { pct: monthProjection.posCoveragePct })}
           </div>
           <div style={{ marginTop:12, display:'flex', gap:8, flexWrap:'wrap' }}>
             <span style={{ fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'#EAF0FA', color:'var(--navy)' }}>
@@ -197,7 +216,7 @@ function HomeTab({ bar, onTab }) {
             </span>
             {monthProjection.estimatedSharePct > 0 && (
               <span style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:20, background:'#fffbeb', color:'var(--amber)' }}>
-                ~{monthProjection.estimatedSharePct}% estimado
+                {t('portal.home.estimated', { pct: monthProjection.estimatedSharePct })}
               </span>
             )}
           </div>
@@ -205,13 +224,13 @@ function HomeTab({ bar, onTab }) {
 
         <div style={{ background:'var(--bg2)', border:'1px solid rgba(52,199,89,0.25)', borderRadius:20, padding:'22px 24px' }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            Lucro projetado (margem)
+            {t('portal.home.projectedProfit')}
           </div>
           <div style={{ fontSize:30, fontWeight:900, color:'var(--green)', lineHeight:1, letterSpacing:-0.5 }}>
             {fmtYen(monthProjection.margin)}
           </div>
           <div style={{ fontSize:12, color:'var(--text2)', marginTop:10 }}>
-            Margem {monthProjection.marginPct}% sobre faturamento POS
+            {t('portal.home.marginOnPos', { pct: monthProjection.marginPct })}
           </div>
           <div style={{ marginTop:14, height:6, background:'var(--bg3)', borderRadius:3, overflow:'hidden' }}>
             <div style={{ height:'100%', width:Math.min(monthProjection.marginPct,100)+'%', background:'var(--green)', borderRadius:3 }}/>
@@ -223,10 +242,15 @@ function HomeTab({ bar, onTab }) {
       {periodo !== '30' || monthProjection.jbmTotal !== periodProjection.jbmTotal ? (
         <div style={{ background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:14, padding:'12px 16px', marginBottom:16, fontSize:12, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
           <span>
-            <strong>Últimos {periodo} dias:</strong> compras {fmtYen(periodProjection.jbmTotal)} → projeção POS {fmtYen(periodProjection.posTotal)} (lucro {fmtYen(periodProjection.margin)})
+            <strong>{t('portal.home.periodStrip', {
+              days: periodo,
+              jbm: fmtYen(periodProjection.jbmTotal),
+              pos: fmtYen(periodProjection.posTotal),
+              margin: fmtYen(periodProjection.margin),
+            })}</strong>
           </span>
           <button onClick={()=>onTab('precos')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
-            Ajustar preços POS →
+            {t('portal.home.adjustPosPrices')}
           </button>
         </div>
       ) : null}
@@ -234,10 +258,10 @@ function HomeTab({ bar, onTab }) {
       {/* KPI row */}
       <div className="portal-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[
-          { label:'Gasto total', value:fmtYen(totalPeriod), sub: growth!==null?(growth>=0?'↑ +'+growth+'% vs anterior':'↓ '+growth+'% vs anterior'):null, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
-          { label:'Entregas', value:vendasPeriod.length, sub:'em '+periodo+' dias', color:'var(--blue)' },
-          { label:'Média/entrega', value:fmtYen(avgOrder), sub:'por entrega', color:'var(--green)' },
-          { label:'Pedidos ativos', value:ativos.length, sub:ativos.length>0?ativos.map(p=>p.status).join(', '):'tudo ok ✓', color:ativos.length>0?'var(--gold)':'var(--green)' },
+          { label:t('portal.home.totalSpend'), value:fmtYen(totalPeriod), sub: growthSub, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
+          { label:t('common.deliveries'), value:vendasPeriod.length, sub:t('portal.home.inDays', { days: periodo }), color:'var(--blue)' },
+          { label:t('portal.home.avgPerDelivery'), value:fmtYen(avgOrder), sub:t('portal.home.perDelivery'), color:'var(--green)' },
+          { label:t('portal.home.activeOrders'), value:ativos.length, sub:ativos.length>0?ativos.map(p=>t(`orderStatus.${p.status}`)).join(', '):t('portal.home.allOk'), color:ativos.length>0?'var(--gold)':'var(--green)' },
         ].map(k => (
           <div key={k.label} style={{
             background:'var(--bg2)', border:'1px solid var(--border)',
@@ -254,8 +278,8 @@ function HomeTab({ bar, onTab }) {
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:8 }}>
           <div>
-            <div style={{ fontSize:14, fontWeight:700 }}>Gasto mensal</div>
-            <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>Clique no mês · {chartMonthKey}</div>
+            <div style={{ fontSize:14, fontWeight:700 }}>{t('portal.home.monthlySpend')}</div>
+            <div style={{ fontSize:11, color:'var(--text2)', marginTop:4 }}>{t('portal.home.clickMonth', { month: chartMonthKey })}</div>
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <div style={{ fontSize:13, fontWeight:800, color:'var(--navy)' }}>{fmtYen(chartMonthStats.jbmTotal)}</div>
@@ -289,8 +313,8 @@ function HomeTab({ bar, onTab }) {
         </div>
         {chartMonthStats.jbmTotal > 0 && (
           <div style={{ marginTop:16, padding:'12px 14px', background:'var(--bg3)', borderRadius:12, display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, fontSize:12 }}>
-            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>Projeção POS</span><strong style={{ color:'var(--navy)' }}>{fmtYen(chartMonthStats.posTotal)}</strong></div>
-            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>Lucro proj.</span><strong style={{ color:'var(--green)' }}>{fmtYen(chartMonthStats.margin)}</strong></div>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>{t('portal.home.posProjection')}</span><strong style={{ color:'var(--navy)' }}>{fmtYen(chartMonthStats.posTotal)}</strong></div>
+            <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>{t('portal.home.projProfit')}</span><strong style={{ color:'var(--green)' }}>{fmtYen(chartMonthStats.margin)}</strong></div>
             <div><span style={{ color:'var(--text2)', fontSize:10, display:'block' }}>ROI</span><strong>{chartMonthStats.roiPct}%</strong></div>
           </div>
         )}
@@ -300,10 +324,10 @@ function HomeTab({ bar, onTab }) {
       <div className="portal-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
         {/* By revenue */}
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Top by cost</div>
-          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>What you spent · Last {periodo} days</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.topByCost')}</div>
+          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>{t('portal.home.whatYouSpent', { days: periodo })}</div>
           {topRevenue.length === 0
-            ? <Empty text="No data" icon="📊" />
+            ? <Empty text={t('common.noData')} icon="📊" />
             : topRevenue.map(([nome,val], i) => {
               const pct = val/topRevenue[0][1]*100
               return (
@@ -325,10 +349,10 @@ function HomeTab({ bar, onTab }) {
 
         {/* By volume */}
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>Top by volume</div>
-          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>Last {periodo} days</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.topByVolume')}</div>
+          <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>{t('portal.home.lastDays', { days: periodo })}</div>
           {topVolume.length === 0
-            ? <Empty text="No data" icon="📊" />
+            ? <Empty text={t('common.noData')} icon="📊" />
             : topVolume.map(([nome,vol], i) => {
               const pct = vol/topVolume[0][1]*100
               return (
@@ -337,7 +361,7 @@ function HomeTab({ bar, onTab }) {
                     <span style={{ fontWeight:i===0?700:500, color:i===0?'var(--navy)':'var(--text)' }}>
                       {i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '} {nome}
                     </span>
-                    <span style={{ fontWeight:600, color:'var(--text2)' }}>{vol} units</span>
+                    <span style={{ fontWeight:600, color:'var(--text2)' }}>{vol} {t('portal.home.units')}</span>
                   </div>
                   <div style={{ height:4, background:'var(--bg3)', borderRadius:2, overflow:'hidden' }}>
                     <div style={{ height:'100%', width:pct+'%', background:'var(--gold)', borderRadius:2 }}/>
@@ -354,11 +378,11 @@ function HomeTab({ bar, onTab }) {
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
             <div>
-              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>🏆 Bebidas com mais margem (projeção POS)</div>
-              <div style={{ fontSize:11, color:'var(--text2)' }}>Compras JBM × preços do bar · Últimos {periodo} dias</div>
+              <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.topMarginTitle')}</div>
+              <div style={{ fontSize:11, color:'var(--text2)' }}>{t('portal.home.topMarginSub', { days: periodo })}</div>
             </div>
             <button onClick={()=>onTab('precos')} style={{ fontSize:11, padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', background:'white', cursor:'pointer', fontWeight:600 }}>
-              Editar preços
+              {t('portal.home.editPrices')}
             </button>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:10 }}>
@@ -409,16 +433,16 @@ function HomeTab({ bar, onTab }) {
         if (rows.length === 0) return null
         return (
           <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>📊 Detalhe: compra JBM → projeção POS</div>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.home.detailTitle')}</div>
             <div style={{ fontSize:11, color:'var(--text2)', marginBottom:16 }}>
-              Preços do bar (Pricing tab) · Últimos {periodo} dias · itens estimados marcados ~
+              {t('portal.home.detailSub', { days: periodo })}
             </div>
             <div style={{ overflowX:'auto' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                 <thead>
                   <tr style={{ borderBottom:'2px solid var(--border)' }}>
-                    {['Produto','Qtd','Custo JBM','Proj. POS/un','Margem total','Margem %',''].map(h => (
-                      <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }}>{h}</th>
+                    {tableHeaders.map(h => (
+                      <th key={h || 'empty'} style={{ padding:'8px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -450,11 +474,11 @@ function HomeTab({ bar, onTab }) {
       {/* Quick actions + recent */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:12 }}>
         <div style={{ background:'var(--navy)', borderRadius:16, padding:'20px 24px', display:'flex', flexDirection:'column', gap:10 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>Ações rápidas</div>
+          <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>{t('portal.home.quickActions')}</div>
           {[
-            { label:'+ Novo pedido', icon:'🛒', tab:'pedidos' },
-            { label:'Ver entregas', icon:'📦', tab:'entregas' },
-            { label:'Ver estoque', icon:'📊', tab:'estoque' },
+            { label:t('portal.home.newOrder'), icon:'🛒', tab:'pedidos' },
+            { label:t('portal.home.viewDeliveries'), icon:'📦', tab:'entregas' },
+            { label:t('portal.home.viewInventory'), icon:'📊', tab:'estoque' },
           ].map(a => (
             <button key={a.tab} onClick={()=>onTab(a.tab)} style={{
               background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)',
@@ -465,9 +489,9 @@ function HomeTab({ bar, onTab }) {
         </div>
 
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px' }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>Entregas recentes</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{t('portal.home.recentDeliveries')}</div>
           {vendas.length === 0
-            ? <Empty text="Nenhuma entrega ainda" />
+            ? <Empty text={t('portal.home.noDeliveriesYet')} />
             : vendas.slice(-8).reverse().map(v => (
               <div key={v.id} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
                 <span style={{ color:'var(--text2)' }}>{fmtDate(v.data)}</span>
@@ -1844,6 +1868,7 @@ function MenuTab({ bar }) {
 
 // ── FATURAS CLIENTE ───────────────────────────────────────────────────────────
 function FaturasTab({ bar }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [faturas, setFaturas] = useState([])
   const [vendas, setVendas] = useState([])
@@ -1943,21 +1968,21 @@ function FaturasTab({ bar }) {
   const maxSpend = Math.max(...monthlySpend, 1)
   const mwd = monthlySpend.filter(v=>v>0).length
   const avgMonthly = mwd>0?Math.round(monthlySpend.reduce((a,v)=>a+v,0)/mwd):0
-  if (loading) return <Spinner text="Carregando faturas..." />
+  if (loading) return <Spinner text={t('portal.invoices.loading')} />
   return (
     <div className="fade-in portal-page" style={{ maxWidth:860 }}>
-      <SectionTitle sub="Somente faturas JBM Drinks — limpeza/KuriPuro não aparecem aqui">Faturas JBM</SectionTitle>
+      <SectionTitle sub={t('portal.invoices.subtitle')}>{t('portal.invoices.title')}</SectionTitle>
       {overdue.length>0 && (
         <div style={{ background:"linear-gradient(135deg,#ff3b30,#c0392b)", borderRadius:16, padding:"16px 20px", marginBottom:16 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:"white" }}>🚨 {overdue.length} pagamento{overdue.length>1?"s":""} em atraso</div>
+          <div style={{ fontSize:15, fontWeight:700, color:"white" }}>{t('portal.invoices.overdueAlert', { count: overdue.length })}</div>
         </div>
       )}
       <div className="portal-grid-4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:20 }}>
         {[
-          { label:"Pendente", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
-          { label:"Total pago", value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+faturaValor(f),0)), color:"var(--green)", icon:"✅" },
-          { label:"Em atraso", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
-          { label:"Média/mês", value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
+          { label:t('portal.invoices.pending'), value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
+          { label:t('portal.invoices.totalPaid'), value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+faturaValor(f),0)), color:"var(--green)", icon:"✅" },
+          { label:t('portal.invoices.overdue'), value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
+          { label:t('portal.invoices.avgMonthly'), value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
         ].map(k=>(
           <div key={k.label} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:14, padding:"14px" }}>
             <div style={{ fontSize:18, marginBottom:4 }}>{k.icon}</div>
@@ -1967,7 +1992,7 @@ function FaturasTab({ bar }) {
         ))}
       </div>
       <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Gasto mensal (compras JBM)</div>
+        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>{t('portal.invoices.monthlySpend')}</div>
         <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:80 }}>
           {monthlySpend.map((v,i) => (
             <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
@@ -1980,7 +2005,7 @@ function FaturasTab({ bar }) {
       </div>
       {upcoming.length>0 && (
         <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Próximos vencimentos</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>{t('portal.invoices.upcomingDue')}</div>
           {upcoming.map(f => {
             const venc = faturaVencimento(f)
             const daysLeft = Math.ceil((new Date(venc)-new Date())/(1000*60*60*24))
@@ -1990,17 +2015,17 @@ function FaturasTab({ bar }) {
               <div key={f.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border)" }}>
                 <div style={{ width:44, height:44, borderRadius:12, background:daysLeft<=5?"#fef2f2":"#f0fdf4", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?"var(--red)":"var(--green)", lineHeight:1 }}>{daysLeft}</div>
-                  <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>dias</div>
+                  <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>{t('portal.invoices.days')}</div>
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>Vence {fmtDate(venc)}</div>
-                  <div style={{ fontSize:11, color:"var(--text2)" }}>{fmtDate(faturaEmissao(f))} a {fmtDate(venc)}</div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{t('portal.invoices.dueOn', { date: fmtDate(venc) })}</div>
+                  <div style={{ fontSize:11, color:"var(--text2)" }}>{t('portal.invoices.periodRange', { from: fmtDate(faturaEmissao(f)), to: fmtDate(venc) })}</div>
                   {f.obs && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{f.obs}</div>}
-                  {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>⏳ Pagamento aguardando confirmação</div>}
+                  {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>{t('portal.invoices.paymentAwaiting')}</div>}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:"var(--red)" }}>{fmtYen(remaining)}</div>
-                  {fp.length===0 && <button onClick={()=>setPayModal(f)} style={{ padding:"5px 12px", fontSize:11, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>Enviar comprovante</button>}
+                  {fp.length===0 && <button onClick={()=>setPayModal(f)} style={{ padding:"5px 12px", fontSize:11, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>{t('portal.invoices.sendProof')}</button>}
                 </div>
               </div>
             )
@@ -2009,12 +2034,12 @@ function FaturasTab({ bar }) {
       )}
       <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
         <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{ padding:"7px 10px", borderRadius:8, fontSize:12 }} />
-        <span style={{ color:"var(--text2)", fontSize:12 }}>até</span>
+        <span style={{ color:"var(--text2)", fontSize:12 }}>{t('portal.invoices.dateTo')}</span>
         <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{ padding:"7px 10px", borderRadius:8, fontSize:12 }} />
-        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("")}} style={{ fontSize:12, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Limpar</button>}
+        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("")}} style={{ fontSize:12, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>{t('portal.invoices.clear')}</button>}
       </div>
-      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Histórico de faturas</div>
-      {filtered.length===0?<Empty text="Nenhuma fatura JBM" icon="🧾" />:(
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>{t('portal.invoices.history')}</div>
+      {filtered.length===0?<Empty text={t('portal.invoices.noInvoices')} icon="🧾" />:(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {filtered.map(f => {
             const remaining = faturaRemaining(f)
@@ -2029,13 +2054,13 @@ function FaturasTab({ bar }) {
               <div key={f.id} style={{ background:"var(--bg2)", border:"1px solid", borderColor:isOverdue?"rgba(255,59,48,0.3)":"var(--border)", borderRadius:14, padding:"14px 18px" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(faturaEmissao(f))} a {fmtDate(venc)}</div>
-                    <div style={{ fontSize:11, color:"var(--text2)" }}>Vencimento: {fmtDate(venc)}</div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{t('portal.invoices.periodRange', { from: fmtDate(faturaEmissao(f)), to: fmtDate(venc) })}</div>
+                    <div style={{ fontSize:11, color:"var(--text2)" }}>{t('portal.invoices.dueDate', { date: fmtDate(venc) })}</div>
                     {f.obs && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{f.obs}</div>}
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:f.status==="pago"?"#f0fdf4":isOverdue?"#fef2f2":"#EAF0FA", color:f.status==="pago"?"var(--green)":isOverdue?"var(--red)":"var(--navy)" }}>
-                      {f.status==="pago"?"✅ Pago":isOverdue?"🚨 Atrasado":"⏳ Pendente"}
+                      {f.status==="pago"?t('portal.invoices.statusPaid'):isOverdue?t('portal.invoices.statusOverdue'):t('portal.invoices.statusPending')}
                     </span>
                     <div style={{ fontSize:16, fontWeight:800, color:"var(--navy)", marginTop:4 }}>{fmtYen(total)}</div>
                   </div>
@@ -2044,18 +2069,18 @@ function FaturasTab({ bar }) {
                   <div style={{ height:"100%", width:pct+"%", background:f.status==="pago"?"var(--green)":"var(--gold)", borderRadius:2 }}/>
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--text2)", marginBottom:8 }}>
-                  <span>Pago: {fmtYen(pago)} ({pct}%)</span>
-                  {remaining>0&&<span style={{ color:"var(--red)", fontWeight:600 }}>Restante: {fmtYen(remaining)}</span>}
+                  <span>{t('portal.invoices.paidPct', { amount: fmtYen(pago), pct })}</span>
+                  {remaining>0&&<span style={{ color:"var(--red)", fontWeight:600 }}>{t('portal.invoices.remaining', { amount: fmtYen(remaining) })}</span>}
                 </div>
                 {pendingP.length>0&&(
                   <div style={{ background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12 }}>
-                    ⏳ {pendingP.length} pagamento{pendingP.length>1?"s":""} aguardando confirmação — {fmtYen(pendingP.reduce((a,p)=>a+p.valor,0))}
+                    {t('portal.invoices.paymentsAwaiting', { count: pendingP.length, amount: fmtYen(pendingP.reduce((a,p)=>a+p.valor,0)) })}
                   </div>
                 )}
                 <div style={{ display:"flex", gap:8 }}>
-                  {f.status!=="pago"&&pendingP.length===0&&<button onClick={()=>setPayModal(f)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>💳 Enviar comprovante</button>}
+                  {f.status!=="pago"&&pendingP.length===0&&<button onClick={()=>setPayModal(f)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>{t('portal.invoices.sendProofBtn')}</button>}
                   {fp.length>0&&<button onClick={()=>setSelected(selected===f.id?null:f.id)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>
-                    {selected===f.id?"▲ Ocultar":"▼ Ver"} {fp.length} pagamento{fp.length>1?"s":""}
+                    {selected===f.id?t('portal.invoices.hide'):t('portal.invoices.show')} {fp.length} {t('portal.invoices.payments')}
                   </button>}
                 </div>
                 {selected===f.id&&fp.length>0&&(
@@ -2065,11 +2090,11 @@ function FaturasTab({ bar }) {
                         <div>
                           <span style={{ fontWeight:600 }}>{fmtDate(p.data)}</span>
                           <span style={{ color:"var(--text2)", marginLeft:8 }}>{p.metodo}</span>
-                          {!p.confirmado&&<span style={{ marginLeft:8, color:"var(--amber)", fontWeight:600 }}>⏳ Pendente</span>}
-                          {p.confirmado&&<span style={{ marginLeft:8, color:"var(--green)", fontWeight:600 }}>✅ Confirmado</span>}
+                          {!p.confirmado&&<span style={{ marginLeft:8, color:"var(--amber)", fontWeight:600 }}>{t('portal.invoices.statusPending')}</span>}
+                          {p.confirmado&&<span style={{ marginLeft:8, color:"var(--green)", fontWeight:600 }}>{t('portal.invoices.confirmed')}</span>}
                         </div>
                         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                          {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>📎 Comprovante</a>}
+                          {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>{t('portal.invoices.proofLink')}</a>}
                           {p.confirmado && (
                             <button
                               type="button"
@@ -2077,7 +2102,7 @@ function FaturasTab({ bar }) {
                               disabled={emittingReceipt === `p-${p.id}`}
                               style={{ fontSize:11, padding:"4px 10px", borderRadius:8, border:"none", background:"var(--gold)", color:"var(--navy)", cursor:"pointer", fontWeight:700 }}
                             >
-                              {emittingReceipt === `p-${p.id}` ? '...' : '🧾 Recibo'}
+                              {emittingReceipt === `p-${p.id}` ? '...' : t('portal.invoices.receipt')}
                             </button>
                           )}
                           <span style={{ fontWeight:700, color:"var(--green)" }}>{fmtYen(p.valor)}</span>
@@ -2096,12 +2121,12 @@ function FaturasTab({ bar }) {
           onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}}>
           <div style={{ background:"var(--bg2)", borderRadius:20, padding:"28px", width:"100%", maxWidth:420, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}
             onClick={e=>e.stopPropagation()}>
-            <div style={{ fontSize:16, fontWeight:800, marginBottom:4 }}>Enviar comprovante</div>
+            <div style={{ fontSize:16, fontWeight:800, marginBottom:4 }}>{t('portal.invoices.sendProofTitle')}</div>
             <div style={{ fontSize:12, color:"var(--text2)", marginBottom:20 }}>
-              {fmtDate(payModal.periodo_inicio)} a {fmtDate(payModal.periodo_fim)} · Restante: <strong style={{ color:"var(--red)" }}>{fmtYen(faturaRemaining(payModal))}</strong>
+              {t('portal.invoices.periodRange', { from: fmtDate(payModal.periodo_inicio), to: fmtDate(payModal.periodo_fim) })} · {t('portal.invoices.remainingLabel')}: <strong style={{ color:"var(--red)" }}>{fmtYen(faturaRemaining(payModal))}</strong>
             </div>
             <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Comprovante (foto ou PDF)</div>
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>{t('portal.invoices.proofUpload')}</div>
               <div style={{ border:"2px dashed var(--border)", borderRadius:12, padding:"20px", textAlign:"center", cursor:"pointer", background:"var(--bg3)" }}
                 onClick={()=>document.getElementById("receipt-upload").click()}>
                 {image?(
