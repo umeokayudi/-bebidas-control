@@ -1868,6 +1868,7 @@ function MenuTab({ bar }) {
 
 // ── FATURAS CLIENTE ───────────────────────────────────────────────────────────
 function FaturasTab({ bar }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [faturas, setFaturas] = useState([])
   const [vendas, setVendas] = useState([])
@@ -1967,21 +1968,21 @@ function FaturasTab({ bar }) {
   const maxSpend = Math.max(...monthlySpend, 1)
   const mwd = monthlySpend.filter(v=>v>0).length
   const avgMonthly = mwd>0?Math.round(monthlySpend.reduce((a,v)=>a+v,0)/mwd):0
-  if (loading) return <Spinner text="Carregando faturas..." />
+  if (loading) return <Spinner text={t('portal.invoices.loading')} />
   return (
     <div className="fade-in portal-page" style={{ maxWidth:860 }}>
-      <SectionTitle sub="Somente faturas JBM Drinks — limpeza/KuriPuro não aparecem aqui">Faturas JBM</SectionTitle>
+      <SectionTitle sub={t('portal.invoices.subtitle')}>{t('portal.invoices.title')}</SectionTitle>
       {overdue.length>0 && (
         <div style={{ background:"linear-gradient(135deg,#ff3b30,#c0392b)", borderRadius:16, padding:"16px 20px", marginBottom:16 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:"white" }}>🚨 {overdue.length} pagamento{overdue.length>1?"s":""} em atraso</div>
+          <div style={{ fontSize:15, fontWeight:700, color:"white" }}>{t('portal.invoices.overdueAlert', { count: overdue.length })}</div>
         </div>
       )}
       <div className="portal-grid-4" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:20 }}>
         {[
-          { label:"Pendente", value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
-          { label:"Total pago", value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+faturaValor(f),0)), color:"var(--green)", icon:"✅" },
-          { label:"Em atraso", value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
-          { label:"Média/mês", value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
+          { label:t('portal.invoices.pending'), value:fmtYen(totalPending), color:totalPending>0?"var(--red)":"var(--green)", icon:"⏳" },
+          { label:t('portal.invoices.totalPaid'), value:fmtYen(filtered.filter(f=>f.status==="pago").reduce((a,f)=>a+faturaValor(f),0)), color:"var(--green)", icon:"✅" },
+          { label:t('portal.invoices.overdue'), value:overdue.length, color:overdue.length>0?"var(--red)":"var(--green)", icon:"🚨" },
+          { label:t('portal.invoices.avgMonthly'), value:fmtYen(avgMonthly), color:"var(--navy)", icon:"📊" },
         ].map(k=>(
           <div key={k.label} style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:14, padding:"14px" }}>
             <div style={{ fontSize:18, marginBottom:4 }}>{k.icon}</div>
@@ -1991,7 +1992,7 @@ function FaturasTab({ bar }) {
         ))}
       </div>
       <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Gasto mensal (compras JBM)</div>
+        <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>{t('portal.invoices.monthlySpend')}</div>
         <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:80 }}>
           {monthlySpend.map((v,i) => (
             <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
@@ -2004,7 +2005,7 @@ function FaturasTab({ bar }) {
       </div>
       {upcoming.length>0 && (
         <div style={{ background:"var(--bg2)", border:"1px solid var(--border)", borderRadius:16, padding:"20px", marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>📅 Próximos vencimentos</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>{t('portal.invoices.upcomingDue')}</div>
           {upcoming.map(f => {
             const venc = faturaVencimento(f)
             const daysLeft = Math.ceil((new Date(venc)-new Date())/(1000*60*60*24))
@@ -2014,17 +2015,17 @@ function FaturasTab({ bar }) {
               <div key={f.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 0", borderBottom:"1px solid var(--border)" }}>
                 <div style={{ width:44, height:44, borderRadius:12, background:daysLeft<=5?"#fef2f2":"#f0fdf4", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:daysLeft<=5?"var(--red)":"var(--green)", lineHeight:1 }}>{daysLeft}</div>
-                  <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>dias</div>
+                  <div style={{ fontSize:9, color:"var(--text2)", textTransform:"uppercase" }}>{t('portal.invoices.days')}</div>
                 </div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>Vence {fmtDate(venc)}</div>
-                  <div style={{ fontSize:11, color:"var(--text2)" }}>{fmtDate(faturaEmissao(f))} a {fmtDate(venc)}</div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{t('portal.invoices.dueOn', { date: fmtDate(venc) })}</div>
+                  <div style={{ fontSize:11, color:"var(--text2)" }}>{t('portal.invoices.periodRange', { from: fmtDate(faturaEmissao(f)), to: fmtDate(venc) })}</div>
                   {f.obs && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{f.obs}</div>}
-                  {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>⏳ Pagamento aguardando confirmação</div>}
+                  {fp.length>0 && <div style={{ fontSize:11, color:"var(--amber)", fontWeight:600 }}>{t('portal.invoices.paymentAwaiting')}</div>}
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:"var(--red)" }}>{fmtYen(remaining)}</div>
-                  {fp.length===0 && <button onClick={()=>setPayModal(f)} style={{ padding:"5px 12px", fontSize:11, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>Enviar comprovante</button>}
+                  {fp.length===0 && <button onClick={()=>setPayModal(f)} style={{ padding:"5px 12px", fontSize:11, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>{t('portal.invoices.sendProof')}</button>}
                 </div>
               </div>
             )
@@ -2033,12 +2034,12 @@ function FaturasTab({ bar }) {
       )}
       <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16 }}>
         <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{ padding:"7px 10px", borderRadius:8, fontSize:12 }} />
-        <span style={{ color:"var(--text2)", fontSize:12 }}>até</span>
+        <span style={{ color:"var(--text2)", fontSize:12 }}>{t('portal.invoices.dateTo')}</span>
         <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{ padding:"7px 10px", borderRadius:8, fontSize:12 }} />
-        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("")}} style={{ fontSize:12, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>Limpar</button>}
+        {(dateFrom||dateTo)&&<button onClick={()=>{setDateFrom("");setDateTo("")}} style={{ fontSize:12, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>{t('portal.invoices.clear')}</button>}
       </div>
-      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Histórico de faturas</div>
-      {filtered.length===0?<Empty text="Nenhuma fatura JBM" icon="🧾" />:(
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>{t('portal.invoices.history')}</div>
+      {filtered.length===0?<Empty text={t('portal.invoices.noInvoices')} icon="🧾" />:(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {filtered.map(f => {
             const remaining = faturaRemaining(f)
@@ -2053,13 +2054,13 @@ function FaturasTab({ bar }) {
               <div key={f.id} style={{ background:"var(--bg2)", border:"1px solid", borderColor:isOverdue?"rgba(255,59,48,0.3)":"var(--border)", borderRadius:14, padding:"14px 18px" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700 }}>{fmtDate(faturaEmissao(f))} a {fmtDate(venc)}</div>
-                    <div style={{ fontSize:11, color:"var(--text2)" }}>Vencimento: {fmtDate(venc)}</div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{t('portal.invoices.periodRange', { from: fmtDate(faturaEmissao(f)), to: fmtDate(venc) })}</div>
+                    <div style={{ fontSize:11, color:"var(--text2)" }}>{t('portal.invoices.dueDate', { date: fmtDate(venc) })}</div>
                     {f.obs && <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>{f.obs}</div>}
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:f.status==="pago"?"#f0fdf4":isOverdue?"#fef2f2":"#EAF0FA", color:f.status==="pago"?"var(--green)":isOverdue?"var(--red)":"var(--navy)" }}>
-                      {f.status==="pago"?"✅ Pago":isOverdue?"🚨 Atrasado":"⏳ Pendente"}
+                      {f.status==="pago"?t('portal.invoices.statusPaid'):isOverdue?t('portal.invoices.statusOverdue'):t('portal.invoices.statusPending')}
                     </span>
                     <div style={{ fontSize:16, fontWeight:800, color:"var(--navy)", marginTop:4 }}>{fmtYen(total)}</div>
                   </div>
@@ -2068,18 +2069,18 @@ function FaturasTab({ bar }) {
                   <div style={{ height:"100%", width:pct+"%", background:f.status==="pago"?"var(--green)":"var(--gold)", borderRadius:2 }}/>
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--text2)", marginBottom:8 }}>
-                  <span>Pago: {fmtYen(pago)} ({pct}%)</span>
-                  {remaining>0&&<span style={{ color:"var(--red)", fontWeight:600 }}>Restante: {fmtYen(remaining)}</span>}
+                  <span>{t('portal.invoices.paidPct', { amount: fmtYen(pago), pct })}</span>
+                  {remaining>0&&<span style={{ color:"var(--red)", fontWeight:600 }}>{t('portal.invoices.remaining', { amount: fmtYen(remaining) })}</span>}
                 </div>
                 {pendingP.length>0&&(
                   <div style={{ background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"8px 12px", marginBottom:8, fontSize:12 }}>
-                    ⏳ {pendingP.length} pagamento{pendingP.length>1?"s":""} aguardando confirmação — {fmtYen(pendingP.reduce((a,p)=>a+p.valor,0))}
+                    {t('portal.invoices.paymentsAwaiting', { count: pendingP.length, amount: fmtYen(pendingP.reduce((a,p)=>a+p.valor,0)) })}
                   </div>
                 )}
                 <div style={{ display:"flex", gap:8 }}>
-                  {f.status!=="pago"&&pendingP.length===0&&<button onClick={()=>setPayModal(f)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>💳 Enviar comprovante</button>}
+                  {f.status!=="pago"&&pendingP.length===0&&<button onClick={()=>setPayModal(f)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"none", background:"var(--navy)", color:"white", cursor:"pointer", fontWeight:600 }}>{t('portal.invoices.sendProofBtn')}</button>}
                   {fp.length>0&&<button onClick={()=>setSelected(selected===f.id?null:f.id)} style={{ padding:"6px 14px", fontSize:12, borderRadius:8, border:"1px solid var(--border)", background:"transparent", cursor:"pointer" }}>
-                    {selected===f.id?"▲ Ocultar":"▼ Ver"} {fp.length} pagamento{fp.length>1?"s":""}
+                    {selected===f.id?t('portal.invoices.hide'):t('portal.invoices.show')} {fp.length} {t('portal.invoices.payments')}
                   </button>}
                 </div>
                 {selected===f.id&&fp.length>0&&(
@@ -2089,11 +2090,11 @@ function FaturasTab({ bar }) {
                         <div>
                           <span style={{ fontWeight:600 }}>{fmtDate(p.data)}</span>
                           <span style={{ color:"var(--text2)", marginLeft:8 }}>{p.metodo}</span>
-                          {!p.confirmado&&<span style={{ marginLeft:8, color:"var(--amber)", fontWeight:600 }}>⏳ Pendente</span>}
-                          {p.confirmado&&<span style={{ marginLeft:8, color:"var(--green)", fontWeight:600 }}>✅ Confirmado</span>}
+                          {!p.confirmado&&<span style={{ marginLeft:8, color:"var(--amber)", fontWeight:600 }}>{t('portal.invoices.statusPending')}</span>}
+                          {p.confirmado&&<span style={{ marginLeft:8, color:"var(--green)", fontWeight:600 }}>{t('portal.invoices.confirmed')}</span>}
                         </div>
                         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                          {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>📎 Comprovante</a>}
+                          {p.comprovante_url&&<a href={p.comprovante_url} target="_blank" rel="noreferrer" style={{ fontSize:11, color:"var(--navy)" }}>{t('portal.invoices.proofLink')}</a>}
                           {p.confirmado && (
                             <button
                               type="button"
@@ -2101,7 +2102,7 @@ function FaturasTab({ bar }) {
                               disabled={emittingReceipt === `p-${p.id}`}
                               style={{ fontSize:11, padding:"4px 10px", borderRadius:8, border:"none", background:"var(--gold)", color:"var(--navy)", cursor:"pointer", fontWeight:700 }}
                             >
-                              {emittingReceipt === `p-${p.id}` ? '...' : '🧾 Recibo'}
+                              {emittingReceipt === `p-${p.id}` ? '...' : t('portal.invoices.receipt')}
                             </button>
                           )}
                           <span style={{ fontWeight:700, color:"var(--green)" }}>{fmtYen(p.valor)}</span>
@@ -2120,12 +2121,12 @@ function FaturasTab({ bar }) {
           onClick={()=>{setPayModal(null);setImage(null);setScannedData(null)}}>
           <div style={{ background:"var(--bg2)", borderRadius:20, padding:"28px", width:"100%", maxWidth:420, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,0.3)" }}
             onClick={e=>e.stopPropagation()}>
-            <div style={{ fontSize:16, fontWeight:800, marginBottom:4 }}>Enviar comprovante</div>
+            <div style={{ fontSize:16, fontWeight:800, marginBottom:4 }}>{t('portal.invoices.sendProofTitle')}</div>
             <div style={{ fontSize:12, color:"var(--text2)", marginBottom:20 }}>
-              {fmtDate(payModal.periodo_inicio)} a {fmtDate(payModal.periodo_fim)} · Restante: <strong style={{ color:"var(--red)" }}>{fmtYen(faturaRemaining(payModal))}</strong>
+              {t('portal.invoices.periodRange', { from: fmtDate(payModal.periodo_inicio), to: fmtDate(payModal.periodo_fim) })} · {t('portal.invoices.remainingLabel')}: <strong style={{ color:"var(--red)" }}>{fmtYen(faturaRemaining(payModal))}</strong>
             </div>
             <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>Comprovante (foto ou PDF)</div>
+              <div style={{ fontSize:11, fontWeight:700, color:"var(--text2)", textTransform:"uppercase", marginBottom:8 }}>{t('portal.invoices.proofUpload')}</div>
               <div style={{ border:"2px dashed var(--border)", borderRadius:12, padding:"20px", textAlign:"center", cursor:"pointer", background:"var(--bg3)" }}
                 onClick={()=>document.getElementById("receipt-upload").click()}>
                 {image?(

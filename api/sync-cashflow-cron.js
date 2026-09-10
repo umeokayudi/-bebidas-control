@@ -1,35 +1,24 @@
 /**
- * Cron: sincroniza cashflow bebidas-control → jbm-master Supabase.
- * Vercel Cron chama GET /api/sync-cashflow-cron a cada 15 min.
- * Protegido por CRON_SECRET (header Authorization: Bearer ...).
+ * Cron: sync cashflow bebidas-control → jbm-master Supabase.
+ * Protected by CRON_SECRET or Vercel cron header.
  */
 import { createClient } from '@supabase/supabase-js'
+import { drinksAdminClient } from './_supabaseAdmin.js'
+import { buildLiveSnapshot } from './_cashflowSnapshot.js'
 
 const HOLDING_URL = process.env.HOLDING_SUPABASE_URL || 'https://fxsakrshmldmkdmbevna.supabase.co'
 const BUCKET = 'system-private'
 const FILE = 'cashflow_snapshot.json'
 const KEY_FILE = 'holding_service_role_key.txt'
-const DRINKS_URL = process.env.VITE_SUPABASE_URL || 'https://ojirgkqtqvugqktyuhem.supabase.co'
 
 async function resolveHoldingKey() {
   if (process.env.HOLDING_SERVICE_ROLE_KEY) return process.env.HOLDING_SERVICE_ROLE_KEY
-  const drinksKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!drinksKey) return null
-  const sb = createClient(DRINKS_URL, drinksKey, { auth: { autoRefreshToken: false, persistSession: false } })
   try {
+    const sb = drinksAdminClient()
     const { data } = await sb.storage.from(BUCKET).download(KEY_FILE)
     if (data) return (await data.text()).trim()
   } catch { /* */ }
   return null
-}
-
-async function fetchSnapshotFromApi() {
-  const url = process.env.CASHFLOW_API_URL || 'https://bebidas-control.vercel.app/api/cashflow-export'
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`cashflow-export → ${res.status}`)
-  const data = await res.json()
-  if (data.error) throw new Error(data.error)
-  return { ...data, fonte: 'bebidas-control-cron', destino: 'jbm-master' }
 }
 
 export default async function handler(req, res) {
@@ -45,12 +34,19 @@ export default async function handler(req, res) {
 
   try {
     const holdingKey = await resolveHoldingKey()
-    if (!holdingKey) return res.status(500).json({ error: 'HOLDING_SERVICE_ROLE_KEY missing — run scripts/set-holding-sync-secret.mjs' })
+    if (!holdingKey) {
+      return res.status(500).json({ error: 'HOLDING_SERVICE_ROLE_KEY missing — run scripts/set-holding-sync-secret.mjs' })
+    }
+
+    const sb = drinksAdminClient()
+    const snapshot = {
+      ...(await buildLiveSnapshot(sb)),
+      fonte: 'bebidas-control-cron',
+      destino: 'jbm-master',
+      geradoEm: new Date().toISOString(),
+    }
 
     const holdingSb = createClient(HOLDING_URL, holdingKey, { auth: { autoRefreshToken: false, persistSession: false } })
-    const snapshot = await fetchSnapshotFromApi()
-    snapshot.geradoEm = new Date().toISOString()
-
     const { data: buckets } = await holdingSb.storage.listBuckets()
     if (!buckets?.some(b => b.name === BUCKET)) {
       await holdingSb.storage.createBucket(BUCKET, { public: false })

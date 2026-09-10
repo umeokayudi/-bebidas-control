@@ -1,16 +1,19 @@
+import { apiAuthHeaders } from './apiAuth'
+
 async function readApiJson(res) {
   const text = await res.text()
   try {
     return JSON.parse(text)
   } catch {
-    return { error: text?.slice(0, 200) || res.statusText || 'Resposta inválida do servidor' }
+    return { error: text?.slice(0, 200) || res.statusText || 'Invalid server response' }
   }
 }
 
 export async function callGeminiChat({ messages, system, image, temperature, maxOutputTokens }) {
+  const headers = await apiAuthHeaders({ 'Content-Type': 'application/json' })
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ messages, system, image, temperature, maxOutputTokens }),
   })
   const data = await readApiJson(res)

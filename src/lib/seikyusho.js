@@ -1,16 +1,19 @@
+import { staffAuthHeaders } from './apiAuth'
+
 async function readApiJson(res) {
   const text = await res.text()
   try {
     return JSON.parse(text)
   } catch {
-    throw new Error(text?.slice(0, 200) || res.statusText || 'Resposta inválida do servidor')
+    throw new Error(text?.slice(0, 200) || res.statusText || 'Invalid server response')
   }
 }
 
 async function seikyushoFetch(payload) {
+  const headers = await staffAuthHeaders({ 'Content-Type': 'application/json' })
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ module: 'seikyusho', ...payload }),
   })
   const data = await readApiJson(res)

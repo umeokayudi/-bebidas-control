@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
-/** Headers com Bearer do staff logado para APIs /api/* protegidas. */
-export async function staffAuthHeaders(extra = {}) {
+/** Headers with Bearer token for any logged-in user (staff, admin, or portal cliente). */
+export async function apiAuthHeaders(extra = {}) {
   const { data: { session } } = await supabase.auth.getSession()
   const headers = { ...extra }
   if (session?.access_token) {
@@ -10,7 +10,15 @@ export async function staffAuthHeaders(extra = {}) {
   return headers
 }
 
-export async function staffFetch(url, options = {}) {
-  const headers = await staffAuthHeaders(options.headers || {})
+/** @deprecated alias */
+export const staffAuthHeaders = apiAuthHeaders
+
+export async function apiFetch(url, options = {}) {
+  const headers = await apiAuthHeaders(options.headers || {})
   return fetch(url, { ...options, headers })
+}
+
+/** Staff/admin API calls — same as apiFetch (JWT role checked server-side). */
+export async function staffFetch(url, options = {}) {
+  return apiFetch(url, options)
 }

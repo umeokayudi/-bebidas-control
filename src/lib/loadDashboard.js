@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 
 export async function loadDashboard() {
   let { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) throw new Error('Não autenticado')
+  if (!session?.access_token) throw new Error('Not authenticated')
 
   const expiresAt = session.expires_at ? session.expires_at * 1000 : 0
   if (expiresAt && expiresAt < Date.now() + 60_000) {

@@ -1,24 +1,29 @@
 import { fixAtomicReceivables, revertAtomicPedidosToJune, markPedidosEntregue, ATOMIC_BAR_ID } from './_atomicJuneFix.js'
 import { fixVendaDatesFromPedidos, dedupePedidoVendas, syncMissingVendasFromPedidos, backfillVendaItensFromPedidos, fixSeikyushoCompraDates } from './_pedidoVendaFix.js'
 import { drinksAdminClient } from './_supabaseAdmin.js'
+import { requireStaff } from './_requireStaff.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      error: 'Use POST',
-      exemplo: { confirm: 'atomic-june-465000', action: 'fix' },
-    })
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const secret = process.env.FIX_ATOMIC_SECRET || 'jbm-atomic-june-2026'
+  const sb = drinksAdminClient()
+  const auth = await requireStaff(req, sb, { adminOnly: true })
+  if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
+  const secret = process.env.FIX_ATOMIC_SECRET
+  if (!secret) {
+    return res.status(503).json({ error: 'FIX_ATOMIC_SECRET not configured' })
+  }
+
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
-  if (body.confirm !== secret && body.confirm !== 'atomic-june-465000') {
-    return res.status(403).json({ error: 'confirm inválido' })
+  if (body.confirm !== secret) {
+    return res.status(403).json({ error: 'Invalid confirm token' })
   }
 
   try {
-    const sb = drinksAdminClient()
     const action = body.action || 'fix'
 
     if (action === 'revertPedidos') {
@@ -77,9 +82,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'backfillVendaItens') {
-      const backfill = await backfillVendaItensFromPedidos(sb, {
-        barId: body.barId || ATOMIC_BAR_ID,
-      })
+      const backfill = await backfillVendaItensFromPedidos(sb, { barId: body.barId || ATOMIC_BAR_ID })
       return res.status(200).json({ ok: true, backfill })
     }
 
@@ -100,7 +103,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(400).json({
-      error: 'action inválida',
+      error: 'Invalid action',
       actions: ['fix', 'revertPedidos', 'markEntregue', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas', 'syncMissingVendas', 'backfillVendaItens', 'fixSeikyushoCompraDates'],
     })
   } catch (e) {
