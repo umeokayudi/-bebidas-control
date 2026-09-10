@@ -18,6 +18,9 @@ const checks = [
   { name: 'VITE_SUPABASE_ANON_KEY', scope: 'client', required: true },
   { name: 'SUPABASE_SERVICE_ROLE_KEY', scope: 'server', required: true },
   { name: 'GEMINI_API_KEY', scope: 'server', required: true },
+  { name: 'RESEND_API_KEY', scope: 'server', required: false },
+  { name: 'EMAIL_FROM', scope: 'server', required: false },
+  { name: 'REPORT_EMAIL_RECIPIENTS', scope: 'server', required: false },
 ]
 
 console.log('\n🔍 JBM Drinks — environment check\n')
@@ -54,6 +57,9 @@ if (missing.length) {
   for (const m of missing) {
     if (m === 'GEMINI_API_KEY') console.log(`   ${m} → https://aistudio.google.com/apikey (mesma do Kuripuro)`)
     else if (m === 'SUPABASE_SERVICE_ROLE_KEY') console.log(`   ${m} → Supabase → Settings → API → service_role`)
+    else if (m === 'RESEND_API_KEY') console.log(`   ${m} → https://resend.com/api-keys`)
+    else if (m === 'EMAIL_FROM') console.log(`   ${m} → verified sender in Resend (e.g. JBM Drinks <billing@yourdomain.com>)`)
+    else if (m === 'REPORT_EMAIL_RECIPIENTS') console.log(`   ${m} → comma-separated admin emails for daily report cron`)
     else console.log(`   ${m}`)
   }
   console.log('')

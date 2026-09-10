@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { fmtYen, fmtDate, Spinner, Empty } from './utils'
 import { AdminPage, PortalSurface, PortalAlert } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 export default function EstoqueTab() {
+  const { t } = useI18n()
   const { user, perfil } = useAuth()
   const [produtos,    setProdutos]    = useState([])
   const [movimentos,  setMovimentos]  = useState([])
@@ -89,67 +91,67 @@ export default function EstoqueTab() {
   const lowStock = stockList.filter(p => p.estoque > 0 && p.estoque <= 3)
   const outStock  = stockList.filter(p => p.estoque <= 0)
 
-  if (loading) return <Spinner text="Carregando estoque..." />
+  if (loading) return <Spinner text={t('estoque.loading')} />
 
   return (
     <AdminPage
-      title="Estoque"
-      subtitle="Níveis de garrafas e movimentações"
+      title={t('estoque.title')}
+      subtitle={t('estoque.subtitle')}
       actions={(
         <button className="btn-primary" onClick={() => setShowForm(x => !x)} style={{ padding: '9px 18px', borderRadius: 10 }}>
-          {showForm ? 'Cancelar' : '🍾 Abrir garrafa'}
+          {showForm ? t('common.cancel') : t('estoque.openBottle')}
         </button>
       )}
     >
 
       {outStock.length > 0 && (
         <PortalAlert variant="red">
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Sem estoque</div>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('estoque.outOfStock')}</div>
           <div style={{ fontSize: 12, opacity: 0.9 }}>{outStock.map(p => p.nome).join(', ')}</div>
         </PortalAlert>
       )}
       {lowStock.length > 0 && (
         <PortalAlert variant="amber">
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Estoque baixo</div>
-          <div style={{ fontSize: 12 }}>{lowStock.map(p => p.nome + ' (' + p.estoque + ' rest.)').join(', ')}</div>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('estoque.lowStock')}</div>
+          <div style={{ fontSize: 12 }}>{lowStock.map(p => p.nome + ' (' + p.estoque + ' ' + t('estoque.rest') + ')').join(', ')}</div>
         </PortalAlert>
       )}
 
       {showForm && (
-        <PortalSurface title="Registrar abertura de garrafa" style={{ marginBottom: 16, border: '2px solid rgba(193,156,86,0.3)' }}>
+        <PortalSurface title={t('estoque.registerOpen')} style={{ marginBottom: 16, border: '2px solid rgba(193,156,86,0.3)' }}>
           <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:12, marginBottom:12 }}>
             <div>
-              <label className="form-label">Produto</label>
+              <label className="form-label">{t('estoque.product')}</label>
               <select value={formProdId} onChange={e => setFormProdId(e.target.value)}>
                 {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="form-label">Bar</label>
+              <label className="form-label">{t('estoque.bar')}</label>
               <select value={formBarId} onChange={e => setFormBarId(e.target.value)}>
                 {bars.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="form-label">Qtd</label>
+              <label className="form-label">{t('estoque.qty')}</label>
               <input type="number" min="0.1" step="0.1" value={formQtd}
                 onChange={e => setFormQtd(+e.target.value)} />
             </div>
           </div>
           <div style={{ marginBottom:12 }}>
-            <label className="form-label">Observações (opcional)</label>
+            <label className="form-label">{t('estoque.notesOptional')}</label>
             <input type="text" value={formObs} onChange={e => setFormObs(e.target.value)}
-              placeholder="Ex: abertura para mesa 5 no Atomic..." />
+              placeholder={t('estoque.notesPlaceholder')} />
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <button className="btn-primary" onClick={openBottle} disabled={saving}>
-              {saving ? 'Salvando...' : 'Registrar abertura'}
+              {saving ? t('common.saving') : t('estoque.registerOpenBtn')}
             </button>
           </div>
         </PortalSurface>
       )}
 
-      <PortalSurface title="Níveis de estoque" style={{ marginBottom: 16 }}>
+      <PortalSurface title={t('estoque.stockLevels')} style={{ marginBottom: 16 }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:8 }}>
           {stockList.filter(p => p.estoque > 0 || p.estoque_atual > 0).map(p => {
             const stock = p.estoque || p.estoque_atual || 0
@@ -168,7 +170,7 @@ export default function EstoqueTab() {
                     background:status==='ok'?'#f0fdf4':status==='low'?'#fffbeb':'#fef2f2',
                     color:colors[status]
                   }}>
-                    {status === 'ok' ? 'OK' : status === 'low' ? 'Baixo' : 'Zerado'}
+                    {status === 'ok' ? t('estoque.ok') : status === 'low' ? t('estoque.low') : t('estoque.empty')}
                   </span>
                 </div>
               </div>
@@ -176,31 +178,31 @@ export default function EstoqueTab() {
           })}
           {stockList.filter(p => p.estoque > 0 || p.estoque_atual > 0).length === 0 && (
             <div style={{ gridColumn:'1/-1' }}>
-              <Empty text="Sem dados de estoque. O estoque aumenta quando compras são registradas." />
+              <Empty text={t('estoque.noStockData')} />
             </div>
           )}
         </div>
       </PortalSurface>
 
       <PortalSurface
-        title="Histórico de movimentos"
+        title={t('estoque.movementHistory')}
         headerRight={(
           <div style={{ display: 'flex', gap: 8 }}>
             <select value={filterBar} onChange={e => setFilterBar(e.target.value)} style={{ width: 'auto', fontSize: 12 }}>
-              <option value="">Todos os bars</option>
+              <option value="">{t('estoque.allBars')}</option>
               {bars.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
             </select>
             <select value={filterProd} onChange={e => setFilterProd(e.target.value)} style={{ width: 'auto', fontSize: 12 }}>
-              <option value="">Todos os produtos</option>
+              <option value="">{t('estoque.allProducts')}</option>
               {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
           </div>
         )}
       >
-        {filtered.length === 0 ? <Empty text="Nenhum movimento ainda" /> : (
+        {filtered.length === 0 ? <Empty text={t('estoque.noMovements')} /> : (
           <table>
             <thead>
-              <tr><th>Data</th><th>Produto</th><th>Bar</th><th>Tipo</th><th>Qtd</th><th>Obs</th></tr>
+              <tr><th>{t('estoque.colDate')}</th><th>{t('estoque.colProduct')}</th><th>{t('estoque.colBar')}</th><th>{t('estoque.colType')}</th><th>{t('estoque.colQty')}</th><th>{t('estoque.colObs')}</th></tr>
             </thead>
             <tbody>
               {filtered.map(m => (
@@ -214,7 +216,7 @@ export default function EstoqueTab() {
                       background: m.tipo === 'entrada' ? '#f0fdf4' : '#fff7ed',
                       color: m.tipo === 'entrada' ? 'var(--green)' : 'var(--amber)',
                     }}>
-                      {m.tipo === 'entrada' ? '↑ Entrada' : '↓ Saída'}
+                      {m.tipo === 'entrada' ? t('estoque.entry') : t('estoque.exit')}
                     </span>
                   </td>
                   <td style={{ fontWeight: 700 }}>{m.qtd}</td>

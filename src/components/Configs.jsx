@@ -42,7 +42,7 @@ export function ProductsTab() {
   }
 
   async function del(id) {
-    if (!confirm('Remover produto?')) return
+    if (!confirm(t('configs.confirmDeleteProduct'))) return
     await supabase.from('produtos').update({ ativo: false }).eq('id', id)
     load()
   }
@@ -54,39 +54,39 @@ export function ProductsTab() {
 
   return (
     <AdminPage title={t('nav.products')} subtitle={t('configs.productsSubtitle')}>
-      <PortalSurface title={editId ? 'Editar produto' : 'Novo produto'} style={{ marginBottom: 16 }}>
+      <PortalSurface title={editId ? t('configs.editProduct') : t('configs.newProduct')} style={{ marginBottom: 16 }}>
         <div className="grid4" style={{ marginBottom:12, alignItems:'end' }}>
           <div style={{ gridColumn:'span 1' }}>
-            <label className="form-label">Nome</label>
-            <input type="text" value={form.nome} onChange={e=>setF('nome',e.target.value)} placeholder="Ex: Asahi 500ml" />
+            <label className="form-label">{t('configs.productName')}</label>
+            <input type="text" value={form.nome} onChange={e=>setF('nome',e.target.value)} placeholder={t('configs.productPlaceholder')} />
           </div>
           <div>
-            <label className="form-label">Categoria</label>
+            <label className="form-label">{t('configs.category')}</label>
             <select value={form.categoria} onChange={e=>setF('categoria',e.target.value)}>
               {CATEGORIAS.map(c=><option key={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="form-label">Custo (¥)</label>
+            <label className="form-label">{t('configs.cost')}</label>
             <input type="number" value={form.custo} onChange={e=>setF('custo',+e.target.value)} />
           </div>
           <div>
-            <label className="form-label">Preço de venda (¥)</label>
+            <label className="form-label">{t('configs.sellPrice')}</label>
             <input type="number" value={form.preco_venda} onChange={e=>setF('preco_venda',+e.target.value)} />
           </div>
         </div>
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-          {editId && <button onClick={()=>{setEditId(null);setForm({nome:'',categoria:'Cerveja',custo:0,preco_venda:0})}}>Cancelar</button>}
+          {editId && <button onClick={()=>{setEditId(null);setForm({nome:'',categoria:'Cerveja',custo:0,preco_venda:0})}}>{t('common.cancel')}</button>}
           <button className="btn-primary" onClick={save} disabled={saving}>
-            {saving ? <><span className="spinner"/>Salvando...</> : editId?'Salvar edição':'Adicionar produto'}
+            {saving ? <><span className="spinner"/>{t('common.saving')}</> : editId ? t('configs.saveEdit') : t('configs.addProduct')}
           </button>
         </div>
       </PortalSurface>
 
       <PortalSurface>
-        {loading ? <Spinner /> : produtos.length===0 ? <Empty text="Nenhum produto" /> : (
+        {loading ? <Spinner /> : produtos.length===0 ? <Empty text={t('configs.noProducts')} /> : (
           <table>
-            <thead><tr><th>Produto</th><th>Categoria</th><th>Custo</th><th>Venda</th><th>Margem</th><th></th></tr></thead>
+            <thead><tr><th>{t('configs.productCol')}</th><th>{t('configs.categoryCol')}</th><th>{t('configs.costCol')}</th><th>{t('configs.sellCol')}</th><th>{t('configs.margin')}</th><th></th></tr></thead>
             <tbody>
               {produtos.filter(p=>p.ativo!==false).map(p=>{
                 const m = p.preco_venda>0 ? Math.round((p.preco_venda-p.custo)/p.preco_venda*100) : 0
@@ -141,26 +141,26 @@ export function BarsTab() {
   }
 
   async function del(id) {
-    if (!confirm('Remover bar?')) return
+    if (!confirm(t('configs.confirmDeleteBar'))) return
     await supabase.from('bars').delete().eq('id', id)
     load()
   }
 
   return (
     <AdminPage title={t('nav.bars')} subtitle={t('configs.barsSubtitle')}>
-      <PortalSurface title="Adicionar bar / cliente" style={{ marginBottom: 16 }}>
+      <PortalSurface title={t('configs.addBar')} style={{ marginBottom: 16 }}>
         <div style={{ display:'grid', gridTemplateColumns:'2fr 60px auto', gap:10, alignItems:'end' }}>
-          <div><label className="form-label">Nome</label>
-            <input type="text" value={nome} onChange={e=>setName(e.target.value)} placeholder="Nome do bar" /></div>
-          <div><label className="form-label">Cor</label>
+          <div><label className="form-label">{t('configs.barName')}</label>
+            <input type="text" value={nome} onChange={e=>setName(e.target.value)} placeholder={t('configs.barName')} /></div>
+          <div><label className="form-label">{t('configs.color')}</label>
             <input type="color" value={cor} onChange={e=>setColor(e.target.value)} style={{ height:38, padding:'2px 4px' }} /></div>
-          <button className="btn-primary" onClick={add}>Adicionar</button>
+          <button className="btn-primary" onClick={add}>{t('configs.addBarBtn')}</button>
         </div>
       </PortalSurface>
       <PortalSurface>
-        {loading ? <Spinner /> : bars.length===0 ? <Empty text="Nenhum bar cadastrado" /> : (
+        {loading ? <Spinner /> : bars.length===0 ? <Empty text={t('configs.noBars')} /> : (
           <table>
-            <thead><tr><th>Bar</th><th>Cor</th><th>Vendas</th><th>Receita total</th><th></th></tr></thead>
+            <thead><tr><th>{t('nav.bars')}</th><th>{t('configs.color')}</th><th>{t('nav.sales')}</th><th>{t('configs.totalRevenue')}</th><th></th></tr></thead>
             <tbody>
               {bars.map(b=>{
                 const v = vendas.filter(x=>x.bar_id===b.id)
@@ -250,7 +250,7 @@ export function UsuariosTab() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Update failed')
-      setMsg('User updated')
+      setMsg(t('configs.userUpdated'))
       setEditId(null)
       setEditPw('')
       load()
@@ -262,7 +262,7 @@ export function UsuariosTab() {
   }
 
   async function deleteUser(id) {
-    if (!confirm('Delete profile only? Login remains in Supabase Auth — disable there if needed.')) return
+    if (!confirm(t('configs.confirmDeleteUser'))) return
     await supabase.from('perfis').delete().eq('id', id)
     load()
   }
@@ -281,14 +281,14 @@ export function UsuariosTab() {
   const roleColor = { admin:'var(--gold)', staff:'var(--navy)', funcionario:'var(--navy)', cliente:'var(--green)' }
   const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Cliente' }[r] || r)
 
-  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>Carregando...</div>
+  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>{t('configs.usersLoading')}</div>
 
   return (
     <AdminPage
       title={t('configs.usersTitle')}
       subtitle={t('configs.usersSubtitle')}
       actions={
-        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>{ setShowNew(v=>!v); setErr('') }}>+ Novo usuário</button>
+        <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} onClick={()=>{ setShowNew(v=>!v); setErr('') }}>{t('configs.newUser')}</button>
       }
     >
 
@@ -297,24 +297,24 @@ export function UsuariosTab() {
 
       {bars.length === 0 && (
         <div style={{background:'#FDF3E0',border:'1px solid #f0d080',borderRadius:8,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#8A5A00'}}>
-          Nenhum bar cadastrado. Vá em <strong>Bares</strong> e adicione um bar antes de criar logins de cliente.
+          {t('configs.noBarsWarning')}
         </div>
       )}
 
       {showNew && (
-        <PortalSurface title="Criar login do portal" sub="Para Atomic ou qualquer bar — função Cliente + selecione o bar" style={{marginBottom:20,background:'var(--bg2)',border:'1px solid rgba(193,156,86,0.2)'}}>
+        <PortalSurface title={t('configs.createPortalLogin')} sub={t('configs.createPortalSub')} style={{marginBottom:20,background:'var(--bg2)',border:'1px solid rgba(193,156,86,0.2)'}}>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-            <input className="input" placeholder="Nome completo" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/>
-            <input className="input" placeholder="Email" type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
-            <input className="input" placeholder="Senha (mín. 6)" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
+            <input className="input" placeholder={t('configs.fullName')} value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/>
+            <input className="input" placeholder={t('auth.email')} type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}/>
+            <input className="input" placeholder={t('configs.passwordMin')} type="password" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
             <select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
               <option value="admin">Admin</option>
-              <option value="staff">Staff</option>
-              <option value="cliente">Cliente (portal do bar)</option>
+              <option value="staff">{t('shell.roles.staff')}</option>
+              <option value="cliente">{t('configs.roleClientPortal')}</option>
             </select>
             {form.role === 'cliente' && (
               <select className="input" value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} style={{ gridColumn:'span 2' }}>
-                <option value="">— Selecione o bar (obrigatório) —</option>
+                <option value="">{t('configs.selectBarRequired')}</option>
                 {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
               </select>
             )}
@@ -332,7 +332,7 @@ export function UsuariosTab() {
                   })
                   const json = await res.json()
                   if (!res.ok) throw new Error(json.error || 'Create failed')
-                  setMsg('Usuário criado: ' + newEmail)
+                  setMsg(t('configs.userCreated', { email: newEmail }))
                   setShowNew(false); setNewEmail(''); setNewPw('')
                   setForm({ nome:'', email:'', role:'cliente', bar_id:'' })
                   load()
@@ -340,9 +340,9 @@ export function UsuariosTab() {
                 } catch(e) { setErr(e.message) }
                 setCreating(false)
               }}>
-              {creating ? 'Criando...' : 'Criar login'}
+              {creating ? t('configs.creating') : t('configs.createLogin')}
             </button>
-            <button onClick={()=>setShowNew(false)} style={{fontSize:12,padding:'8px 16px',background:'var(--bg3)',border:'none',borderRadius:8,cursor:'pointer',color:'var(--text2)'}}>Cancelar</button>
+            <button onClick={()=>setShowNew(false)} style={{fontSize:12,padding:'8px 16px',background:'var(--bg3)',border:'none',borderRadius:8,cursor:'pointer',color:'var(--text2)'}}>{t('common.cancel')}</button>
           </div>
         </PortalSurface>
       )}
@@ -351,7 +351,7 @@ export function UsuariosTab() {
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead>
             <tr style={{background:'var(--bg2)',borderBottom:'1px solid var(--border)'}}>
-              {['Nome','Email','Função','Bar','Status','Ações'].map(h=>(
+              {[t('configs.colName'),t('configs.colEmail'),t('configs.colRole'),t('configs.colBar'),t('configs.colStatus'),t('configs.colActions')].map(h=>(
                 <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.05em'}}>{h}</th>
               ))}
             </tr>
@@ -362,7 +362,7 @@ export function UsuariosTab() {
                 {editId===u.id ? (
                   <>
                     <td style={{padding:'8px 14px'}}><input className="input" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})}/></td>
-                    <td style={{padding:'8px 14px'}}><input className="input" type="email" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="Change login email"/></td>
+                    <td style={{padding:'8px 14px'}}><input className="input" type="email" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder={t('configs.changeEmail')}/></td>
                     <td style={{padding:'8px 14px'}}>
                       <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
                         <option value="admin">Admin</option>
@@ -377,12 +377,12 @@ export function UsuariosTab() {
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>
-                      <input className="input" type="password" style={{padding:'4px 8px',fontSize:11,width:'100%'}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder="Nova senha (opcional)"/>
+                      <input className="input" type="password" style={{padding:'4px 8px',fontSize:11,width:'100%'}} value={editPw} onChange={e=>setEditPw(e.target.value)} placeholder={t('configs.newPasswordOptional')}/>
                     </td>
                     <td style={{padding:'8px 14px'}}>
                       <div style={{display:'flex',gap:6}}>
-                        <button className="btn-primary" style={{fontSize:11,padding:'4px 10px'}} disabled={saving} onClick={()=>saveEdit(u.id)}>{saving?'...':'Salvar'}</button>
-                        <button onClick={()=>{setEditId(null);setEditPw('')}} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>Cancelar</button>
+                        <button className="btn-primary" style={{fontSize:11,padding:'4px 10px'}} disabled={saving} onClick={()=>saveEdit(u.id)}>{saving?'...':t('common.save')}</button>
+                        <button onClick={()=>{setEditId(null);setEditPw('')}} style={{fontSize:11,padding:'4px 10px',background:'var(--bg3)',border:'none',borderRadius:6,cursor:'pointer'}}>{t('common.cancel')}</button>
                       </div>
                     </td>
                   </>
@@ -396,13 +396,13 @@ export function UsuariosTab() {
                     <td style={{padding:'10px 14px',fontSize:12,color:'var(--text2)'}}>{bars.find(b=>b.id===u.bar_id)?.nome||'—'}</td>
                     <td style={{padding:'10px 14px',fontSize:11}}>
                       {u.role === 'cliente' && !u.bar_id
-                        ? <span style={{color:'var(--red)',fontWeight:600}}>Sem bar vinculado</span>
+                        ? <span style={{color:'var(--red)',fontWeight:600}}>{t('configs.noBarLinked')}</span>
                         : <span style={{color:'var(--green)'}}>OK</span>}
                     </td>
                     <td style={{padding:'10px 14px'}}>
                       <div style={{display:'flex',gap:6}}>
-                        <button onClick={()=>startEdit(u)} style={{fontSize:11,padding:'4px 10px',background:'var(--navy)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Editar</button>
-                        <button onClick={()=>deleteUser(u.id)} style={{fontSize:11,padding:'4px 10px',background:'var(--red)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>Excluir</button>
+                        <button onClick={()=>startEdit(u)} style={{fontSize:11,padding:'4px 10px',background:'var(--navy)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>{t('common.edit')}</button>
+                        <button onClick={()=>deleteUser(u.id)} style={{fontSize:11,padding:'4px 10px',background:'var(--red)',color:'white',border:'none',borderRadius:6,cursor:'pointer'}}>{t('common.delete')}</button>
                       </div>
                     </td>
                   </>
@@ -411,12 +411,11 @@ export function UsuariosTab() {
             ))}
           </tbody>
         </table>
-        {users.length===0 && <div style={{padding:32,textAlign:'center',color:'var(--text3)',fontSize:13}}>Nenhum usuário encontrado</div>}
+        {users.length===0 && <div style={{padding:32,textAlign:'center',color:'var(--text3)',fontSize:13}}>{t('configs.noUsers')}</div>}
       </PortalSurface>
 
       <div style={{marginTop:16,fontSize:12,color:'var(--text2)',lineHeight:1.6}}>
-        <strong>Configuração:</strong> adicione <code>SUPABASE_SERVICE_ROLE_KEY</code> nas variáveis de ambiente da Vercel (Supabase → Settings → API → service_role).
-        Execute <code>USUARIOS_SQL.sql</code> uma vez no Supabase se a coluna email estiver faltando.
+        {t('configs.configHint')}
       </div>
     </AdminPage>
   )
@@ -623,33 +622,33 @@ export function PedidosAdminTab() {
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           {missingCount>0&&(
             <button onClick={async()=>{
-              if(!confirm(`Registrar vendas para ${missingCount} pedido(s) entregue(s)?`)) return
+              if(!confirm(t('configs.confirmSyncMissing', { count: missingCount }))) return
               for(const p of pedidos.filter(x=>missingVenda[x.id])) await repairVenda(p)
             }} style={{padding:'8px 14px',fontSize:11,borderRadius:8,background:'var(--red)',color:'white',border:'none',fontWeight:700,cursor:'pointer'}}>
-              Sincronizar vendas faltantes
+              {t('configs.syncMissingSales')}
             </button>
           )}
           <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={{width:'auto'}}>
-            <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="confirmado">Confirmado</option>
-            <option value="entregue">Entregue</option>
-            <option value="cancelado">Cancelado</option>
+            <option value="">{t('configs.allStatuses')}</option>
+            <option value="pendente">{t('orderStatus.pendente')}</option>
+            <option value="confirmado">{t('orderStatus.confirmado')}</option>
+            <option value="entregue">{t('orderStatus.entregue')}</option>
+            <option value="cancelado">{t('orderStatus.cancelado')}</option>
           </select>
         </div>
       }
     >
       {(pendentes>0||missingCount>0)&&(
         <div style={{marginBottom:16}}>
-          {pendentes>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2}}>{pendentes} pedido(s) aguardando confirmação</div>}
-          {missingCount>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2,fontWeight:600}}>{missingCount} pedido(s) entregue(s) sem venda registrada</div>}
+          {pendentes>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2}}>{t('configs.awaitingConfirm', { count: pendentes })}</div>}
+          {missingCount>0&&<div style={{fontSize:12,color:'var(--red)',marginTop:2,fontWeight:600}}>{t('configs.deliveredNoSale', { count: missingCount })}</div>}
         </div>
       )}
 
       {loading
-        ? <div style={{color:'var(--text2)',fontSize:13}}>Carregando...</div>
+        ? <div style={{color:'var(--text2)',fontSize:13}}>{t('common.loading')}</div>
         : filtered.length===0
-          ? <div style={{color:'var(--text3)',textAlign:'center',padding:'40px 0'}}>Nenhum pedido</div>
+          ? <div style={{color:'var(--text3)',textAlign:'center',padding:'40px 0'}}>{t('configs.noOrders')}</div>
           : filtered.map(p=>{
             const s=STATUS_MAP[p.status]||STATUS_MAP.pendente
             return(
@@ -681,21 +680,21 @@ export function PedidosAdminTab() {
                 </div>
                 {missingVenda[p.id]&&(
                   <div style={{marginBottom:12,padding:'10px 14px',borderRadius:10,background:'#FBEAEA',border:'1px solid #f5c6c6',fontSize:12,color:'#7f1d1d'}}>
-                    ⚠️ Venda não registrada em Vendas / Dashboard.
+                    ⚠️ {t('configs.saleNotRegistered')}
                     <button onClick={()=>repairVenda(p)} disabled={repairing===p.id}
                       style={{marginLeft:10,padding:'4px 10px',fontSize:11,borderRadius:6,background:'#7f1d1d',color:'white',border:'none',fontWeight:700,cursor:'pointer'}}>
-                      {repairing===p.id?'Registrando...':'Registrar venda agora'}
+                      {repairing===p.id ? t('configs.registering') : t('configs.registerSaleNow')}
                     </button>
                   </div>
                 )}
                 <div style={{display:'flex',gap:8}}>
                   {p.status==='pendente'&&<>
-                    <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>Confirmar</button>
-                    <button onClick={()=>updateStatus(p.id,'cancelado')} className="btn-danger" style={{padding:'6px 14px',fontSize:11,borderRadius:8}}>Cancelar</button>
+                    <button onClick={()=>updateStatus(p.id,'confirmado')} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--navy)',color:'var(--gold)',border:'none',fontWeight:600}}>{t('configs.confirm')}</button>
+                    <button onClick={()=>updateStatus(p.id,'cancelado')} className="btn-danger" style={{padding:'6px 14px',fontSize:11,borderRadius:8}}>{t('common.cancel')}</button>
                   </>}
                   <button onClick={async()=>{ if(!confirm('Excluir este pedido?'))return; setPedidos(prev=>prev.filter(x=>x.id!==p.id)); await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); const {data:v}=await supabase.from('vendas').select('id').eq('obs','Auto: order '+p.id.slice(0,8)).maybeSingle(); if(v){await supabase.from('vendas_itens').delete().eq('venda_id',v.id); await supabase.from('vendas').delete().eq('id',v.id);} await supabase.from('pedidos').delete().eq('id',p.id); }} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'#7f1d1d',color:'white',border:'none',fontWeight:600,cursor:'pointer'}}>🗑</button>
                   {p.status==='confirmado'&&(
-                    <button onClick={()=>openChecklist(p)} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--green)',color:'white',border:'none',fontWeight:600}}>&#10003; Marcar entregue</button>
+                    <button onClick={()=>openChecklist(p)} style={{padding:'6px 14px',fontSize:11,borderRadius:8,background:'var(--green)',color:'white',border:'none',fontWeight:600}}>{t('configs.markDelivered')}</button>
                   )}
                 </div>
               </PortalSurface>
@@ -706,8 +705,8 @@ export function PedidosAdminTab() {
       {checklistPedido&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div style={{background:'var(--bg2)',borderRadius:16,padding:'28px 28px 24px',width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-            <div style={{fontSize:16,fontWeight:800,color:'var(--navy)',marginBottom:4}}>Checklist de entrega</div>
-            <div style={{fontSize:12,color:'var(--text3)',marginBottom:20}}>{checklistPedido.bars?.nome} &mdash; marque cada item antes de confirmar</div>
+            <div style={{fontSize:16,fontWeight:800,color:'var(--navy)',marginBottom:4}}>{t('configs.deliveryChecklist')}</div>
+            <div style={{fontSize:12,color:'var(--text3)',marginBottom:20}}>{checklistPedido.bars?.nome} &mdash; {t('configs.markEachItem')}</div>
             {(checklistPedido.pedidos_itens||[]).map(it=>(
               <div key={it.id} onClick={()=>setCheckedItems(prev=>({...prev,[it.id]:!prev[it.id]}))}
                 style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:10,marginBottom:8,cursor:'pointer',
@@ -733,16 +732,19 @@ export function PedidosAdminTab() {
               </div>
             ))}
             <div style={{background:'var(--navy)',borderRadius:10,padding:'12px 16px',display:'flex',justifyContent:'space-between',marginTop:12,marginBottom:20}}>
-              <span style={{color:'rgba(255,255,255,0.6)',fontSize:13}}>Total</span>
+              <span style={{color:'rgba(255,255,255,0.6)',fontSize:13}}>{t('common.total')}</span>
               <span style={{color:'var(--gold)',fontWeight:800,fontSize:15}}>&yen;{Math.round(checklistPedido.total_estimado).toLocaleString()}</span>
             </div>
             <div style={{display:'flex',gap:10}}>
-              <button onClick={()=>{setChecklistPedido(null);setCheckedItems({})}} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border)',background:'transparent',fontSize:13,cursor:'pointer'}}>Cancelar</button>
+              <button onClick={()=>{setChecklistPedido(null);setCheckedItems({})}} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border)',background:'transparent',fontSize:13,cursor:'pointer'}}>{t('common.cancel')}</button>
               <button onClick={confirmDelivery} style={{flex:2,padding:'11px',borderRadius:10,border:'none',
                 background:Object.values(checkedItems).every(v=>v)?'var(--green)':'var(--border)',
                 color:Object.values(checkedItems).every(v=>v)?'white':'var(--text3)',
                 fontSize:13,fontWeight:700,cursor:'pointer'}}>
-                {Object.values(checkedItems).filter(v=>v).length}/{Object.values(checkedItems).length} marcados &mdash; Confirmar entrega
+                {t('configs.markedConfirmDelivery', {
+                  checked: Object.values(checkedItems).filter(v=>v).length,
+                  total: Object.values(checkedItems).length,
+                })}
               </button>
             </div>
           </div>

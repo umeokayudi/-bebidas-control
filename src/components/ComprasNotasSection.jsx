@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen, fmtDate, Empty, RowActions } from './utils'
 import { PortalSurface } from './ui/PageLayout'
+import { useI18n } from '../lib/i18n'
 
 function NotaBlock({ compra, onChanged }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
@@ -39,7 +41,7 @@ function NotaBlock({ compra, onChanged }) {
   }
 
   async function remove() {
-    if (!confirm(`Excluir nota ${compra.fornecedor} (${fmtYen(compra.total_real)})?`)) return
+    if (!confirm(t('comprasNotas.confirmDelete', { supplier: compra.fornecedor, amount: fmtYen(compra.total_real) }))) return
     await supabase.from('compras').delete().eq('id', compra.id)
     onChanged?.()
   }
@@ -64,8 +66,8 @@ function NotaBlock({ compra, onChanged }) {
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)' }}>{compra.fornecedor || '—'}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
-              {fmtDate(compra.data)} · {itens.length} item(ns)
-              {compra.status_pagamento === 'pendente' && ' · pendente'}
+              {fmtDate(compra.data)} · {t('comprasNotas.itemsCount', { count: itens.length })}
+              {compra.status_pagamento === 'pendente' && ` · ${t('comprasNotas.pending')}`}
               {+compra.desconto_pontos > 0 && ` · pontos −${fmtYen(compra.desconto_pontos)}`}
             </div>
           </div>
@@ -80,20 +82,20 @@ function NotaBlock({ compra, onChanged }) {
       {editing && (
         <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-            <div><label className="form-label">Data</label><input type="date" value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))} /></div>
-            <div><label className="form-label">Fornecedor</label><input value={form.fornecedor} onChange={e => setForm(f => ({ ...f, fornecedor: e.target.value }))} /></div>
-            <div><label className="form-label">Total (¥)</label><input type="number" value={form.total_real} onChange={e => setForm(f => ({ ...f, total_real: e.target.value }))} /></div>
-            <div><label className="form-label">Status pag.</label>
+            <div><label className="form-label">{t('comprasNotas.date')}</label><input type="date" value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))} /></div>
+            <div><label className="form-label">{t('comprasNotas.supplier')}</label><input value={form.fornecedor} onChange={e => setForm(f => ({ ...f, fornecedor: e.target.value }))} /></div>
+            <div><label className="form-label">{t('comprasNotas.total')}</label><input type="number" value={form.total_real} onChange={e => setForm(f => ({ ...f, total_real: e.target.value }))} /></div>
+            <div><label className="form-label">{t('comprasNotas.payStatus')}</label>
               <select value={form.status_pagamento} onChange={e => setForm(f => ({ ...f, status_pagamento: e.target.value }))}>
-                <option value="pago">Pago</option>
-                <option value="pendente">Pendente</option>
+                <option value="pago">{t('comprasNotas.paid')}</option>
+                <option value="pendente">{t('comprasNotas.pending')}</option>
               </select>
             </div>
-            <div><label className="form-label">Data pagamento</label><input type="date" value={form.data_pagamento || ''} onChange={e => setForm(f => ({ ...f, data_pagamento: e.target.value }))} /></div>
+            <div><label className="form-label">{t('comprasNotas.payDate')}</label><input type="date" value={form.data_pagamento || ''} onChange={e => setForm(f => ({ ...f, data_pagamento: e.target.value }))} /></div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setEditing(false)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>Cancelar</button>
-            <button className="btn-primary" onClick={saveEdit} disabled={saving} style={{ padding: '8px 14px', borderRadius: 8 }}>{saving ? 'Salvando…' : 'Salvar'}</button>
+            <button onClick={() => setEditing(false)} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>{t('common.cancel')}</button>
+            <button className="btn-primary" onClick={saveEdit} disabled={saving} style={{ padding: '8px 14px', borderRadius: 8 }}>{saving ? t('common.saving') : t('common.save')}</button>
           </div>
         </div>
       )}
@@ -101,15 +103,15 @@ function NotaBlock({ compra, onChanged }) {
       {open && !editing && (
         itens.length === 0 ? (
           <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text3)' }}>
-            Sem itens detalhados{subLinhas !== +compra.total_real ? '' : ` · total ${fmtYen(compra.total_real)}`}
+            {t('comprasNotas.noItems')}{subLinhas !== +compra.total_real ? '' : ` · total ${fmtYen(compra.total_real)}`}
           </div>
         ) : (
           <table style={{ margin: 0, fontSize: 12 }}>
             <thead>
               <tr>
-                <th>Produto</th>
-                <th style={{ textAlign: 'right', width: 56 }}>Qtd</th>
-                <th style={{ textAlign: 'right', width: 88 }}>Unit.</th>
+                <th>{t('comprasNotas.product')}</th>
+                <th style={{ textAlign: 'right', width: 56 }}>{t('comprasNotas.qty')}</th>
+                <th style={{ textAlign: 'right', width: 88 }}>{t('comprasNotas.unit')}</th>
                 <th style={{ textAlign: 'right', width: 88 }}>Total</th>
               </tr>
             </thead>
@@ -135,24 +137,25 @@ function NotaBlock({ compra, onChanged }) {
 }
 
 export default function ComprasNotasSection({ comprasMes, totalCompras, creditoBar, creditosBar, onChanged }) {
+  const { t } = useI18n()
   const sorted = [...(comprasMes || [])].sort((a, b) => (a.data || '').localeCompare(b.data || ''))
 
   if (!sorted.length) {
     return (
-      <PortalSurface title="Notas de compra">
-        <Empty text="Nenhuma compra neste mês" />
+      <PortalSurface title={t('comprasNotas.title')}>
+        <Empty text={t('comprasNotas.noPurchases')} />
       </PortalSurface>
     )
   }
 
   return (
     <PortalSurface
-      title="Notas de compra"
+      title={t('comprasNotas.title')}
       headerRight={<span style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{fmtYen(totalCompras)}</span>}
     >
       {creditoBar > 0 && (
         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, padding: '10px 12px', background: 'var(--bg3)', borderRadius: 8 }}>
-          Pago direto pelo bar (abate fatura): {fmtYen(creditoBar)}
+          {t('comprasNotas.barDirectPay', { amount: fmtYen(creditoBar) })}
           {creditosBar?.length > 0 && creditosBar.map((c, i) => (
             <div key={i} style={{ marginTop: 4 }}>{c.label}: {fmtYen(c.valor)}</div>
           ))}

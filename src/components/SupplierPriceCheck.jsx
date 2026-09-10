@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtYen } from './utils'
 import { fromZeikomi, parseSupplierPriceNotas, formatPriceChange } from '../lib/consumptionTax'
+import { useI18n } from '../lib/i18n'
 
 /** Carrega preços de fornecedor (税込) com metadados de variação */
 export function useSupplierPrices(fornecedorId) {
@@ -45,10 +46,11 @@ export function useSupplierPrices(fornecedorId) {
 
 /** Painel de conferência ao registrar compra */
 export function SupplierPricePanel({ fornecedorId, fornecedorNome, onApplyPrice }) {
+  const { t } = useI18n()
   const { precos, loading } = useSupplierPrices(fornecedorId)
 
   if (!fornecedorId) return null
-  if (loading) return <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>Carregando preços de {fornecedorNome}…</div>
+  if (loading) return <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>{t('supplierPriceCheck.loading', { supplier: fornecedorNome })}</div>
   if (!precos.length) return null
 
   const sorted = [...precos].sort((a, b) => (a.produtos?.nome || '').localeCompare(b.produtos?.nome || ''))
@@ -59,7 +61,7 @@ export function SupplierPricePanel({ fornecedorId, fornecedorNome, onApplyPrice 
       background: 'linear-gradient(135deg,#f8fafc,#eef2ff)', border: '1px solid #c7d2fe',
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>
-        📋 Preços cadastrados — {fornecedorNome} <span style={{ fontWeight: 500, color: 'var(--text2)' }}>(税込 +10%)</span>
+        {t('supplierPriceCheck.registeredPrices', { supplier: fornecedorNome })} <span style={{ fontWeight: 500, color: 'var(--text2)' }}>{t('supplierPriceCheck.taxIncluded')}</span>
       </div>
       <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {sorted.map(p => {
@@ -86,7 +88,7 @@ export function SupplierPricePanel({ fornecedorId, fornecedorNome, onApplyPrice 
               {onApplyPrice && (
                 <button type="button" onClick={() => onApplyPrice(p)}
                   style={{ padding: '3px 8px', fontSize: 10, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg3)', cursor: 'pointer' }}>
-                  Usar
+                  {t('supplierPriceCheck.use')}
                 </button>
               )}
             </div>
