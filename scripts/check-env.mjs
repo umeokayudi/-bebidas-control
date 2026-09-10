@@ -2,6 +2,17 @@
  * Verifica variáveis necessárias para produção (local + Vercel).
  * Uso: node scripts/check-env.mjs
  */
+const DRINKS_REF = 'ojirgkqtqvugqktyuhem'
+
+function serviceRoleRef(key) {
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString())
+    return payload.ref || null
+  } catch {
+    return null
+  }
+}
+
 const checks = [
   { name: 'VITE_SUPABASE_URL', scope: 'client', required: true },
   { name: 'VITE_SUPABASE_ANON_KEY', scope: 'client', required: true },
