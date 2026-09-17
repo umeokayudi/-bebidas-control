@@ -1,6 +1,14 @@
-import { t as translate } from '../lib/i18n'
+import { t as translate, getGlobalLang } from '../lib/i18n'
+import { dateLocale } from '../lib/tokyo'
 export const fmtYen   = n => `¥${Math.round(+n || 0).toLocaleString('ja-JP')}`
-export const fmtDate  = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}) : '—'
+export const fmtDate  = (iso, lang = getGlobalLang()) => {
+  if (!iso) return '—'
+  const raw = String(iso)
+  const hasTime = raw.includes('T')
+  const d = new Date(hasTime ? raw : `${raw.slice(0, 10)}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString(dateLocale(lang), { year: 'numeric', month: 'short', day: 'numeric' })
+}
 export const monthKey = iso => iso ? String(iso).slice(0, 7) : ''
 export const compraDate = c => {
   const d = c?.data_compra || c?.data || ''

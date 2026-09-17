@@ -32,8 +32,21 @@ create index if not exists idx_time_clock_bar_staff on time_clock(bar_id, staff_
 
 alter table time_clock enable row level security;
 
+drop policy if exists "auth time_clock" on time_clock;
+drop policy if exists "bar time_clock" on time_clock;
+
 do $$ begin
-  create policy "auth time_clock" on time_clock for all using (auth.role() = 'authenticated');
+  create policy "bar time_clock" on time_clock for all using (
+    exists (
+      select 1 from perfis p
+      where p.id = auth.uid()
+        and (
+          p.role in ('admin', 'funcionario', 'staff')
+          or (p.bar_id = time_clock.bar_id and p.role in ('cliente', 'caixa'))
+          or (p.id = time_clock.staff_id and p.bar_id = time_clock.bar_id)
+        )
+    )
+  );
 exception when duplicate_object then null; end $$;
 
 select 'Bar access + time clock schema ready' as status;

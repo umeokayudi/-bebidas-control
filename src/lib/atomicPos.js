@@ -1,5 +1,7 @@
 /** Helpers do POS Atomic — preços, descontos, códigos, dashboard e estoque */
 
+import { tokyoDateKey, tokyoHour } from './tokyo.js'
+
 export function generateDiscountCode(prefix = 'ATOMIC') {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let suffix = ''
@@ -17,6 +19,28 @@ export function applyDiscount(preco, code) {
   return { preco: Math.max(0, preco - desconto), desconto }
 }
 
+export function itemDrinkId(item) {
+  if (!item) return null
+  if (item.drink_menu_id) return item.drink_menu_id
+  if (item.kind === 'drink') return item.id
+  return null
+}
+
+export function itemProdutoId(item) {
+  if (!item) return null
+  if (item.produto_id) return item.produto_id
+  if (item.kind === 'shot') return item.id
+  return null
+}
+
+/** Scoped codes only hit the matching drink/product. Cart-wide codes have neither id. */
+export function discountAppliesToItem(code, item) {
+  if (!code) return false
+  if (code.drink_menu_id && itemDrinkId(item) !== code.drink_menu_id) return false
+  if (code.produto_id && itemProdutoId(item) !== code.produto_id) return false
+  return true
+}
+
 export function resolveItemPrice(item, priceType = 'regular', discountCode = null) {
   const lista = item.preco_lista ?? item.preco_venda ?? item.preco_drink ?? 0
   let preco = lista
@@ -27,18 +51,30 @@ export function resolveItemPrice(item, priceType = 'regular', discountCode = nul
     tipo = 'vip'
   }
 
-  if (discountCode) {
+  if (discountCode && discountAppliesToItem(discountCode, item)) {
     const applied = applyDiscount(preco, discountCode)
-    return { preco: applied.preco, preco_lista: lista, tipo_preco: 'codigo', desconto_valor: applied.desconto }
+    return {
+      preco: applied.preco,
+      preco_unitario: applied.preco,
+      preco_lista: lista,
+      tipo_preco: 'codigo',
+      desconto_valor: applied.desconto,
+    }
   }
 
-  return { preco, preco_lista: lista, tipo_preco: tipo, desconto_valor: priceType === 'vip' ? lista - preco : 0 }
+  return {
+    preco,
+    preco_unitario: preco,
+    preco_lista: lista,
+    tipo_preco: tipo,
+    desconto_valor: priceType === 'vip' ? lista - preco : 0,
+  }
 }
 
 export function validateDiscountCode(code, { drinkMenuId, produtoId } = {}) {
   if (!code) return { ok: false, errorKey: 'atomicPos.codeInvalid', error: 'Invalid code' }
   if (!code.ativo) return { ok: false, errorKey: 'atomicPos.codeDisabled', error: 'Code disabled' }
-  if (code.valido_ate && code.valido_ate < new Date().toISOString().slice(0, 10)) {
+  if (code.valido_ate && code.valido_ate < tokyoDateKey()) {
     return { ok: false, errorKey: 'atomicPos.codeExpired', error: 'Code expired' }
   }
   if (code.max_usos != null && (code.usos_atual || 0) >= code.max_usos) {
@@ -66,15 +102,17 @@ export async function fetchPosSetupStatus(supabase) {
   return checkPosSchema(supabase)
 }
 
+export function lineUnitPrice(it) {
+  return +(it?.preco_unitario ?? it?.preco ?? 0) || 0
+}
+
 export function cartTotal(cart) {
-  return (cart || []).reduce((a, it) => a + (it.preco_unitario || 0) * (it.qtd || 1), 0)
+  return (cart || []).reduce((a, it) => a + lineUnitPrice(it) * (it.qtd || 1), 0)
 }
 
-export function todayKey() {
-  return new Date().toISOString().slice(0, 10)
-}
+export const todayKey = tokyoDateKey
 
-/** Agrega vendas POS por faixa horária (0–23) para o dashboard */
+/** Agrega vendas POS por faixa horária de Tóquio (0–23) */
 export function aggregateHourlySales(sales = []) {
   const hours = Array.from({ length: 24 }, (_, h) => ({
     hour: h,
@@ -85,7 +123,7 @@ export function aggregateHourlySales(sales = []) {
   for (const s of sales) {
     const ts = s.criado_em || s.data
     if (!ts) continue
-    const h = new Date(ts).getHours()
+    const h = tokyoHour(ts)
     hours[h].count += 1
     hours[h].total += +s.total || 0
   }
@@ -124,7 +162,8 @@ export {
   productsAlreadyOnOpenOrders,
   isRestockPedido,
   syncPosStockAndReorder,
-} from './posSupply'
+  fetchAllStockMovements,
+} from './posSupply.js'
 
 /** Métricas rápidas do dia para o dashboard POS */
 export function computeDayMetrics(sales = []) {
@@ -134,4 +173,122 @@ export function computeDayMetrics(sales = []) {
   const hourly = aggregateHourlySales(sales)
   const peakHour = hourly.reduce((best, h) => (h.total > best.total ? h : best), hourly[0])
   return { total, count, ticketMedio, peakHour, hourly }
+}
+
+export async function rollbackPosSale(supabase, vendaId) {
+  if (!vendaId) return
+  await supabase.from('discount_usages').delete().eq('pos_venda_id', vendaId)
+  await supabase.from('vip_usages').delete().eq('pos_venda_id', vendaId)
+  await supabase.from('pos_vendas_itens').delete().eq('pos_venda_id', vendaId)
+  await supabase.from('pos_vendas').delete().eq('id', vendaId)
+}
+
+/**
+ * Grava a venda POS e só confirma se o estoque baixar.
+ * Nunca escreve em `vendas` / `faturas`.
+ */
+export async function commitPosSale(supabase, {
+  bar,
+  cart,
+  payMethod = 'Cash',
+  priceType = 'regular',
+  vipId = null,
+  activeCode = null,
+  agentId = null,
+  userId = null,
+  shots = [],
+  syncStock,
+}) {
+  if (!cart?.length) return { ok: false, errorKey: 'atomicPos.cartEmpty' }
+  if (priceType === 'vip' && !vipId) return { ok: false, errorKey: 'atomicPos.vipMemberRequired' }
+
+  const subtotal = cart.reduce((a, it) => a + (it.preco_lista || lineUnitPrice(it)) * (it.qtd || 1), 0)
+  const total = cartTotal(cart)
+  const desconto = subtotal - total
+  const tipo = priceType === 'vip' || vipId ? 'vip' : activeCode ? 'desconto' : 'balcao'
+
+  const vendaPayload = {
+    bar_id: bar.id,
+    data: tokyoDateKey(),
+    subtotal,
+    desconto_total: desconto,
+    total,
+    metodo_pagamento: payMethod,
+    tipo,
+    vip_member_id: vipId || null,
+    discount_code_id: activeCode?.id || null,
+    criado_por: userId || null,
+  }
+  if (agentId) vendaPayload.drink_back_agent_id = agentId
+
+  let venda, error
+  ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
+  if (error?.message?.includes('drink_back_agent_id')) {
+    delete vendaPayload.drink_back_agent_id
+    ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
+  }
+  if (error) return { ok: false, error: error.message }
+
+  const { error: itemsError } = await supabase.from('pos_vendas_itens').insert(
+    cart.map(it => ({
+      pos_venda_id: venda.id,
+      drink_menu_id: it.drink_menu_id,
+      produto_id: it.produto_id,
+      nome: it.nome,
+      qtd: it.qtd,
+      preco_unitario: lineUnitPrice(it),
+      preco_lista: it.preco_lista,
+      tipo_preco: it.tipo_preco,
+      desconto_valor: it.desconto_valor || 0,
+    }))
+  )
+  if (itemsError) {
+    await rollbackPosSale(supabase, venda.id)
+    return { ok: false, error: itemsError.message, errorKey: 'atomicPos.saleStockFailed' }
+  }
+
+  let stock = { deducted: 0, alerts: [], pedido: null, restockItems: [] }
+  try {
+    if (syncStock) {
+      stock = await syncStock({
+        bar,
+        cart,
+        vendaId: venda.id,
+        userId,
+      })
+    }
+  } catch (stockErr) {
+    await rollbackPosSale(supabase, venda.id)
+    return { ok: false, error: stockErr.message, errorKey: 'atomicPos.saleStockFailed' }
+  }
+
+  if (activeCode) {
+    await supabase.from('discount_codes').update({ usos_atual: (activeCode.usos_atual || 0) + 1 }).eq('id', activeCode.id)
+    await supabase.from('discount_usages').insert({
+      bar_id: bar.id,
+      discount_code_id: activeCode.id,
+      pos_venda_id: venda.id,
+      valor_desconto: desconto,
+    })
+  }
+
+  if (vipId) {
+    for (const it of cart) {
+      await supabase.from('vip_usages').insert({
+        bar_id: bar.id,
+        vip_member_id: vipId,
+        drink_menu_id: it.drink_menu_id,
+        produto_id: it.produto_id,
+        nome: it.nome,
+        qtd: it.qtd,
+        preco_aplicado: lineUnitPrice(it),
+        preco_lista: it.preco_lista,
+        tipo: 'vip',
+        pos_venda_id: venda.id,
+        criado_por: userId || null,
+      })
+    }
+  }
+
+  return { ok: true, venda, total, desconto, stock, shots }
 }

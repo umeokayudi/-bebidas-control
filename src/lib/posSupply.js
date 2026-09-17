@@ -11,12 +11,40 @@
  * Nunca gravar venda de balcão em `vendas`. Nunca criar fatura a partir de POS.
  */
 
+import { tokyoDateKey } from './tokyo.js'
+
 export const RESTOCK_OBS = 'Auto: restock caixa'
 export const POS_STOCK_OBS_PREFIX = 'POS caixa'
 export const JBM_DELIVERY_OBS_PREFIX = 'JBM delivery'
 
 export function isRestockPedido(pedido) {
   return String(pedido?.obs || '').includes(RESTOCK_OBS)
+}
+
+export function findOpenRestockPedido(pedidos = []) {
+  return (pedidos || []).find(p =>
+    isRestockPedido(p) && p.status !== 'entregue' && p.status !== 'cancelado'
+  ) || null
+}
+
+export async function fetchAllRows(queryFactory, pageSize = 1000) {
+  const rows = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1)
+    if (error) throw error
+    rows.push(...(data || []))
+    if (!data || data.length < pageSize) break
+    from += pageSize
+  }
+  return rows
+}
+
+/** Todos os movimentos do bar — sem corte de 500 linhas. */
+export async function fetchAllStockMovements(supabase, barId, columns = 'produto_id,tipo,qtd') {
+  return fetchAllRows(() =>
+    supabase.from('estoque_movimentos').select(columns).eq('bar_id', barId)
+  )
 }
 
 export function bottlesFromShots(shotQty, drinksPerBottle) {
@@ -147,7 +175,7 @@ export async function createJbmRestockPedido(supabase, { bar, userId, items }) {
     bar_id: bar.id,
     criado_por: userId || null,
     status: 'pendente',
-    data_pedido: new Date().toISOString().slice(0, 10),
+    data_pedido: tokyoDateKey(),
     obs: RESTOCK_OBS,
     total_estimado: total,
   }).select().single()
@@ -171,12 +199,49 @@ export async function createJbmRestockPedido(supabase, { bar, userId, items }) {
         user_id: adm.id,
         tipo: 'pedido_novo',
         titulo: `Restock ${bar.nome}`,
-        mensagem: `${list.length} produto(s) · ¥${Math.round(total).toLocaleString('ja-JP')} · ${RESTOCK_OBS}`,
+        mensagem: `${list.length} product(s) · ¥${Math.round(total).toLocaleString('ja-JP')} · ${RESTOCK_OBS}`,
       }))
     ).catch(() => {})
   }
 
   return { pedido, created: true, total, items: list }
+}
+
+/** Acrescenta SKUs novos a um pedido restock já aberto. Não toca em `vendas`. */
+export async function appendItemsToRestockPedido(supabase, pedido, items) {
+  const list = (items || []).filter(it => it.produto_id && it.qtd > 0)
+  if (!pedido?.id || !list.length) return { pedido, added: 0, totalAdded: 0 }
+
+  const { error } = await supabase.from('pedidos_itens').insert(
+    list.map(it => ({
+      pedido_id: pedido.id,
+      produto_id: it.produto_id,
+      qtd: it.qtd,
+      preco_unitario: +it.preco_unitario || 0,
+    }))
+  )
+  if (error) throw error
+
+  const extra = list.reduce((a, it) => a + (+it.preco_unitario || 0) * (+it.qtd || 0), 0)
+  const nextTotal = (+pedido.total_estimado || 0) + extra
+  await supabase.from('pedidos').update({ total_estimado: nextTotal }).eq('id', pedido.id)
+  return { pedido: { ...pedido, total_estimado: nextTotal }, added: list.length, totalAdded: extra }
+}
+
+async function notifyPosReorderWebhook(payload) {
+  if (typeof fetch !== 'function') return
+  let headers = { 'Content-Type': 'application/json' }
+  try {
+    const { staffAuthHeaders } = await import('./apiAuth.js')
+    headers = await staffAuthHeaders(headers)
+  } catch {
+    // testes Node / sessão ausente
+  }
+  await fetch('/api/pos-reorder', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function syncPosStockAndReorder(supabase, {
@@ -192,48 +257,58 @@ export async function syncPosStockAndReorder(supabase, {
     barId: bar.id, cart, vendaId, userId, pricingByProduto,
   })
 
-  const produtoIds = Object.keys(deducted.bottles || {})
-  if (!produtoIds.length) return { ...deducted, alerts: [], pedido: null }
-
-  const [mR, rR, pR, pedR] = await Promise.all([
-    supabase.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', bar.id),
+  const [movimentos, rR, pedR] = await Promise.all([
+    fetchAllStockMovements(supabase, bar.id),
     supabase.from('estoque_regras').select('produto_id,minimo').eq('bar_id', bar.id),
-    supabase.from('produtos_public').select('id,nome,preco_venda').in('id', produtoIds),
-    supabase.from('pedidos').select('id,status,obs,pedidos_itens(produto_id,qtd)').eq('bar_id', bar.id).in('status', ['pendente', 'confirmado']),
+    supabase.from('pedidos').select('id,status,obs,total_estimado,pedidos_itens(produto_id,qtd,preco_unitario)').eq('bar_id', bar.id).in('status', ['pendente', 'confirmado']),
   ])
 
-  const stockMap = buildStockMap(mR.data || [])
   const regras = Object.fromEntries((rR.data || []).map(r => [r.produto_id, r.minimo]))
-  const alerts = findLowStockProducts(pR.data || [], stockMap, regras)
+  const regraIds = Object.keys(regras)
+  let produtos = []
+  if (regraIds.length) {
+    const pR = await supabase.from('produtos_public').select('id,nome,preco_venda').in('id', regraIds)
+    produtos = pR.data || []
+  }
+
+  const stockMap = buildStockMap(movimentos || [])
+  const alerts = findLowStockProducts(produtos, stockMap, regras)
   const already = productsAlreadyOnOpenOrders(pedR.data || [])
   const restockItems = buildRestockItems(alerts, already)
 
   let pedido = null
+  let merged = false
   if (restockItems.length) {
-    const created = await createJbmRestockPedido(supabase, { bar, userId, items: restockItems })
-    pedido = created.pedido
+    const openRestock = findOpenRestockPedido(pedR.data || [])
+    if (openRestock) {
+      const appended = await appendItemsToRestockPedido(supabase, openRestock, restockItems)
+      pedido = appended.pedido
+      merged = true
+    } else {
+      const created = await createJbmRestockPedido(supabase, { bar, userId, items: restockItems })
+      pedido = created.pedido
+    }
   }
 
   try {
-    await fetch('/api/pos-reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const hookItems = (restockItems.length ? restockItems : alerts).map(a => ({
+      produto_id: a.produto_id || a.id,
+      nome: a.nome,
+      stock_atual: a.stock,
+      min_stock: a.minimo,
+      qty_sugerida: a.qtd || suggestedReorderQty(a.stock, a.minimo),
+    }))
+    if (hookItems.length) {
+      await notifyPosReorderWebhook({
         bar_id: bar.id,
         bar_nome: bar.nome,
         pedido_id: pedido?.id || null,
-        items: (restockItems.length ? restockItems : alerts).map(a => ({
-          produto_id: a.produto_id || a.id,
-          nome: a.nome,
-          stock_atual: a.stock,
-          min_stock: a.minimo,
-          qty_sugerida: a.qtd || suggestedReorderQty(a.stock, a.minimo),
-        })),
-      }),
-    })
+        items: hookItems,
+      })
+    }
   } catch {
     // webhook opcional
   }
 
-  return { ...deducted, alerts, pedido, restockItems }
+  return { ...deducted, alerts, pedido, restockItems, merged }
 }

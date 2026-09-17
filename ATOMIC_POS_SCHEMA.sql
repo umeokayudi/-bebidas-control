@@ -129,29 +129,68 @@ alter table vip_usages enable row level security;
 alter table discount_codes enable row level security;
 alter table discount_usages enable row level security;
 
+-- RLS: dono/caixa do bar vê só o próprio bar; JBM (admin/funcionario/staff) vê todos.
+-- bar_staff não lê vendas POS. Não usa auth.role()='authenticated'.
+
+drop policy if exists "auth bar_pricing" on bar_pricing;
+drop policy if exists "auth drink_menu" on drink_menu;
+drop policy if exists "auth pos_vendas" on pos_vendas;
+drop policy if exists "auth pos_vendas_itens" on pos_vendas_itens;
+drop policy if exists "auth vip_members" on vip_members;
+drop policy if exists "auth vip_usages" on vip_usages;
+drop policy if exists "auth discount_codes" on discount_codes;
+drop policy if exists "auth discount_usages" on discount_usages;
+
+drop policy if exists "bar_or_jbm bar_pricing" on bar_pricing;
+drop policy if exists "bar_or_jbm drink_menu" on drink_menu;
+drop policy if exists "bar_or_jbm pos_vendas" on pos_vendas;
+drop policy if exists "bar_or_jbm pos_vendas_itens" on pos_vendas_itens;
+drop policy if exists "bar_or_jbm vip_members" on vip_members;
+drop policy if exists "bar_or_jbm vip_usages" on vip_usages;
+drop policy if exists "bar_or_jbm discount_codes" on discount_codes;
+drop policy if exists "bar_or_jbm discount_usages" on discount_usages;
+
+create or replace function public.pos_can_access_bar(target_bar uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from perfis p
+    where p.id = auth.uid()
+      and (
+        p.role in ('admin', 'funcionario', 'staff')
+        or (p.bar_id = target_bar and p.role in ('cliente', 'caixa'))
+      )
+  );
+$$;
+
 do $$ begin
-  create policy "auth bar_pricing" on bar_pricing for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm bar_pricing" on bar_pricing for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth drink_menu" on drink_menu for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm drink_menu" on drink_menu for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth pos_vendas" on pos_vendas for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm pos_vendas" on pos_vendas for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth pos_vendas_itens" on pos_vendas_itens for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm pos_vendas_itens" on pos_vendas_itens for all
+    using (exists (select 1 from pos_vendas v where v.id = pos_venda_id and public.pos_can_access_bar(v.bar_id)));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth vip_members" on vip_members for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm vip_members" on vip_members for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth vip_usages" on vip_usages for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm vip_usages" on vip_usages for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth discount_codes" on discount_codes for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm discount_codes" on discount_codes for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy "auth discount_usages" on discount_usages for all using (auth.role() = 'authenticated');
+  create policy "bar_or_jbm discount_usages" on discount_usages for all using (public.pos_can_access_bar(bar_id));
 exception when duplicate_object then null; end $$;
 
 -- Índices

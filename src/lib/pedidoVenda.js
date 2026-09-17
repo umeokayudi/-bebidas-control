@@ -137,3 +137,42 @@ async function insertVendaItensFromPedido(supabase, venda, pedido) {
 export async function ensureVendaFromPedido(supabase, pedido) {
   return createVendaFromPedido(supabase, pedido)
 }
+
+/** Uma fatura por bar+período — soma entregas em vez de duplicar. */
+export async function mergeOrInsertPeriodFatura(supabase, { barId, amount, saleDate, vendaId, notas }) {
+  const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
+  const totalAdd = +amount || 0
+  const { data: existing } = await supabase.from('faturas')
+    .select('*')
+    .eq('bar_id', barId)
+    .eq('periodo_inicio', periodStart)
+    .eq('periodo_fim', periodEnd)
+    .maybeSingle()
+
+  if (existing) {
+    const newTotal = (+existing.total || +existing.valor || 0) + totalAdd
+    await supabase.from('faturas').update({
+      total: newTotal,
+      valor: newTotal,
+    }).eq('id', existing.id)
+    return { fatura: { ...existing, total: newTotal, valor: newTotal }, merged: true, periodStart, periodEnd, dueDate }
+  }
+
+  const insert = {
+    bar_id: barId,
+    periodo_inicio: periodStart,
+    periodo_fim: periodEnd,
+    vencimento: dueDate,
+    data_vencimento: dueDate,
+    data_emissao: saleDate,
+    total: totalAdd,
+    valor: totalAdd,
+    pago: 0,
+    status: 'pendente',
+    notas: notas || 'Auto-generated',
+    venda_id: vendaId || null,
+  }
+  const { data, error } = await supabase.from('faturas').insert(insert).select().single()
+  if (error) throw error
+  return { fatura: data, merged: false, periodStart, periodEnd, dueDate }
+}

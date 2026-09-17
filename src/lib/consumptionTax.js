@@ -9,6 +9,13 @@ export function fromZeikomi(zeikomi) {
   return Math.round(+zeikomi / (1 + CONSUMPTION_TAX_RATE))
 }
 
+/** POS listed prices are already 税込. Split 内消費税 — never add 10% on top. */
+export function includedTaxBreakdown(zeikomi) {
+  const total = Math.round(+zeikomi || 0)
+  const net = fromZeikomi(total)
+  return { total, net, tax: total - net, rate: CONSUMPTION_TAX_RATE }
+}
+
 export function priceChangePct(oldPrice, newPrice) {
   const old = +oldPrice || 0
   const newP = +newPrice || 0

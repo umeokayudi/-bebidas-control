@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { ensureVendaFromPedido, findVendaForPedido, findVendaKeysForPedidos, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
+import { ensureVendaFromPedido, findVendaForPedido, findVendaKeysForPedidos, pedidoSaleDate, mergeOrInsertPeriodFatura } from '../lib/pedidoVenda'
 import { addStockFromDelivery } from '../lib/posSupply'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
@@ -527,22 +527,20 @@ export function PedidosAdminTab() {
         await supabase.from('pedidos').update({status}).eq('id',id)
         await supabase.from('notificacoes').insert({
           user_id:pedido.criado_por,tipo:'pedido_entregue',
-          titulo:'Pedido entregue',
-          mensagem:'Entregue. Total: \u00a5'+Math.round(pedido.total_estimado).toLocaleString(),
+          titulo: t('configs.notifDeliveredTitle'),
+          mensagem: t('configs.notifDeliveredBody', { amount: '¥'+Math.round(pedido.total_estimado).toLocaleString('ja-JP') }),
           link:'pedidos',
         }).catch(()=>{})
         const saleDate = pedidoSaleDate(pedido)
-        const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
-        await supabase.from('faturas').insert({
-          bar_id: pedido.bar_id,
-          venda_id: venda?.id || null,
-          valor: pedido.total_estimado,
-          status: 'pendente',
-          data_emissao: saleDate,
-          data_vencimento: dueDate,
-          periodo_inicio: periodStart,
-          periodo_fim: periodEnd,
-        }).catch((e)=>{ console.error('auto-fatura error:', e) })
+        try {
+          await mergeOrInsertPeriodFatura(supabase, {
+            barId: pedido.bar_id,
+            amount: pedido.total_estimado,
+            saleDate,
+            vendaId: venda?.id || null,
+            notas: t('configs.invoiceAutoNote'),
+          })
+        } catch (e) { console.error('auto-fatura error:', e) }
       } catch (e) {
         alert('Erro ao registrar venda: ' + e.message)
         return
@@ -554,7 +552,7 @@ export function PedidosAdminTab() {
       const pedido=pedidos.find(p=>p.id===id)
       if(pedido) await supabase.from('notificacoes').insert({
         user_id:pedido.criado_por,tipo:'pedido_confirmado',
-        titulo:'Pedido confirmado',mensagem:'Seu pedido está sendo preparado.',link:'pedidos',
+        titulo:t('configs.notifConfirmedTitle'),mensagem:t('configs.notifConfirmedBody'),link:'pedidos',
       }).catch(()=>{})
     }
     setPedidos(prev => prev.map(p => p.id===id ? {...p, status} : p))
@@ -580,32 +578,19 @@ export function PedidosAdminTab() {
     try {
       const venda = await registerVendaForPedido(pedido)
       await supabase.from("pedidos").update({status:"entregue"}).eq("id",id)
-      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:"Pedido entregue",mensagem:`Entregue · ¥${Math.round(venda.total||0).toLocaleString()} · ${venda.data}`,link:"pedidos"}).catch(()=>{})
+      await supabase.from("notificacoes").insert({user_id:pedido.criado_por,tipo:"pedido_entregue",titulo:t('configs.notifDeliveredTitle'),mensagem:t('configs.notifDeliveredBody', { amount: `¥${Math.round(venda.total||0).toLocaleString('ja-JP')}` }),link:"pedidos"}).catch(()=>{})
 
       const saleDate = pedidoSaleDate(pedido)
-      const { periodStart, periodEnd, dueDate } = billingPeriodForDate(saleDate)
       try {
-        const { data: existingFatura } = await supabase.from('faturas')
-          .select('*').eq('bar_id', pedido.bar_id).eq('periodo_inicio', periodStart).eq('periodo_fim', periodEnd).single()
-        if (existingFatura) {
-          await supabase.from('faturas').update({ total: existingFatura.total + pedido.total_estimado }).eq('id', existingFatura.id)
-        } else {
-          await supabase.from('faturas').insert({
-            bar_id: pedido.bar_id,
-            periodo_inicio: periodStart,
-            periodo_fim: periodEnd,
-            vencimento: dueDate,
-            data_vencimento: dueDate,
-            total: pedido.total_estimado,
-            valor: pedido.total_estimado,
-            pago: 0,
-            status: 'pendente',
-            notas: 'Auto-generated',
-            venda_id: venda?.id || null,
-          })
-        }
+        await mergeOrInsertPeriodFatura(supabase, {
+          barId: pedido.bar_id,
+          amount: pedido.total_estimado,
+          saleDate,
+          vendaId: venda?.id || null,
+          notas: t('configs.invoiceAutoNote'),
+        })
       } catch (e) { console.error('Invoice auto-create failed:', e) }
-      alert(`Entrega OK · Venda ¥${Math.round(venda.total || 0).toLocaleString('ja-JP')} registrada em ${venda.data}`)
+      alert(t('configs.deliveryOk', { amount: fmtYen(venda.total || 0), date: venda.data }))
     } catch (e) {
       alert('Erro ao registrar venda: ' + e.message)
     }

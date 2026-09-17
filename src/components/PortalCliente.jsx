@@ -26,7 +26,7 @@ import PortalClienteAI from './PortalClienteAI'
 import AtomicPosPanel from './AtomicPos'
 import TimeClockPanel from './TimeClock'
 import BarTeamTab from './BarTeamTab'
-import { isRestockPedido } from '../lib/posSupply'
+import { isRestockPedido, fetchAllStockMovements } from '../lib/posSupply'
 import { navForBarRole, defaultBarTab, posAccessForRole, canManageBarTeam } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
@@ -623,6 +623,7 @@ function DeliveriesTab({ bar }) {
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────
 function OrdersTab({ bar }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [produtos,  setProdutos]  = useState([])
   const [pedidos,   setPedidos]   = useState([])
@@ -672,7 +673,7 @@ function OrdersTab({ bar }) {
   }, 0)
 
   async function enviarOrder() {
-    if (items.length === 0) return alert('Add at least one item')
+    if (items.length === 0) return alert(t('portal.orders.addOneItem'))
     setSaving(true)
     const { data: pedido, error } = await supabase.from('pedidos').insert({
       bar_id: bar.id, criado_por: user.id,
@@ -682,8 +683,8 @@ function OrdersTab({ bar }) {
       obs, total_estimado: totalOrder
     }).select().single()
 
-    if (error) { alert('Error: ' + error.message); setSaving(false); return }
-    if (!pedido) { alert('Error saving order'); setSaving(false); return }
+    if (error) { alert(t('portal.orders.saveError', { message: error.message })); setSaving(false); return }
+    if (!pedido) { alert(t('portal.orders.saveOrderError')); setSaving(false); return }
 
     const { error: itemsError } = await supabase.from('pedidos_itens').insert(
       items.map(it => {
@@ -691,15 +692,15 @@ function OrdersTab({ bar }) {
         return { pedido_id: pedido.id, produto_id: it.produto_id, qtd: it.qtd, preco_unitario: p?.preco_venda||0 }
       })
     )
-    if (itemsError) alert('Error saving items: ' + itemsError.message)
+    if (itemsError) alert(t('portal.orders.saveItemsError', { message: itemsError.message }))
 
     const { data: admins } = await supabase.from('perfis').select('id').eq('role', 'admin')
     if (admins && admins.length > 0) {
       await supabase.from('notificacoes').insert(
         admins.map(adm => ({
           user_id: adm.id, tipo: 'pedido_novo',
-          titulo: 'New order from ' + bar.nome,
-          mensagem: items.length + ' product(s) - \u00a5' + Math.round(totalOrder).toLocaleString()
+          titulo: t('portal.orders.newOrderFrom', { bar: bar.nome }),
+          mensagem: t('portal.orders.productsCount', { count: items.length, amount: '¥' + Math.round(totalOrder).toLocaleString('ja-JP') })
         }))
       )
     }
@@ -711,18 +712,18 @@ function OrdersTab({ bar }) {
 
   const cats = [...new Set(produtos.map(p => p.categoria))]
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text={t('portal.orders.loading')} />
 
   return (
     <div className="fade-in">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <SectionTitle>My orders</SectionTitle>
+        <SectionTitle>{t('portal.orders.title')}</SectionTitle>
         <div style={{display:'flex',gap:8}}>
           <button onClick={()=>setViewMode(v=>v==='list'?'summary':'list')} style={{padding:'9px 18px',borderRadius:10,fontSize:12,fontWeight:600,border:'1px solid var(--border)',background:'var(--bg2)',cursor:'pointer'}}>
-            {viewMode==='list'?'📊 Monthly summary':'📋 Order list'}
+            {viewMode==='list'?t('portal.orders.monthlySummary'):t('portal.orders.orderList')}
           </button>
           <button className="btn-primary" onClick={() => setShowForm(x => !x)} style={{ padding:'9px 18px', borderRadius:10 }}>
-            {showForm ? 'Cancel' : '+ New order'}
+            {showForm ? t('common.cancel') : t('portal.orders.newOrder')}
           </button>
         </div>
       </div>
@@ -730,17 +731,17 @@ function OrdersTab({ bar }) {
       {viewMode==='summary' && (
         <div className="card" style={{marginBottom:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-            <div style={{fontSize:14,fontWeight:700}}>Monthly order summary</div>
+            <div style={{fontSize:14,fontWeight:700}}>{t('portal.orders.monthlyTitle')}</div>
             <select value={mesFiltro} onChange={e=>setSummaryMes(e.target.value)} style={{padding:'6px 10px',borderRadius:8,border:'1px solid var(--border)',fontSize:12}}>
               {allMeses.map(m=><option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-          {summaryList.length===0 ? <div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:20}}>No orders this month</div> : <>
+          {summaryList.length===0 ? <div style={{color:'var(--text3)',fontSize:13,textAlign:'center',padding:20}}>{t('portal.orders.noOrdersMonth')}</div> : <>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                 <thead>
                   <tr style={{background:'var(--bg3)',borderBottom:'2px solid var(--border)'}}>
-                    {['Product','Category','Vol/unit','Qty','Unit cost','Total'].map(h=>(
+                    {[t('portal.orders.colProduct'),t('portal.orders.colCategory'),t('portal.orders.colVol'),t('portal.orders.colQty'),t('portal.orders.colUnit'),t('portal.orders.colTotal')].map(h=>(
                       <th key={h} style={{padding:'8px 12px',textAlign:'left',fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.04em'}}>{h}</th>
                     ))}
                   </tr>
@@ -759,7 +760,7 @@ function OrdersTab({ bar }) {
                 </tbody>
                 <tfoot>
                   <tr style={{borderTop:'2px solid var(--border)',background:'var(--bg2)'}}>
-                    <td colSpan={5} style={{padding:'10px 12px',fontWeight:700,fontSize:13}}>Total</td>
+                    <td colSpan={5} style={{padding:'10px 12px',fontWeight:700,fontSize:13}}>{t('common.total')}</td>
                     <td style={{padding:'10px 12px',fontWeight:800,fontSize:14,color:'var(--navy)'}}>{fmtYen(summaryTotal)}</td>
                   </tr>
                 </tfoot>
@@ -771,18 +772,18 @@ function OrdersTab({ bar }) {
 
       {showForm && (
         <div className="card" style={{ marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>New order for JBM Drinks</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:4 }}>{t('portal.orders.newOrderJbm')}</div>
           <div style={{ fontSize:12, color:'var(--text2)', marginBottom:16 }}>
-            Supplier price list — 税込 (10% tax included). Menu/POS drinks are not shown here.
+            {t('portal.orders.supplierListHint')}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
             <div>
-              <label className="form-label">Requested delivery date</label>
+              <label className="form-label">{t('portal.orders.deliveryDate')}</label>
               <input type="date" value={entrega} onChange={e => setEntrega(e.target.value)} />
             </div>
             <div>
-              <label className="form-label">Notes</label>
-              <input type="text" value={obs} onChange={e => setObs(e.target.value)} placeholder="urgent, deliver morning..." />
+              <label className="form-label">{t('portal.orders.notes')}</label>
+              <input type="text" value={obs} onChange={e => setObs(e.target.value)} placeholder={t('portal.orders.notesPlaceholder')} />
             </div>
           </div>
           {cats.map(cat => (
@@ -831,7 +832,7 @@ function OrdersTab({ bar }) {
                 <div style={{ fontSize:15, fontWeight:700, marginBottom:4 }}>
                   {produtos.find(p=>p.id===qtyPopup)?.nome}
                 </div>
-                <div style={{ fontSize:12, color:'var(--text2)', marginBottom:16 }}>Set quantity</div>
+                <div style={{ fontSize:12, color:'var(--text2)', marginBottom:16 }}>{t('portal.orders.setQty')}</div>
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
                   <button onClick={()=>setQtyInput(v=>String(Math.max(0,+v-1)))}
                     style={{ width:44, height:44, borderRadius:12, border:'1px solid var(--border)', background:'var(--bg3)', fontSize:20, cursor:'pointer', fontWeight:700 }}>−</button>
@@ -845,7 +846,7 @@ function OrdersTab({ bar }) {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                   <button onClick={()=>{setItems(items.filter(i=>i.produto_id!==qtyPopup));setQtyPopup(null)}}
                     style={{ padding:'12px', borderRadius:12, border:'1px solid var(--red)', background:'transparent', color:'var(--red)', fontWeight:600, cursor:'pointer', fontSize:13 }}>
-                    Remove
+                    {t('portal.orders.remove')}
                   </button>
                   <button onClick={()=>{
                     const qty = +qtyInput
@@ -853,7 +854,7 @@ function OrdersTab({ bar }) {
                     else setItems(items.map(i=>i.produto_id===qtyPopup?{...i,qtd:qty}:i))
                     setQtyPopup(null)
                   }} style={{ padding:'12px', borderRadius:12, border:'none', background:'var(--navy)', color:'white', fontWeight:700, cursor:'pointer', fontSize:14 }}>
-                    Confirm
+                    {t('common.confirm')}
                   </button>
                 </div>
               </div>
@@ -862,9 +863,9 @@ function OrdersTab({ bar }) {
 
           {items.length > 0 && (
             <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div style={{ fontSize:14, fontWeight:700 }}>Estimated total: {fmtYen(totalOrder)}</div>
+              <div style={{ fontSize:14, fontWeight:700 }}>{t('portal.orders.estimatedTotal', { amount: fmtYen(totalOrder) })}</div>
               <button className="btn-primary" onClick={enviarOrder} disabled={saving} style={{ padding:'10px 20px' }}>
-                {saving ? 'Sending...' : 'Send order →'}
+                {saving ? t('portal.orders.sending') : t('portal.orders.sendOrder')}
               </button>
             </div>
           )}
@@ -872,7 +873,7 @@ function OrdersTab({ bar }) {
       )}
 
       {pedidos.length === 0
-        ? <Empty text="No orders yet" icon="🛒" />
+        ? <Empty text={t('portal.orders.noOrders')} icon="🛒" />
         : pedidos.map(p => {
           const s = STATUS_PEDIDO[p.status] || STATUS_PEDIDO.pendente
           return (
@@ -882,10 +883,10 @@ function OrdersTab({ bar }) {
                     <div style={{ fontWeight:700, fontSize:14 }}>{fmtDate(p.criado_em?.slice(0,10))}</div>
                     {isRestockPedido(p) && (
                       <div style={{ fontSize:11, fontWeight:700, color:'var(--navy)', marginTop:2 }}>
-                        Restock from counter → JBM
+                        {t('portal.orders.restockFromCounter')}
                       </div>
                     )}
-                    {p.data_entrega_prevista && <div style={{ fontSize:12, color:'var(--text2)' }}>Expected: {p.data_entrega_prevista}</div>}
+                    {p.data_entrega_prevista && <div style={{ fontSize:12, color:'var(--text2)' }}>{t('portal.orders.expected', { date: p.data_entrega_prevista })}</div>}
                     {p.obs && !isRestockPedido(p) && <div style={{ fontSize:12, color:'var(--text2)' }}>{p.obs}</div>}
                   </div>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -909,9 +910,9 @@ function OrdersTab({ bar }) {
                   fontSize:11, padding:'5px 12px', borderRadius:8,
                   border:'1px solid var(--border)', background:'transparent',
                   cursor:'pointer', color:'var(--text2)', fontWeight:600
-                }}>📋 View order details</button>
+                }}>{t('portal.orders.viewDetails')}</button>
                 {p.status==='pendente'&&(
-                  <button onClick={async()=>{ if(!confirm('Cancel this order?'))return; await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); setPedidos(prev=>prev.filter(x=>x.id!==p.id)) }} style={{
+                  <button onClick={async()=>{ if(!confirm(t('portal.orders.cancelConfirm')))return; await supabase.from('pedidos_itens').delete().eq('pedido_id',p.id); await supabase.from('pedidos').delete().eq('id',p.id); setPedidos(prev=>prev.filter(x=>x.id!==p.id)) }} style={{
                     fontSize:11, padding:'5px 12px', borderRadius:8,
                     border:'none', background:'#fef2f2',
                     cursor:'pointer', color:'var(--red)', fontWeight:600
@@ -931,16 +932,16 @@ function OrdersTab({ bar }) {
             onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
               <div>
-                <div style={{ fontSize:18, fontWeight:800 }}>Order Details</div>
+                <div style={{ fontSize:18, fontWeight:800 }}>{t('portal.orders.detailsTitle')}</div>
                 <div style={{ fontSize:12, color:'var(--text2)', marginTop:2 }}>{fmtDate(orderPreview.criado_em?.slice(0,10))}</div>
               </div>
               <span style={{ fontSize:11, fontWeight:700, padding:'4px 12px', borderRadius:20,
                 background: orderPreview.status==='entregue'?'#EAF5F0':'#FDF3E0',
                 color: orderPreview.status==='entregue'?'#1A7A5E':'#8A5A00'
-              }}>{orderPreview.status}</span>
+              }}>{t(`status.${orderPreview.status}`)}</span>
             </div>
             <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>Items</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>{t('portal.orders.items')}</div>
               {(orderPreview.pedidos_itens||[]).map(it => (
                 <div key={it.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
                   <div>
@@ -952,10 +953,10 @@ function OrdersTab({ bar }) {
               ))}
             </div>
             <div style={{ background:'var(--navy)', borderRadius:12, padding:'14px 18px', display:'flex', justifyContent:'space-between', marginBottom:20 }}>
-              <span style={{ color:'rgba(255,255,255,0.7)', fontSize:13 }}>Total</span>
+              <span style={{ color:'rgba(255,255,255,0.7)', fontSize:13 }}>{t('common.total')}</span>
               <span style={{ color:'var(--gold)', fontWeight:800, fontSize:18 }}>¥{Math.round(orderPreview.total_estimado||0).toLocaleString()}</span>
             </div>
-            <button onClick={()=>setOrderPreview(null)} style={{ width:'100%', padding:'12px', borderRadius:14, border:'1px solid var(--border)', background:'transparent', fontSize:13, cursor:'pointer' }}>Close</button>
+            <button onClick={()=>setOrderPreview(null)} style={{ width:'100%', padding:'12px', borderRadius:14, border:'1px solid var(--border)', background:'transparent', fontSize:13, cursor:'pointer' }}>{t('common.close')}</button>
           </div>
         </div>
       )}
@@ -966,6 +967,7 @@ function OrdersTab({ bar }) {
 
 // ── INVENTORY ────────────────────────────────────────────────────────────────
 function InventoryTab({ bar, onOrder }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [produtos,   setProdutos]   = useState([])
   const [movimentos, setMovimentos] = useState([])
@@ -981,13 +983,13 @@ function InventoryTab({ bar, onOrder }) {
   useEffect(() => { load() }, [bar])
 
   async function load() {
-    const [pR, mR, rR] = await Promise.all([
+    const movimentos = await fetchAllStockMovements(supabase, bar.id, '*')
+    const [pR, rR] = await Promise.all([
       supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
-      supabase.from('estoque_movimentos').select('*').eq('bar_id', bar.id).order('criado_em', { ascending: false }).limit(500),
       supabase.from('estoque_regras').select('*').eq('bar_id', bar.id),
     ])
     setProdutos((pR.data || []).filter(isSupplierProduct))
-    setMovimentos(mR.data || [])
+    setMovimentos(movimentos || [])
     const rMap = {}
     ;(rR.data || []).forEach(r => { rMap[r.produto_id] = r.minimo })
     setRegras(rMap)
@@ -1037,7 +1039,7 @@ function InventoryTab({ bar, onOrder }) {
   const good     = filtered.filter(p => p.minimo === 0 || p.stock >= p.minimo)
   const selectedProd = list.find(p => p.id === selected)
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text={t('portal.inventory.loading')} />
 
       {/* Search bar - added after loading check in render */}
 
@@ -1054,7 +1056,7 @@ function InventoryTab({ bar, onOrder }) {
         }}>
           <div>
             <div style={{ fontSize:17, fontWeight:700, color:'white', marginBottom:6 }}>
-              🚨 Out of stock ({critical.length})
+              🚨 {t('portal.inventory.outOfStock', { count: critical.length })}
             </div>
             <div style={{ fontSize:13, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
               {critical.map(p => p.nome).join('  ·  ')}
@@ -1065,7 +1067,7 @@ function InventoryTab({ bar, onOrder }) {
             borderRadius:14, padding:'12px 22px', fontWeight:700,
             fontSize:13, cursor:'pointer', flexShrink:0, marginLeft:16,
             boxShadow:'0 2px 8px rgba(0,0,0,0.1)'
-          }}>Order now →</button>
+          }}>{t('portal.inventory.orderNow')}</button>
         </div>
       )}
 
@@ -1078,10 +1080,10 @@ function InventoryTab({ bar, onOrder }) {
         }}>
           <div>
             <div style={{ fontSize:17, fontWeight:700, color:'white', marginBottom:6 }}>
-              ⚠️ Running low ({low.length})
+              ⚠️ {t('portal.inventory.runningLow', { count: low.length })}
             </div>
             <div style={{ fontSize:13, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
-              {low.map(p => p.nome + ' — ' + p.stock + ' left (min ' + p.minimo + ')').join('  ·  ')}
+              {low.map(p => t('portal.inventory.leftMin', { name: p.nome, stock: p.stock, min: p.minimo })).join('  ·  ')}
             </div>
           </div>
           <button onClick={onOrder} style={{
@@ -1089,7 +1091,7 @@ function InventoryTab({ bar, onOrder }) {
             borderRadius:14, padding:'12px 22px', fontWeight:700,
             fontSize:13, cursor:'pointer', flexShrink:0, marginLeft:16,
             boxShadow:'0 2px 8px rgba(0,0,0,0.1)'
-          }}>Order now →</button>
+          }}>{t('portal.inventory.orderNow')}</button>
         </div>
       )}
 
@@ -1097,7 +1099,7 @@ function InventoryTab({ bar, onOrder }) {
       <div style={{ position:'relative', marginBottom:16 }}>
         <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'var(--text3)' }}>🔍</span>
         <input
-          type="text" placeholder="Search products..."
+          type="text" placeholder={t('portal.inventory.search')}
           value={search} onChange={e=>setSearch(e.target.value)}
           style={{ width:'100%', padding:'11px 14px 11px 40px', borderRadius:12, fontSize:14 }}
         />
@@ -1111,9 +1113,9 @@ function InventoryTab({ bar, onOrder }) {
       {/* Summary */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, margin:'20px 0' }}>
         {[
-          { label:'Total products', value:list.length, icon:'📦', color:'var(--navy)' },
-          { label:'Need attention', value:critical.length+low.length, icon:critical.length>0?'🚨':'⚠️', color:critical.length>0?'#ff3b30':low.length>0?'#ff9500':'var(--green)' },
-          { label:'Well stocked', value:good.filter(p=>p.stock>0).length, icon:'✅', color:'#34c759' },
+          { label:t('portal.inventory.totalProducts'), value:list.length, icon:'📦', color:'var(--navy)' },
+          { label:t('portal.inventory.needAttention'), value:critical.length+low.length, icon:critical.length>0?'🚨':'⚠️', color:critical.length>0?'#ff3b30':low.length>0?'#ff9500':'var(--green)' },
+          { label:t('portal.inventory.wellStocked'), value:good.filter(p=>p.stock>0).length, icon:'✅', color:'#34c759' },
         ].map(s => (
           <div key={s.label} style={{
             background:'var(--bg2)', border:'1px solid var(--border)',
@@ -1164,7 +1166,7 @@ function InventoryTab({ bar, onOrder }) {
                   {/* Stock */}
                   <div style={{ textAlign:'center', minWidth:44 }}>
                     <div style={{ fontSize:22, fontWeight:800, color:dotColor, lineHeight:1 }}>{p.stock}</div>
-                    <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:2 }}>stock</div>
+                    <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:2 }}>{t('portal.inventory.stock')}</div>
                   </div>
 
                   {/* Min rule */}
@@ -1181,7 +1183,7 @@ function InventoryTab({ bar, onOrder }) {
                         <div style={{ fontSize:16, fontWeight:700, color:p.minimo>0?'var(--navy)':'var(--text3)' }}>
                           {p.minimo>0?p.minimo:'—'}
                         </div>
-                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:2 }}>minimum</div>
+                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:2 }}>{t('portal.inventory.minimum')}</div>
                       </div>
                     )}
                   </div>
@@ -1192,7 +1194,7 @@ function InventoryTab({ bar, onOrder }) {
                     borderRadius:10, padding:'8px 16px', fontSize:12,
                     fontWeight:600, cursor:'pointer', flexShrink:0,
                     transition:'opacity 0.15s'
-                  }}>Update</button>
+                  }}>{t('portal.inventory.update')}</button>
                 </div>
               )
             })}
@@ -1212,11 +1214,11 @@ function InventoryTab({ bar, onOrder }) {
           }}>
             <div style={{ fontSize:18, fontWeight:800, marginBottom:4 }}>{selectedProd.nome}</div>
             <div style={{ fontSize:13, color:'var(--text2)', marginBottom:24 }}>
-              Current stock: <strong style={{ color:'var(--navy)' }}>{selectedProd.stock}</strong>
-              {selectedProd.minimo>0 && <span> · Minimum: <strong>{selectedProd.minimo}</strong></span>}
+              {t('portal.inventory.currentStock')}: <strong style={{ color:'var(--navy)' }}>{selectedProd.stock}</strong>
+              {selectedProd.minimo>0 && <span> · {t('portal.inventory.minLabel')}: <strong>{selectedProd.minimo}</strong></span>}
             </div>
 
-            <label style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:8 }}>Quantity</label>
+            <label style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:8 }}>{t('portal.inventory.quantity')}</label>
             <input type="number" min="0.5" step="0.5" value={modalQty}
               onChange={e=>setModalQty(+e.target.value)}
               style={{ width:'100%', padding:'14px', fontSize:20, textAlign:'center', borderRadius:12, fontWeight:700, marginBottom:20 }}
@@ -1230,7 +1232,7 @@ function InventoryTab({ bar, onOrder }) {
                 color:'white', fontSize:14, fontWeight:700, cursor:'pointer',
                 boxShadow:'0 4px 12px rgba(52,199,89,0.3)'
               }}>
-                {saving?'..':'+ Add stock'}
+                {saving?'..':t('portal.inventory.addStock')}
               </button>
               <button onClick={()=>doMove(selected,'saida')} disabled={saving} style={{
                 padding:'14px', borderRadius:14, border:'none',
@@ -1238,7 +1240,7 @@ function InventoryTab({ bar, onOrder }) {
                 color:'white', fontSize:14, fontWeight:700, cursor:'pointer',
                 boxShadow:'0 4px 12px rgba(255,149,0,0.3)'
               }}>
-                {saving?'..':'− Used'}
+                {saving?'..':t('portal.inventory.used')}
               </button>
             </div>
 
@@ -1257,6 +1259,7 @@ function InventoryTab({ bar, onOrder }) {
 
 // ── PRICING ───────────────────────────────────────────────────────────────────
 function PricingTab({ bar }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [produtos,  setProdutos]  = useState([])
   const [pricing,   setPricing]   = useState({}) // prodId -> {drinks_por_garrafa, preco_drink}
@@ -1315,28 +1318,28 @@ function PricingTab({ bar }) {
   const selectedProd = list.find(p => p.id === selected)
   const cats = [...new Set(filtered.map(p => p.categoria))]
 
-  if (loading) return <Spinner text="Loading..." />
+  if (loading) return <Spinner text={t('portal.pricing.loading')} />
 
   return (
     <div className="fade-in" style={{ maxWidth:860 }}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
         <div>
-          <div style={{ fontSize:20, fontWeight:800 }}>Drink Pricing</div>
+          <div style={{ fontSize:20, fontWeight:800 }}>{t('portal.pricing.title')}</div>
           <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>
-            Set your selling price to calculate cost & margin
+            {t('portal.pricing.subtitle')}
           </div>
         </div>
         <div style={{ textAlign:'right' }}>
           <div style={{ fontSize:22, fontWeight:800, color:'var(--green)' }}>{configured.length}</div>
-          <div style={{ fontSize:11, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em' }}>configured</div>
+          <div style={{ fontSize:11, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{t('portal.pricing.configured')}</div>
         </div>
       </div>
 
       {/* Search */}
       <div style={{ position:'relative', marginBottom:16 }}>
         <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'var(--text3)' }}>🔍</span>
-        <input type="text" placeholder="Search products..." value={search}
+        <input type="text" placeholder={t('portal.pricing.search')} value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ width:'100%', padding:'11px 14px 11px 40px', borderRadius:12, fontSize:14 }}
         />
@@ -1347,9 +1350,9 @@ function PricingTab({ bar }) {
       {configured.length > 0 && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
           {[
-            { label:'Avg margin', value: Math.round(configured.filter(p=>p.margem!==null).reduce((a,p)=>a+p.margem,0)/configured.filter(p=>p.margem!==null).length||0)+'%', color:'var(--green)', icon:'📈' },
-            { label:'Best margin', value: configured.filter(p=>p.margem!==null).sort((a,b)=>b.margem-a.margem)[0]?.nome?.split(' ')[0]||'—', color:'var(--navy)', icon:'🏆' },
-            { label:'Not set', value: notConfigured.length, color: notConfigured.length>0?'var(--amber)':'var(--green)', icon:'⚙️' },
+            { label:t('portal.pricing.avgMargin'), value: Math.round(configured.filter(p=>p.margem!==null).reduce((a,p)=>a+p.margem,0)/configured.filter(p=>p.margem!==null).length||0)+'%', color:'var(--green)', icon:'📈' },
+            { label:t('portal.pricing.bestMargin'), value: configured.filter(p=>p.margem!==null).sort((a,b)=>b.margem-a.margem)[0]?.nome?.split(' ')[0]||'—', color:'var(--navy)', icon:'🏆' },
+            { label:t('portal.pricing.notSet'), value: notConfigured.length, color: notConfigured.length>0?'var(--amber)':'var(--green)', icon:'⚙️' },
           ].map(s => (
             <div key={s.label} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
               <span style={{ fontSize:22 }}>{s.icon}</span>
@@ -1386,8 +1389,8 @@ function PricingTab({ bar }) {
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:600 }}>{p.nome}</div>
                     <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>
-                      JBM cost: {fmtYen(p.preco_venda)}
-                      {isSet && <span style={{ marginLeft:8 }}>· {p.drinks} drinks/bottle · {fmtYen(p.custo_drink)}/drink</span>}
+                      {t('portal.pricing.jbmCost', { amount: fmtYen(p.preco_venda) })}
+                      {isSet && <span style={{ marginLeft:8 }}>· {t('portal.pricing.drinksBottle', { count: p.drinks, amount: fmtYen(p.custo_drink) })}</span>}
                     </div>
                   </div>
 
@@ -1396,15 +1399,15 @@ function PricingTab({ bar }) {
                     <>
                       <div style={{ textAlign:'center', minWidth:64 }}>
                         <div style={{ fontSize:15, fontWeight:800, color:'var(--navy)' }}>{fmtYen(p.preco)}</div>
-                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:1 }}>price/drink</div>
+                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:1 }}>{t('portal.pricing.priceDrink')}</div>
                       </div>
                       <div style={{ textAlign:'center', minWidth:54 }}>
                         <div style={{ fontSize:15, fontWeight:800, color:p.margem>60?'#34c759':p.margem>40?'#ff9500':'var(--red)' }}>{p.margem}%</div>
-                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:1 }}>margin</div>
+                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:1 }}>{t('portal.pricing.margin')}</div>
                       </div>
                       <div style={{ textAlign:'center', minWidth:70 }}>
                         <div style={{ fontSize:13, fontWeight:700, color:'var(--green)' }}>{fmtYen(p.revenue_garrafa)}</div>
-                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:1 }}>rev/bottle</div>
+                        <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:1 }}>{t('portal.pricing.revBottle')}</div>
                       </div>
                     </>
                   )}
@@ -1416,7 +1419,7 @@ function PricingTab({ bar }) {
                     border: isSet ? '1px solid var(--border)' : 'none',
                     borderRadius:10, padding:'8px 14px', fontSize:12,
                     fontWeight:600, cursor:'pointer', flexShrink:0
-                  }}>{isSet ? 'Edit' : 'Set price'}</button>
+                  }}>{isSet ? t('portal.pricing.edit') : t('portal.pricing.setPrice')}</button>
                 </div>
               )
             })}
@@ -1430,33 +1433,33 @@ function PricingTab({ bar }) {
           <div style={{ background:'var(--bg2)', borderRadius:24, padding:'32px', width:'100%', maxWidth:380, boxShadow:'0 24px 60px rgba(0,0,0,0.3)' }}>
             <div style={{ fontSize:18, fontWeight:800, marginBottom:4 }}>{selectedProd.nome}</div>
             <div style={{ fontSize:13, color:'var(--text2)', marginBottom:24 }}>
-              JBM cost per bottle: <strong>{fmtYen(selectedProd.preco_venda)}</strong>
+              {t('portal.pricing.jbmCostBottle')}: <strong>{fmtYen(selectedProd.preco_venda)}</strong>
             </div>
 
             <div style={{ marginBottom:16 }}>
               <label style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:8 }}>
-                Drinks per bottle
+                {t('portal.pricing.drinksPerBottle')}
               </label>
               <input type="number" min="1" step="1" value={form.drinks}
                 onChange={e=>setForm({...form, drinks:e.target.value})}
-                placeholder="e.g. 16 shots of 45ml"
+                placeholder={t('portal.pricing.drinksPlaceholder')}
                 style={{ width:'100%', padding:'12px 14px', fontSize:16, borderRadius:12 }}
                 autoFocus
               />
               {form.drinks > 0 && selectedProd.preco_venda > 0 && (
                 <div style={{ fontSize:12, color:'var(--text2)', marginTop:6 }}>
-                  Cost per drink: <strong style={{ color:'var(--red)' }}>{fmtYen(Math.round(selectedProd.preco_venda / form.drinks))}</strong>
+                  {t('portal.pricing.costPerDrink')}: <strong style={{ color:'var(--red)' }}>{fmtYen(Math.round(selectedProd.preco_venda / form.drinks))}</strong>
                 </div>
               )}
             </div>
 
             <div style={{ marginBottom:24 }}>
               <label style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.06em', display:'block', marginBottom:8 }}>
-                Your selling price per drink (¥)
+                {t('portal.pricing.yourPrice')}
               </label>
               <input type="number" min="0" value={form.preco}
                 onChange={e=>setForm({...form, preco:e.target.value})}
-                placeholder="e.g. 1200"
+                placeholder={t('portal.pricing.pricePlaceholder')}
                 style={{ width:'100%', padding:'12px 14px', fontSize:16, borderRadius:12 }}
               />
               {form.drinks > 0 && form.preco > 0 && selectedProd.preco_venda > 0 && (
@@ -1510,6 +1513,7 @@ function PricingTab({ bar }) {
 
 // ── MENU ─────────────────────────────────────────────────────────────────────
 function MenuTab({ bar }) {
+  const { t } = useI18n()
   const [drinks,   setDrinks]   = useState([])
   const [loading,  setLoading]  = useState(true)
   const [search,   setSearch]   = useState('')
@@ -1573,7 +1577,7 @@ function MenuTab({ bar }) {
   }
 
   async function deleteDrink(id) {
-    if (!confirm('Delete this drink?')) return
+    if (!confirm(t('portal.menu.deleteConfirm'))) return
     await supabase.from('drink_menu').delete().eq('id', id)
     load()
   }
@@ -1613,34 +1617,34 @@ function MenuTab({ bar }) {
   const liveMarginVip = form.preco_desconto && form.custo
     ? Math.round((+form.preco_desconto - +form.custo) / +form.preco_desconto * 100) : null
 
-  if (loading) return <Spinner text="Loading menu..." />
+  if (loading) return <Spinner text={t('portal.menu.title')} />
 
   return (
     <div className="fade-in" style={{ maxWidth:900 }}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
         <div>
-          <div style={{ fontSize:20, fontWeight:800 }}>Menu & Pricing</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{drinks.length} drinks · recipes, costs & margins</div>
+          <div style={{ fontSize:20, fontWeight:800 }}>{t('portal.menu.title')}</div>
+          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{t('portal.menu.drinksMeta', { count: drinks.length })}</div>
         </div>
         <button className="btn-primary" onClick={()=>{setShowAdd(x=>!x);setEditId(null);setForm(emptyForm)}}
           style={{ padding:'9px 18px', borderRadius:10 }}>
-          {showAdd ? 'Cancel' : '+ Add drink'}
+          {showAdd ? t('common.cancel') : t('portal.menu.addDrink')}
         </button>
       </div>
 
       {/* Add/Edit form */}
       {showAdd && (
         <div style={{ background:'var(--bg2)', border:'2px solid rgba(193,156,86,0.3)', borderRadius:16, padding:'24px', marginBottom:20 }}>
-          <div style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>{editId ? 'Edit drink' : 'Add custom drink'}</div>
+          <div style={{ fontSize:15, fontWeight:700, marginBottom:16 }}>{editId ? t('portal.menu.editDrink') : t('portal.menu.addCustom')}</div>
 
           <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:12 }}>
             <div>
-              <label className="form-label">Name *</label>
-              <input type="text" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder="e.g. Gin & Tonic Special" />
+              <label className="form-label">{t('portal.menu.name')}</label>
+              <input type="text" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder={t('portal.menu.namePlaceholder')} />
             </div>
             <div>
-              <label className="form-label">Category</label>
+              <label className="form-label">{t('portal.menu.category')}</label>
               <select value={form.categoria} onChange={e=>setForm({...form,categoria:e.target.value})}>
                 {allCats.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -1649,22 +1653,22 @@ function MenuTab({ bar }) {
 
           <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:12 }}>
             <div>
-              <label className="form-label">Recipe / ingredients</label>
-              <input type="text" value={form.receita} onChange={e=>setForm({...form,receita:e.target.value})} placeholder="e.g. gin 30ml + tonic 150ml + lime 1ml" />
+              <label className="form-label">{t('portal.menu.recipe')}</label>
+              <input type="text" value={form.receita} onChange={e=>setForm({...form,receita:e.target.value})} placeholder={t('portal.menu.recipePlaceholder')} />
             </div>
             <div>
-              <label className="form-label">Glass / vessel</label>
-              <input type="text" value={form.copo} onChange={e=>setForm({...form,copo:e.target.value})} placeholder="e.g. Red Cup 210ml" />
+              <label className="form-label">{t('portal.menu.glass')}</label>
+              <input type="text" value={form.copo} onChange={e=>setForm({...form,copo:e.target.value})} placeholder={t('portal.menu.glassPlaceholder')} />
             </div>
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
             <div>
-              <label className="form-label">Sale price (¥) *</label>
+              <label className="form-label">{t('portal.menu.salePrice')}</label>
               <input type="number" value={form.preco_venda} onChange={e=>setForm({...form,preco_venda:e.target.value})} placeholder="1000" />
             </div>
             <div>
-              <label className="form-label">Cost (¥)</label>
+              <label className="form-label">{t('portal.menu.cost')}</label>
               <input type="number" value={form.custo} onChange={e=>setForm({...form,custo:e.target.value})} placeholder="0" />
             </div>
             <div>

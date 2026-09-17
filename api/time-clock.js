@@ -111,8 +111,7 @@ export default async function handler(req, res) {
     if (staff.ativo === false) return res.status(403).json({ error: 'Staff inactive' })
 
     const pinOk = secretsMatch(String(body.pin || ''), staff.clock_pin_hash)
-    const selfPunch = auth && !auth.error && auth.user.id === staffId
-    if (!pinOk && !selfPunch) {
+    if (!pinOk) {
       return res.status(403).json({ error: 'Invalid PIN', code: 'pin' })
     }
 

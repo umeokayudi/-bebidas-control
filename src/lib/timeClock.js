@@ -1,5 +1,14 @@
 /** Ponto eletrônico + cálculo direto de horas e salário. */
 
+import { tokyoHour } from './tokyo.js'
+
+export { monthRange } from './tokyo.js'
+
+/** Labor Standards Act art. 37 — 25% from 22:00 to 05:00 (Tokyo). */
+export const LATE_NIGHT_PREMIUM = 0.25
+export const LATE_NIGHT_START_HOUR = 22
+export const LATE_NIGHT_END_HOUR = 5
+
 const EARTH_M = 6371000
 
 export function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -35,6 +44,32 @@ export function calcPay(hours, salarioHora) {
   return Math.round(h * rate)
 }
 
+export function isLateNightHour(hour) {
+  const h = ((+hour % 24) + 24) % 24
+  return h >= LATE_NIGHT_START_HOUR || h < LATE_NIGHT_END_HOUR
+}
+
+/** Minutes in 22:00–05:00 JST, rounded to 0.01h. */
+export function lateNightHoursBetween(startIso, endIso) {
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  if (!start || !end || end <= start) return 0
+  const step = 60 * 1000
+  let lateMs = 0
+  for (let t = start; t < end; t += step) {
+    if (isLateNightHour(tokyoHour(new Date(t)))) lateMs += step
+  }
+  return Math.round((lateMs / 3600000) * 100) / 100
+}
+
+export function calcPayWithLateNight(hours, lateNightHours, salarioHora) {
+  const total = Math.max(0, +hours || 0)
+  const late = Math.min(total, Math.max(0, +lateNightHours || 0))
+  const regular = Math.max(0, Math.round((total - late) * 100) / 100)
+  const rate = Math.max(0, +salarioHora || 0)
+  return Math.round(regular * rate + late * rate * (1 + LATE_NIGHT_PREMIUM))
+}
+
 /** Emparelha IN/OUT em ordem. Ponto aberto fica sem saída. */
 export function pairPunches(punches = []) {
   const sorted = [...punches].sort((a, b) => new Date(a.punched_at) - new Date(b.punched_at))
@@ -52,12 +87,14 @@ export function pairPunches(punches = []) {
       const open = openByStaff[sid]
       if (!open) continue
       const hours = hoursBetween(open.clockIn.punched_at, p.punched_at)
+      const lateHours = lateNightHoursBetween(open.clockIn.punched_at, p.punched_at)
       shifts.push({
         staff_id: sid,
         clockIn: open.clockIn,
         clockOut: p,
         open: false,
         hours,
+        lateHours,
         pay: 0,
       })
       delete openByStaff[sid]
@@ -87,6 +124,7 @@ export function payrollFromPunches(punches, staffList = [], { from, to } = {}) {
       cargo: s.cargo || '',
       salario_hora: +s.salario_hora || 0,
       hours: 0,
+      lateHours: 0,
       pay: 0,
       open: false,
       shifts: [],
@@ -94,22 +132,15 @@ export function payrollFromPunches(punches, staffList = [], { from, to } = {}) {
   }
   for (const sh of shifts) {
     const row = byStaff[sh.staff_id] || (byStaff[sh.staff_id] = {
-      staff_id: sh.staff_id, nome: '—', cargo: '', salario_hora: 0, hours: 0, pay: 0, open: false, shifts: [],
+      staff_id: sh.staff_id, nome: '—', cargo: '', salario_hora: 0, hours: 0, lateHours: 0, pay: 0, open: false, shifts: [],
     })
-    const pay = calcPay(sh.hours, row.salario_hora)
+    const pay = calcPayWithLateNight(sh.hours, sh.lateHours || 0, row.salario_hora)
     sh.pay = pay
     row.hours = Math.round((row.hours + sh.hours) * 100) / 100
+    row.lateHours = Math.round(((row.lateHours || 0) + (sh.lateHours || 0)) * 100) / 100
     row.pay += pay
     if (sh.open) row.open = true
     row.shifts.push(sh)
   }
   return Object.values(byStaff).sort((a, b) => b.hours - a.hours)
-}
-
-export function monthRange(isoDay = new Date().toISOString().slice(0, 10)) {
-  const [y, m] = isoDay.split('-')
-  const from = `${y}-${m}-01T00:00:00.000Z`
-  const last = new Date(+y, +m, 0).getDate()
-  const to = `${y}-${m}-${String(last).padStart(2, '0')}T23:59:59.999Z`
-  return { from, to, monthKey: `${y}-${m}` }
 }

@@ -28,15 +28,15 @@ assert('longe bloqueia', !far.ok && far.reason === 'outside')
 assert('sem GPS do bar bloqueia', !isInsideGeofence({ lat: 1, lng: 1, barLat: null, barLng: null }).ok)
 assert('haversine ~0 no mesmo ponto', haversineMeters(35, 139, 35, 139) < 1)
 
-console.log('\n== Cálculo direto horas × salário ==')
+console.log('\n== Cálculo direto horas × salário + 深夜割増 ==')
 assert('2h exatas', hoursBetween('2026-09-17T18:00:00Z', '2026-09-17T20:00:00Z') === 2)
 assert('pay 2h × 1500 = 3000', calcPay(2, 1500) === 3000)
 const punches = [
-  { staff_id: 'a', tipo: 'in', punched_at: '2026-09-17T10:00:00Z' },
-  { staff_id: 'a', tipo: 'out', punched_at: '2026-09-17T14:00:00Z' },
+  { staff_id: 'a', tipo: 'in', punched_at: '2026-09-17T01:00:00Z' }, // 10:00 JST
+  { staff_id: 'a', tipo: 'out', punched_at: '2026-09-17T05:00:00Z' }, // 14:00 JST
 ]
 const pay = payrollFromPunches(punches, [{ id: 'a', nome: 'Ana', salario_hora: 1200 }])
-assert('4h × 1200 = 4800', pay[0].hours === 4 && pay[0].pay === 4800)
+assert('4h diurnas × 1200 = 4800', pay[0].hours === 4 && pay[0].pay === 4800)
 assert('par IN/OUT', pairPunches(punches).length === 1 && pairPunches(punches)[0].open === false)
 
 if (failed) {

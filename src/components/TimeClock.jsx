@@ -112,7 +112,7 @@ function PunchKiosk({ bar, staffIdLocked, onPunched }) {
           }}>{x === 'in' ? t('clock.in') : t('clock.out')}</button>
         ))}
       </div>
-      <button className="btn-primary" disabled={busy || !(staffIdLocked || staffId) || (!staffIdLocked && pin.length < 4)} onClick={punch} style={{ width: '100%', padding: 14, fontSize: 16 }}>
+      <button className="btn-primary" disabled={busy || !(staffIdLocked || staffId) || pin.length < 4} onClick={punch} style={{ width: '100%', padding: 14, fontSize: 16 }}>
         {busy ? t('common.wait') : t('clock.confirm')}
       </button>
       {msg && <div style={{ marginTop: 12, color: 'var(--green)', fontSize: 13, fontWeight: 700 }}>{msg}</div>}

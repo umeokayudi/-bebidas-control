@@ -14,9 +14,13 @@ import {
   validateDiscountCode,
   pricingMapFromShots,
   isRestockPedido,
+  commitPosSale,
+  lineUnitPrice,
 } from '../lib/atomicPos'
 import { syncPosStockAndReorder } from '../lib/posSupply'
 import { isSupplierProduct } from './utils'
+import { includedTaxBreakdown } from '../lib/consumptionTax'
+import { tokyoMonthKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
 
 const SUB_TAB_IDS = [
@@ -109,112 +113,51 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
         nome: item.nome,
         qtd: 1,
         ...pricing,
+        preco_unitario: pricing.preco,
       }]
     })
   }
 
   async function completeSale() {
     if (!cart.length) return
+    if (priceType === 'vip' && !vipId) return alert(t('atomicPos.vipMemberRequired'))
     setSaving(true)
-    const subtotal = cart.reduce((a, it) => a + (it.preco_lista || it.preco_unitario) * it.qtd, 0)
-    const total = cartTotal(cart)
-    const desconto = subtotal - total
-    const tipo = priceType === 'vip' || vipId ? 'vip' : activeCode ? 'desconto' : 'balcao'
-
-    const vendaPayload = {
-      bar_id: bar.id,
-      data: todayKey(),
-      subtotal,
-      desconto_total: desconto,
-      total,
-      metodo_pagamento: payMethod,
-      tipo,
-      vip_member_id: vipId || null,
-      discount_code_id: activeCode?.id || null,
-      criado_por: user?.id,
-    }
-    if (agentId) vendaPayload.drink_back_agent_id = agentId
-
-    let venda, error
-    ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
-    if (error?.message?.includes('drink_back_agent_id')) {
-      delete vendaPayload.drink_back_agent_id
-      ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
-    }
-    if (error) { alert(error.message); setSaving(false); return }
-
-    await supabase.from('pos_vendas_itens').insert(
-      cart.map(it => ({
-        pos_venda_id: venda.id,
-        drink_menu_id: it.drink_menu_id,
-        produto_id: it.produto_id,
-        nome: it.nome,
-        qtd: it.qtd,
-        preco_unitario: it.preco_unitario,
-        preco_lista: it.preco_lista,
-        tipo_preco: it.tipo_preco,
-        desconto_valor: it.desconto_valor || 0,
-      }))
-    )
-
-    if (activeCode) {
-      await supabase.from('discount_codes').update({ usos_atual: (activeCode.usos_atual || 0) + 1 }).eq('id', activeCode.id)
-      await supabase.from('discount_usages').insert({
-        bar_id: bar.id,
-        discount_code_id: activeCode.id,
-        pos_venda_id: venda.id,
-        valor_desconto: desconto,
-      })
-    }
-
-    if (vipId) {
-      for (const it of cart) {
-        await supabase.from('vip_usages').insert({
-          bar_id: bar.id,
-          vip_member_id: vipId,
-          drink_menu_id: it.drink_menu_id,
-          produto_id: it.produto_id,
-          nome: it.nome,
-          qtd: it.qtd,
-          preco_aplicado: it.preco_unitario,
-          preco_lista: it.preco_lista,
-          tipo: 'vip',
-          pos_venda_id: venda.id,
-          criado_por: user?.id,
-        })
-      }
-    }
-
-    try {
-      const result = await syncPosStockAndReorder(supabase, {
-        bar,
-        cart,
-        vendaId: venda.id,
-        userId: user?.id,
+    const result = await commitPosSale(supabase, {
+      bar,
+      cart,
+      payMethod,
+      priceType,
+      vipId,
+      activeCode,
+      agentId,
+      userId: user?.id,
+      shots,
+      syncStock: args => syncPosStockAndReorder(supabase, {
+        ...args,
         pricingByProduto: pricingMapFromShots(shots),
         buildStockMap,
         findLowStockProducts,
-      })
-      setCart([])
-      setActiveCode(null)
-      setCodeInput('')
-      setAgentId('')
-      setSaving(false)
-      onSale?.()
-      const restockNote = result.pedido
-        ? `\n${t('atomicPos.restockSent', { count: result.restockItems?.length || 0 })}`
-        : ''
-      alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }) + restockNote)
-    } catch (stockErr) {
-      console.warn('POS stock update:', stockErr.message)
-      setCart([])
-      setActiveCode(null)
-      setCodeInput('')
-      setAgentId('')
-      setSaving(false)
-      onSale?.()
-      alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }))
+      }),
+    })
+    setSaving(false)
+    if (!result.ok) {
+      return alert(result.errorKey ? t(result.errorKey) : (result.error || t('atomicPos.saleStockFailed')))
     }
+    setCart([])
+    setActiveCode(null)
+    setCodeInput('')
+    setAgentId('')
+    onSale?.()
+    const tax = includedTaxBreakdown(result.total)
+    const restockNote = result.stock?.pedido
+      ? `\n${t('atomicPos.restockSent', { count: result.stock.restockItems?.length || 0 })}`
+      : ''
+    alert(
+      t('atomicPos.saleRegistered', { amount: fmtYen(result.total) })
+      + `\n${t('atomicPos.taxIncluded')} ${fmtYen(tax.total)}`
+      + `\n${t('atomicPos.consumptionTaxIncluded')} ${fmtYen(tax.tax)}`
+      + restockNote
+    )
   }
 
   return (
@@ -238,7 +181,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
 
         {priceType === 'vip' && (
           <select value={vipId} onChange={e => setVipId(e.target.value)} className="pos-select">
-            <option value="">{t('atomicPos.vipMemberOptional')}</option>
+            <option value="">{t('atomicPos.vipMemberRequired')}</option>
             {(vipMembers || []).filter(v => v.ativo).map(v => (
               <option key={v.id} value={v.id}>{v.nome}{v.codigo ? ` · ${v.codigo}` : ''}</option>
             ))}
@@ -286,17 +229,20 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                     <button className="pos-qty" onClick={() => setCart(c => c.map((x, j) => j === i ? { ...x, qtd: Math.max(1, x.qtd - 1) } : x))}>−</button>
                     <span>{it.qtd}</span>
                     <button className="pos-qty" onClick={() => setCart(c => c.map((x, j) => j === i ? { ...x, qtd: x.qtd + 1 } : x))}>+</button>
-                    <strong>{fmtYen(it.preco_unitario * it.qtd)}</strong>
+                    <strong>{fmtYen(lineUnitPrice(it) * it.qtd)}</strong>
                     <button className="pos-qty-del" onClick={() => setCart(c => c.filter((_, j) => j !== i))}>✕</button>
                   </div>
                 </div>
               ))}
             </div>
             <div className="pos-cart-total">{fmtYen(cartTotal(cart))}</div>
+            <div style={{ fontSize: 11, color: 'var(--text2)', margin: '-4px 0 10px' }}>
+              {t('atomicPos.taxIncluded')} · {t('atomicPos.consumptionTaxIncluded')} {fmtYen(includedTaxBreakdown(cartTotal(cart)).tax)}
+            </div>
             <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="pos-select">
               {['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer'].map(m => <option key={m}>{m}</option>)}
             </select>
-            <button className="btn-primary pos-pay" onClick={completeSale} disabled={saving}>
+            <button className="btn-primary pos-pay" onClick={completeSale} disabled={saving || (priceType === 'vip' && !vipId)}>
               {saving ? t('common.saving') : t('atomicPos.registerPosSale')}
             </button>
           </>
@@ -366,7 +312,7 @@ function PosVipTab({ bar, drinks, onUpdate }) {
 
   if (loading) return <Spinner text={t('atomicPos.loadingVip')} />
 
-  const monthUsages = usages.filter(u => u.criado_em?.startsWith(new Date().toISOString().slice(0, 7)))
+  const monthUsages = usages.filter(u => u.criado_em && tokyoMonthKey(u.criado_em) === tokyoMonthKey())
   const monthTotal = monthUsages.reduce((a, u) => a + (+u.preco_aplicado || 0) * (+u.qtd || 1), 0)
 
   return (

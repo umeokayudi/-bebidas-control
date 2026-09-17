@@ -11,6 +11,7 @@ import {
   buildRestockItems,
   productsAlreadyOnOpenOrders,
   isRestockPedido,
+  findOpenRestockPedido,
   RESTOCK_OBS,
   posStockObs,
   deliveryStockObs,
@@ -68,6 +69,11 @@ const items = buildRestockItems(
 assert('não duplica vodka em pedido aberto', items.every(i => i.produto_id !== 'vodka'))
 assert('pede gin', items.some(i => i.produto_id === 'gin' && i.qtd >= 1))
 assert('marca restock não usa a palavra pos', isRestockPedido({ obs: RESTOCK_OBS }) && !/pos/i.test(RESTOCK_OBS))
+assert('merge escolhe o pedido Auto: restock caixa aberto', findOpenRestockPedido([
+  { id: 'x', status: 'pendente', obs: 'cliente pediu extra' },
+  { id: 'r', status: 'pendente', obs: RESTOCK_OBS },
+])?.id === 'r')
+assert('pedido restock entregue não recebe merge', !findOpenRestockPedido([{ id: 'r', status: 'entregue', obs: RESTOCK_OBS }]))
 
 console.log('\n== Obs de estoque isoladas ==')
 assert('saída POS marcada caixa', posStockObs('abc').startsWith('POS caixa'))
