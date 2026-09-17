@@ -55,10 +55,12 @@ export function isSupplierProduct(p) {
 // Supplier deliveries only — excludes POS/bar billing imported into vendas
 export function isSupplierVenda(v) {
   if (!v) return false
-  if (v.origem === 'pos') return false
+  const origem = String(v.origem || '').toLowerCase()
+  if (origem === 'pos' || origem === 'balcao' || origem === 'balcão' || origem === 'square') return false
   const obs = (v.obs || '').toLowerCase()
   if (obs.includes('balcão') || obs.includes('balcao') || obs.includes('square') || obs.includes('pos')) return false
   if (v.cast_id) return false
+  if (v.pos_venda_id) return false
   return true
 }
 

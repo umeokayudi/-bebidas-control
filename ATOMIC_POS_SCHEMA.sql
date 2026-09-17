@@ -159,4 +159,70 @@ create index if not exists idx_pos_vendas_bar_data on pos_vendas(bar_id, data de
 create index if not exists idx_vip_usages_bar on vip_usages(bar_id, criado_em desc);
 create index if not exists idx_discount_codes_bar on discount_codes(bar_id, codigo);
 
+-- ============================================================
+-- POS do bar — contas abertas, hora, drink back, reorder
+-- Isolado de vendas/compras JBM (fornecimento de bebida)
+-- ============================================================
+
+alter table pos_vendas add column if not exists hora integer;
+alter table pos_vendas add column if not exists status text default 'fechada';
+alter table pos_vendas add column if not exists mesa text;
+alter table pos_vendas add column if not exists cliente_nome text;
+alter table pos_vendas add column if not exists drink_back_agent_id uuid;
+alter table pos_vendas add column if not exists drink_back_comissao numeric default 0;
+
+create table if not exists drink_back_agents (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  nome text not null,
+  codigo text,
+  regiao text,
+  comissao_pct numeric not null default 10,
+  ativo boolean default true,
+  notas text,
+  criado_em timestamptz default now()
+);
+
+create table if not exists drink_back_usages (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  drink_back_agent_id uuid references drink_back_agents(id),
+  pos_venda_id uuid references pos_vendas(id),
+  total_venda numeric not null default 0,
+  comissao numeric not null default 0,
+  criado_em timestamptz default now()
+);
+
+create table if not exists pos_reorder_alerts (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  produto_id uuid references produtos(id),
+  nome text,
+  current_stock numeric default 0,
+  min_stock numeric default 0,
+  suggested_qty numeric default 0,
+  status text default 'aberto',
+  pos_venda_id uuid references pos_vendas(id),
+  pedido_id uuid,
+  criado_em timestamptz default now()
+);
+
+alter table drink_back_agents enable row level security;
+alter table drink_back_usages enable row level security;
+alter table pos_reorder_alerts enable row level security;
+
+do $$ begin
+  create policy "auth drink_back_agents" on drink_back_agents for all using (auth.role() = 'authenticated');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "auth drink_back_usages" on drink_back_usages for all using (auth.role() = 'authenticated');
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create policy "auth pos_reorder_alerts" on pos_reorder_alerts for all using (auth.role() = 'authenticated');
+exception when duplicate_object then null; end $$;
+
+create index if not exists idx_pos_vendas_bar_hora on pos_vendas(bar_id, data, hora);
+create index if not exists idx_drink_back_bar on drink_back_agents(bar_id, ativo);
+create index if not exists idx_pos_reorder_bar on pos_reorder_alerts(bar_id, status);
+
 select 'Atomic POS schema ready' as status;
