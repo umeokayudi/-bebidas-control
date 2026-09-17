@@ -17,11 +17,12 @@ export default function PosDrinkBackTab({ agents, usages, onAdd, saving }) {
         <div className="card">
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>{t('atomicPos.drinkBackTitle')}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{t('atomicPos.drinkBackSub')}</div>
-          <input placeholder={t('atomicPos.nameRequired').replace(' required', '').replace('必須', '')} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+          <input placeholder="Name" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
             <input placeholder="Code" value={form.codigo} onChange={e => setForm({ ...form, codigo: e.target.value })} />
             <input placeholder={t('atomicPos.region')} value={form.regiao} onChange={e => setForm({ ...form, regiao: e.target.value })} />
           </div>
+          <label className="form-label">{t('atomicPos.commissionPct')}</label>
           <input type="number" min="0" max="50" placeholder={t('atomicPos.commissionPct')} value={form.comissao_pct} onChange={e => setForm({ ...form, comissao_pct: e.target.value })} style={{ width: '100%', marginBottom: 12 }} />
           <button className="btn-primary" disabled={saving} onClick={() => {
             if (!form.nome.trim()) return

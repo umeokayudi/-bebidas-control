@@ -769,7 +769,6 @@ export default function AtomicPosPanel({ bar, db: dbProp, demo = false, complete
 
   return (
     <div className="fade-in pos-root">
-      {demo && <div className="pos-demo-badge">{t('atomicPos.demoBadge')}</div>}
       <SetupBanner ready={ready} demo={demo} />
       <div className="pos-isolation">{t('atomicPos.isolationNote')}</div>
 
