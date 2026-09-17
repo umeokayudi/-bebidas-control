@@ -325,6 +325,17 @@ begin
     ) then
       raise exception 'Produto não configurado para este bar';
     end if;
+    if p_discount_code_id is not null and exists (
+      select 1
+      from discount_codes code
+      where code.id = p_discount_code_id
+        and (
+          (code.drink_menu_id is not null and code.drink_menu_id is distinct from item.drink_menu_id)
+          or (code.produto_id is not null and code.produto_id is distinct from item.produto_id)
+        )
+    ) then
+      raise exception 'Código de desconto não vale para um dos itens';
+    end if;
 
     insert into pos_vendas_itens (
       pos_venda_id, drink_menu_id, produto_id, nome, qtd, preco_unitario,
@@ -383,8 +394,14 @@ begin
 
   if p_discount_code_id is not null then
     update discount_codes
-    set usos_atual = usos_atual + 1
-    where id = p_discount_code_id;
+    set usos_atual = coalesce(usos_atual, 0) + 1
+    where id = p_discount_code_id
+      and ativo
+      and (valido_ate is null or valido_ate >= current_date)
+      and (max_usos is null or coalesce(usos_atual, 0) < max_usos);
+    if not found then
+      raise exception 'Código de desconto inválido ou esgotado';
+    end if;
     insert into discount_usages (
       bar_id, discount_code_id, pos_venda_id, valor_desconto
     ) values (
