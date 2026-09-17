@@ -44,28 +44,33 @@ export function AuthProvider({ children }) {
 }
 
 function LoginLanguagePicker() {
-  const { lang, setLang } = useI18n()
+  const { lang, setLang, t } = useI18n()
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
-      {Object.values(LANGS).map(opt => (
-        <button
-          key={opt.id}
-          type="button"
-          onClick={() => setLang(opt.id)}
-          style={{
-            padding: '6px 12px',
-            borderRadius: 20,
-            border: lang === opt.id ? '1px solid var(--gold)' : '1px solid rgba(193,156,86,0.25)',
-            background: lang === opt.id ? 'rgba(193,156,86,0.15)' : 'transparent',
-            color: lang === opt.id ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, textAlign: 'center', color: 'rgba(193,156,86,0.75)', marginBottom: 8, letterSpacing: '0.04em' }}>
+        {t('shell.languageHint')}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+        {Object.values(LANGS).map(opt => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => setLang(opt.id)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 20,
+              border: lang === opt.id ? '1px solid var(--gold)' : '1px solid rgba(193,156,86,0.25)',
+              background: lang === opt.id ? 'rgba(193,156,86,0.15)' : 'transparent',
+              color: lang === opt.id ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {opt.id === 'ja' ? t('shell.langJaOptional') : opt.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -146,7 +151,7 @@ export function LoginPage() {
           <div style={{marginBottom:14}}>
             <label className="form-label" style={{color:'rgba(193,156,86,0.7)'}}>{t('auth.email')}</label>
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-              placeholder="seu@email.com"
+                placeholder={t('auth.emailPlaceholder')}
               style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(193,156,86,0.2)',color:'white'}}/>
           </div>
           <div style={{marginBottom:24}}>

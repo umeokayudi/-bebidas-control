@@ -91,7 +91,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     const code = discountCodes.find(c => c.codigo.toUpperCase() === codeInput.trim().toUpperCase())
     if (!code) return alert(t('atomicPos.codeNotFound'))
     const v = validateDiscountCode(code)
-    if (!v.ok) return alert(v.error)
+    if (!v.ok) return alert(t(v.errorKey || 'atomicPos.codeNotFound'))
     setActiveCode(code)
     setPriceType('codigo')
   }
@@ -308,6 +308,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
 
 // ── VIP ───────────────────────────────────────────────────────────────────────
 function PosVipTab({ bar, drinks, onUpdate }) {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [members, setMembers] = useState([])
   const [usages, setUsages] = useState([])
@@ -331,7 +332,7 @@ function PosVipTab({ bar, drinks, onUpdate }) {
   }
 
   async function saveMember() {
-    if (!memberForm.nome) return alert('Nome obrigatório')
+    if (!memberForm.nome) return alert(t('atomicPos.nameRequired'))
     setSaving(true)
     await supabase.from('vip_members').insert({ bar_id: bar.id, ...memberForm, codigo: memberForm.codigo || null })
     setMemberForm({ nome: '', codigo: '', tier: 'standard', notas: '' })
@@ -341,7 +342,7 @@ function PosVipTab({ bar, drinks, onUpdate }) {
   }
 
   async function registerUsage() {
-    if (!usageForm.vip_member_id || !usageForm.drink_menu_id) return alert('Selecione membro e drink')
+    if (!usageForm.vip_member_id || !usageForm.drink_menu_id) return alert(t('atomicPos.selectMemberDrink'))
     const drink = drinks.find(d => d.id === usageForm.drink_menu_id)
     if (!drink) return
     setSaving(true)
@@ -363,7 +364,7 @@ function PosVipTab({ bar, drinks, onUpdate }) {
     load()
   }
 
-  if (loading) return <Spinner text="Carregando VIP..." />
+  if (loading) return <Spinner text={t('atomicPos.loadingVip')} />
 
   const monthUsages = usages.filter(u => u.criado_em?.startsWith(new Date().toISOString().slice(0, 7)))
   const monthTotal = monthUsages.reduce((a, u) => a + (+u.preco_aplicado || 0) * (+u.qtd || 1), 0)
@@ -371,7 +372,7 @@ function PosVipTab({ bar, drinks, onUpdate }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[['register', 'Registrar uso'], ['members', 'Membros'], ['history', 'Histórico']].map(([id, label]) => (
+        {[['register', t('atomicPos.registerUse')], ['members', t('atomicPos.members')], ['history', t('atomicPos.history')]].map(([id, label]) => (
           <button key={id} onClick={() => setMode(id)} style={{
             padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600,
             background: mode === id ? 'var(--navy)' : 'var(--bg3)', color: mode === id ? '#fff' : 'var(--text2)', border: 'none',
@@ -380,43 +381,43 @@ function PosVipTab({ bar, drinks, onUpdate }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 20 }}>
-        <StatCard label="Membros VIP" value={members.filter(m => m.ativo).length} />
-        <StatCard label="Usos este mês" value={monthUsages.length} />
-        <StatCard label="Total VIP mês" value={fmtYen(monthTotal)} />
+        <StatCard label={t('atomicPos.vipMembers')} value={members.filter(m => m.ativo).length} />
+        <StatCard label={t('atomicPos.usesThisMonth')} value={monthUsages.length} />
+        <StatCard label={t('atomicPos.vipMonthTotal')} value={fmtYen(monthTotal)} />
       </div>
 
       {mode === 'register' && (
         <div className="card" style={{ maxWidth: 480 }}>
-          <SectionTitle>Registrar uso VIP</SectionTitle>
-          <label className="form-label">Membro</label>
+          <SectionTitle>{t('atomicPos.registerVipUse')}</SectionTitle>
+          <label className="form-label">{t('atomicPos.member')}</label>
           <select value={usageForm.vip_member_id} onChange={e => setUsageForm({ ...usageForm, vip_member_id: e.target.value })} style={{ width: '100%', marginBottom: 12 }}>
-            <option value="">Selecione...</option>
+            <option value="">{t('atomicPos.selectPlaceholder')}</option>
             {members.filter(m => m.ativo).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
           </select>
-          <label className="form-label">Drink</label>
+          <label className="form-label">{t('atomicPos.drink')}</label>
           <select value={usageForm.drink_menu_id} onChange={e => setUsageForm({ ...usageForm, drink_menu_id: e.target.value })} style={{ width: '100%', marginBottom: 12 }}>
-            <option value="">Selecione...</option>
+            <option value="">{t('atomicPos.selectPlaceholder')}</option>
             {drinks.map(d => <option key={d.id} value={d.id}>{d.nome} — VIP {fmtYen(d.preco_desconto || 500)}</option>)}
           </select>
-          <label className="form-label">Quantidade</label>
+          <label className="form-label">{t('atomicPos.quantity')}</label>
           <input type="number" min="1" value={usageForm.qtd} onChange={e => setUsageForm({ ...usageForm, qtd: e.target.value })} style={{ width: '100%', marginBottom: 12 }} />
-          <button className="btn-primary" onClick={registerUsage} disabled={saving} style={{ width: '100%', padding: 12 }}>{saving ? '...' : 'Registrar uso VIP'}</button>
+          <button className="btn-primary" onClick={registerUsage} disabled={saving} style={{ width: '100%', padding: 12 }}>{saving ? '...' : t('atomicPos.registerVipUseBtn')}</button>
         </div>
       )}
 
       {mode === 'members' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div className="card">
-            <SectionTitle>Novo membro</SectionTitle>
-            <input placeholder="Nome" value={memberForm.nome} onChange={e => setMemberForm({ ...memberForm, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
-            <input placeholder="Código cartão (opcional)" value={memberForm.codigo} onChange={e => setMemberForm({ ...memberForm, codigo: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
-            <button className="btn-primary" onClick={saveMember} disabled={saving} style={{ width: '100%', padding: 10 }}>Adicionar membro</button>
+            <SectionTitle>{t('atomicPos.newMember')}</SectionTitle>
+            <input placeholder={t('atomicPos.namePlaceholder')} value={memberForm.nome} onChange={e => setMemberForm({ ...memberForm, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            <input placeholder={t('atomicPos.cardCodeOptional')} value={memberForm.codigo} onChange={e => setMemberForm({ ...memberForm, codigo: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            <button className="btn-primary" onClick={saveMember} disabled={saving} style={{ width: '100%', padding: 10 }}>{t('atomicPos.addMember')}</button>
           </div>
           <div>
             {members.map(m => (
               <div key={m.id} className="card" style={{ marginBottom: 8, padding: 14 }}>
                 <div style={{ fontWeight: 700 }}>{m.nome}</div>
-                {m.codigo && <div style={{ fontSize: 12, color: 'var(--text2)' }}>Código: {m.codigo}</div>}
+                {m.codigo && <div style={{ fontSize: 12, color: 'var(--text2)' }}>{t('atomicPos.codeLabel', { code: m.codigo })}</div>}
               </div>
             ))}
           </div>
@@ -442,6 +443,7 @@ function PosVipTab({ bar, drinks, onUpdate }) {
 
 // ── PRICES (menu + shots) ─────────────────────────────────────────────────────
 function PosPricesTab({ bar, drinks, onRefresh }) {
+  const { t } = useI18n()
   const [priceMode, setPriceMode] = useState('menu')
   const [produtos, setProdutos] = useState([])
   const [pricing, setPricing] = useState({})
@@ -498,7 +500,7 @@ function PosPricesTab({ bar, drinks, onRefresh }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[['menu', 'Drinks / Menu'], ['shots', 'Shots (garrafa)']].map(([id, label]) => (
+        {[['menu', t('atomicPos.menuDrinks')], ['shots', t('atomicPos.shotsBottle')]].map(([id, label]) => (
           <button key={id} onClick={() => setPriceMode(id)} style={{
             padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600,
             background: priceMode === id ? 'var(--navy)' : 'var(--bg3)', color: priceMode === id ? '#fff' : 'var(--text2)', border: 'none',
@@ -509,17 +511,17 @@ function PosPricesTab({ bar, drinks, onRefresh }) {
       {priceMode === 'menu' && (
         <>
           <div className="card" style={{ marginBottom: 16 }}>
-            <SectionTitle>{editId ? 'Editar drink' : 'Novo drink'}</SectionTitle>
+            <SectionTitle>{editId ? t('atomicPos.editDrink') : t('atomicPos.newDrink')}</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: 8 }}>
-              <input placeholder="Nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
-              <input placeholder="Preço ¥" type="number" value={form.preco_venda} onChange={e => setForm({ ...form, preco_venda: e.target.value })} />
-              <input placeholder="Custo ¥" type="number" value={form.custo} onChange={e => setForm({ ...form, custo: e.target.value })} />
-              <input placeholder="VIP ¥" type="number" value={form.preco_desconto} onChange={e => setForm({ ...form, preco_desconto: e.target.value })} />
-              <button className="btn-primary" onClick={saveDrink} disabled={saving}>{editId ? 'Salvar' : 'Adicionar'}</button>
+              <input placeholder={t('atomicPos.namePlaceholder')} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
+              <input placeholder={t('atomicPos.priceYen')} type="number" value={form.preco_venda} onChange={e => setForm({ ...form, preco_venda: e.target.value })} />
+              <input placeholder={t('atomicPos.costYen')} type="number" value={form.custo} onChange={e => setForm({ ...form, custo: e.target.value })} />
+              <input placeholder={t('atomicPos.vipYen')} type="number" value={form.preco_desconto} onChange={e => setForm({ ...form, preco_desconto: e.target.value })} />
+              <button className="btn-primary" onClick={saveDrink} disabled={saving}>{editId ? t('common.save') : t('common.add')}</button>
             </div>
           </div>
           <table style={{ width: '100%', fontSize: 13 }}>
-            <thead><tr>{['Drink', 'Preço', 'VIP', 'Margem', ''].map(h => <th key={h} style={{ textAlign: 'left', padding: 8 }}>{h}</th>)}</tr></thead>
+            <thead><tr>{[t('atomicPos.colDrink'), t('atomicPos.colPrice'), t('atomicPos.colVip'), t('atomicPos.colMargin'), ''].map(h => <th key={h || 'x'} style={{ textAlign: 'left', padding: 8 }}>{h}</th>)}</tr></thead>
             <tbody>
               {drinks.map(d => (
                 <tr key={d.id} style={{ borderTop: '1px solid var(--border)' }}>
@@ -527,7 +529,7 @@ function PosPricesTab({ bar, drinks, onRefresh }) {
                   <td>{fmtYen(d.preco_venda)}</td>
                   <td style={{ color: 'var(--gold)' }}>{fmtYen(d.preco_desconto || 500)}</td>
                   <td>{Math.round((d.margem || 0) * 100)}%</td>
-                  <td><button onClick={() => { setEditId(d.id); setForm({ nome: d.nome, categoria: d.categoria, preco_venda: d.preco_venda, custo: d.custo, preco_desconto: d.preco_desconto || 500 }) }} style={{ fontSize: 11 }}>Editar</button></td>
+                  <td><button onClick={() => { setEditId(d.id); setForm({ nome: d.nome, categoria: d.categoria, preco_venda: d.preco_venda, custo: d.custo, preco_desconto: d.preco_desconto || 500 }) }} style={{ fontSize: 11 }}>{t('common.edit')}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -540,12 +542,12 @@ function PosPricesTab({ bar, drinks, onRefresh }) {
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 8 }}>
               <select value={shotForm.produto_id} onChange={e => setShotForm({ ...shotForm, produto_id: e.target.value })}>
-                <option value="">Produto JBM...</option>
+                <option value="">{t('atomicPos.jbmProduct')}</option>
                 {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
-              <input placeholder="Drinks/garrafa" type="number" value={shotForm.drinks} onChange={e => setShotForm({ ...shotForm, drinks: e.target.value })} />
-              <input placeholder="Preço/drink ¥" type="number" value={shotForm.preco} onChange={e => setShotForm({ ...shotForm, preco: e.target.value })} />
-              <button className="btn-primary" onClick={saveShot} disabled={saving}>Salvar</button>
+              <input placeholder={t('atomicPos.drinksPerBottle')} type="number" value={shotForm.drinks} onChange={e => setShotForm({ ...shotForm, drinks: e.target.value })} />
+              <input placeholder={t('atomicPos.pricePerDrink')} type="number" value={shotForm.preco} onChange={e => setShotForm({ ...shotForm, preco: e.target.value })} />
+              <button className="btn-primary" onClick={saveShot} disabled={saving}>{t('common.save')}</button>
             </div>
           </div>
           {Object.values(pricing).map(p => (
@@ -562,6 +564,7 @@ function PosPricesTab({ bar, drinks, onRefresh }) {
 
 // ── DISCOUNT CODES ────────────────────────────────────────────────────────────
 function PosDiscountTab({ bar, drinks, onUpdate }) {
+  const { t } = useI18n()
   const [codes, setCodes] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
@@ -614,28 +617,28 @@ function PosDiscountTab({ bar, drinks, onUpdate }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
       <div className="card">
-        <SectionTitle>Criar código de desconto</SectionTitle>
+        <SectionTitle>{t('atomicPos.createDiscount')}</SectionTitle>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <input value={form.codigo} onChange={e => setForm({ ...form, codigo: e.target.value.toUpperCase() })} style={{ flex: 1 }} />
-          <button onClick={() => setForm({ ...form, codigo: generateDiscountCode() })} style={{ padding: '8px 12px', fontSize: 11 }}>Gerar</button>
+          <button onClick={() => setForm({ ...form, codigo: generateDiscountCode() })} style={{ padding: '8px 12px', fontSize: 11 }}>{t('atomicPos.generate')}</button>
         </div>
-        <input placeholder="Descrição" value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+        <input placeholder={t('atomicPos.description')} value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>
-            <option value="percent">Percentual (%)</option>
-            <option value="fixed">Valor fixo (¥)</option>
+            <option value="percent">{t('atomicPos.percentLabel')}</option>
+            <option value="fixed">{t('atomicPos.fixedLabel')}</option>
           </select>
-          <input type="number" placeholder="Valor" value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} />
+          <input type="number" placeholder={t('atomicPos.valuePlaceholder')} value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} />
         </div>
         <select value={form.drink_menu_id} onChange={e => setForm({ ...form, drink_menu_id: e.target.value })} style={{ width: '100%', marginBottom: 8 }}>
-          <option value="">Todos os drinks</option>
+          <option value="">{t('atomicPos.allDrinks')}</option>
           {drinks.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
         </select>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-          <input type="number" placeholder="Máx. usos" value={form.max_usos} onChange={e => setForm({ ...form, max_usos: e.target.value })} />
+          <input type="number" placeholder={t('atomicPos.maxUses')} value={form.max_usos} onChange={e => setForm({ ...form, max_usos: e.target.value })} />
           <input type="date" value={form.valido_ate} onChange={e => setForm({ ...form, valido_ate: e.target.value })} />
         </div>
-        <button className="btn-primary" onClick={saveCode} disabled={saving} style={{ width: '100%', padding: 12 }}>Criar código</button>
+        <button className="btn-primary" onClick={saveCode} disabled={saving} style={{ width: '100%', padding: 12 }}>{t('atomicPos.createCode')}</button>
       </div>
       <div>
         {codes.map(c => (
@@ -644,10 +647,10 @@ function PosDiscountTab({ bar, drinks, onUpdate }) {
               <div>
                 <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: 1 }}>{c.codigo}</div>
                 <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-                  {c.tipo === 'percent' ? `${c.valor}% off` : fmtYen(c.valor)} · usos {c.usos_atual || 0}{c.max_usos ? `/${c.max_usos}` : ''}
+                  {c.tipo === 'percent' ? `${c.valor}% off` : fmtYen(c.valor)} · {t('atomicPos.usesLabel')} {c.usos_atual || 0}{c.max_usos ? `/${c.max_usos}` : ''}
                 </div>
               </div>
-              <button onClick={() => toggleCode(c.id, c.ativo)} style={{ fontSize: 11 }}>{c.ativo ? 'Desativar' : 'Ativar'}</button>
+              <button onClick={() => toggleCode(c.id, c.ativo)} style={{ fontSize: 11 }}>{c.ativo ? t('atomicPos.deactivate') : t('atomicPos.activate')}</button>
             </div>
           </div>
         ))}
@@ -668,6 +671,7 @@ function StatCard({ label, value, sub, color }) {
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function HourlyChart({ data, height = 100 }) {
+  const { t } = useI18n()
   const activeHours = data.filter(h => h.total > 0 || h.count > 0)
   if (!activeHours.length) return <div style={{ color: 'var(--text3)', fontSize: 13, padding: 20, textAlign: 'center' }}>—</div>
   const max = Math.max(...data.map(d => d.total), 1)
@@ -682,7 +686,7 @@ function HourlyChart({ data, height = 100 }) {
             <div style={{
               width: '100%', maxWidth: 28, height: barH, borderRadius: '4px 4px 0 0',
               background: hasData ? 'var(--navy)' : 'var(--bg3)', opacity: hasData ? 1 : 0.3,
-            }} title={`${d.label}: ${fmtYen(d.total)} (${d.count} vendas)`} />
+            }} title={`${d.label}: ${fmtYen(d.total)} (${d.count} ${t('atomicPos.salesWord')})`} />
             <div style={{ fontSize: 9, color: 'var(--text3)' }}>{d.label.slice(0, 2)}h</div>
           </div>
         )
@@ -741,22 +745,21 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
   }, [bar, todaySales])
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 20 }}>
-        <StatCard label={t('atomicPos.todayRevenue')} value={fmtYen(metrics.total)} color="var(--green)" />
-        <StatCard label={t('atomicPos.salesToday')} value={metrics.count} />
-        <StatCard label={t('atomicPos.avgTicket')} value={fmtYen(metrics.ticketMedio)} />
-        <StatCard
-          label={t('atomicPos.peakHour')}
-          value={metrics.peakHour?.total > 0 ? metrics.peakHour.label : '—'}
-          sub={metrics.peakHour?.total > 0 ? fmtYen(metrics.peakHour.total) : undefined}
-        />
+    <div className="easy-dash pos-easy-dash">
+      <div className="easy-dash-hero">
+        <div className="easy-dash-kicker">{t('atomicPos.todayAtCounter')}</div>
+        <div className="easy-dash-value" style={{ color: 'var(--green)' }}>{fmtYen(metrics.total)}</div>
+        <div className="easy-dash-hint">
+          {t('atomicPos.ticketsToday', { count: metrics.count })}
+          {' · '}
+          {t('atomicPos.avgTicketShort', { amount: fmtYen(metrics.ticketMedio) })}
+          {metrics.peakHour?.total > 0 ? ` · ${t('atomicPos.busiestHour')} ${metrics.peakHour.label}` : ''}
+        </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <SectionTitle>{t('atomicPos.hourlyRevenue')}</SectionTitle>
-        <HourlyChart data={metrics.hourly} />
-      </div>
+      {openRestock.length === 0 && lowStock.length === 0 && (
+        <div className="easy-dash-ok" style={{ marginBottom: 16 }}>{t('atomicPos.stockOk')}</div>
+      )}
 
       {openRestock.length > 0 && (
         <div style={{
@@ -807,6 +810,11 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
         </div>
       )}
 
+      <div className="card" style={{ marginBottom: 20 }}>
+        <SectionTitle>{t('atomicPos.hourlyRevenue')}</SectionTitle>
+        <HourlyChart data={metrics.hourly} />
+      </div>
+
       {agentStats.length > 0 && (
         <div className="card">
           <SectionTitle>{t('atomicPos.drinkBackToday')}</SectionTitle>
@@ -814,11 +822,11 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
             <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
               <div>
                 <strong>{a.nome}</strong>
-                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{a.vendas} vendas · {a.comissao_pct}% comissão</div>
+                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{a.vendas} {t('atomicPos.salesWord')} · {t('atomicPos.commissionShort', { pct: a.comissao_pct })}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 700 }}>{fmtYen(a.faturamento)}</div>
-                <div style={{ fontSize: 11, color: 'var(--gold)' }}>Comissão {fmtYen(a.comissao)}</div>
+                <div style={{ fontSize: 11, color: 'var(--gold)' }}>{t('atomicPos.commission')} {fmtYen(a.comissao)}</div>
               </div>
             </div>
           ))}
@@ -903,7 +911,7 @@ function PosDrinkBackTab({ bar, onUpdate }) {
               <div>
                 <div style={{ fontWeight: 700 }}>{a.nome}</div>
                 <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-                  {a.regiao || '—'} · {a.comissao_pct}% comissão
+                  {a.regiao || '—'} · {t('atomicPos.commissionShort', { pct: a.comissao_pct })}
                 </div>
               </div>
               <button onClick={() => toggleAgent(a.id, a.ativo)} style={{ fontSize: 11 }}>

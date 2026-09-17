@@ -282,7 +282,7 @@ export function UsuariosTab() {
   }
 
   const roleColor = { admin:'var(--gold)', staff:'var(--navy)', funcionario:'var(--navy)', cliente:'var(--green)', caixa:'#7c3aed', bar_staff:'#0f766e' }
-  const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Dono do bar', caixa:'Caixa tablet', bar_staff:'Staff do bar' }[r] || r)
+  const roleLabel = r => t(`shell.roles.${r === 'staff' ? 'staff' : r}`) || r
 
   if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>{t('configs.usersLoading')}</div>
 
@@ -370,11 +370,11 @@ export function UsuariosTab() {
                     <td style={{padding:'8px 14px'}}><input className="input" type="email" style={{padding:'4px 8px',fontSize:12,width:'100%'}} value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder={t('configs.changeEmail')}/></td>
                     <td style={{padding:'8px 14px'}}>
                       <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
-                        <option value="admin">Admin</option>
-                        <option value="staff">Staff</option>
-                        <option value="cliente">Cliente</option>
-                        <option value="caixa">Caixa</option>
-                        <option value="bar_staff">Bar staff</option>
+                        <option value="admin">{t('shell.roles.admin')}</option>
+                        <option value="staff">{t('shell.roles.staff')}</option>
+                        <option value="cliente">{t('shell.roles.cliente')}</option>
+                        <option value="caixa">{t('shell.roles.caixa')}</option>
+                        <option value="bar_staff">{t('shell.roles.bar_staff')}</option>
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>

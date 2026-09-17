@@ -5,13 +5,19 @@ import ja from '../locales/ja'
 const LANG_KEY = 'jbm_drinks_lang'
 
 export const LANGS = {
-  en: { id: 'en', label: 'English', htmlLang: 'en', dict: en },
-  ja: { id: 'ja', label: '日本語', htmlLang: 'ja', dict: ja },
+  en: { id: 'en', label: 'English', htmlLang: 'en', dict: en, optional: false },
+  ja: { id: 'ja', label: '日本語', htmlLang: 'ja', dict: ja, optional: true },
 }
 
+export const DEFAULT_LANG = 'en'
+
 function loadLang() {
-  const saved = localStorage.getItem(LANG_KEY)
-  return saved === 'ja' ? 'ja' : 'en'
+  try {
+    const saved = localStorage.getItem(LANG_KEY)
+    return saved === 'ja' ? 'ja' : DEFAULT_LANG
+  } catch {
+    return DEFAULT_LANG
+  }
 }
 
 let globalLang = loadLang()
@@ -22,9 +28,11 @@ function resolveDict(obj, path) {
 }
 
 export function setGlobalLang(lang) {
-  globalLang = lang === 'ja' ? 'ja' : 'en'
-  localStorage.setItem(LANG_KEY, globalLang)
-  document.documentElement.lang = LANGS[globalLang].htmlLang
+  globalLang = lang === 'ja' ? 'ja' : DEFAULT_LANG
+  try { localStorage.setItem(LANG_KEY, globalLang) } catch { /* ignore */ }
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = LANGS[globalLang].htmlLang
+  }
   listeners.forEach(fn => fn(globalLang))
 }
 

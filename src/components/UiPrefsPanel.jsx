@@ -5,20 +5,23 @@ import { useI18n, LANGS } from '../lib/i18n'
 export function LanguageToggle() {
   const { lang, setLang, t } = useI18n()
   return (
-    <div className="layout-toggle">
-      <span className="theme-toggle-label">{t('shell.language')}</span>
-      <span className="theme-pill layout-pill">
-        {Object.values(LANGS).map(opt => (
-          <button
-            key={opt.id}
-            type="button"
-            className={lang === opt.id ? 'on' : ''}
-            onClick={() => setLang(opt.id)}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </span>
+    <div>
+      <div className="layout-toggle">
+        <span className="theme-toggle-label">{t('shell.language')}</span>
+        <span className="theme-pill layout-pill">
+          {Object.values(LANGS).map(opt => (
+            <button
+              key={opt.id}
+              type="button"
+              className={lang === opt.id ? 'on' : ''}
+              onClick={() => setLang(opt.id)}
+            >
+              {opt.id === 'ja' ? t('shell.langJaOptional') : opt.label}
+            </button>
+          ))}
+        </span>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, paddingLeft: 2 }}>{t('shell.languageHint')}</div>
     </div>
   )
 }

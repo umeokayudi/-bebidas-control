@@ -36,19 +36,19 @@ export function resolveItemPrice(item, priceType = 'regular', discountCode = nul
 }
 
 export function validateDiscountCode(code, { drinkMenuId, produtoId } = {}) {
-  if (!code) return { ok: false, error: 'Código inválido' }
-  if (!code.ativo) return { ok: false, error: 'Código desativado' }
+  if (!code) return { ok: false, errorKey: 'atomicPos.codeInvalid', error: 'Invalid code' }
+  if (!code.ativo) return { ok: false, errorKey: 'atomicPos.codeDisabled', error: 'Code disabled' }
   if (code.valido_ate && code.valido_ate < new Date().toISOString().slice(0, 10)) {
-    return { ok: false, error: 'Código expirado' }
+    return { ok: false, errorKey: 'atomicPos.codeExpired', error: 'Code expired' }
   }
   if (code.max_usos != null && (code.usos_atual || 0) >= code.max_usos) {
-    return { ok: false, error: 'Código esgotado' }
+    return { ok: false, errorKey: 'atomicPos.codeExhausted', error: 'Code used up' }
   }
   if (code.drink_menu_id && drinkMenuId && code.drink_menu_id !== drinkMenuId) {
-    return { ok: false, error: 'Código não vale para este drink' }
+    return { ok: false, errorKey: 'atomicPos.codeWrongDrink', error: 'Code not valid for this drink' }
   }
   if (code.produto_id && produtoId && code.produto_id !== produtoId) {
-    return { ok: false, error: 'Código não vale para este produto' }
+    return { ok: false, errorKey: 'atomicPos.codeWrongProduct', error: 'Code not valid for this product' }
   }
   return { ok: true }
 }
@@ -57,7 +57,7 @@ export async function checkPosSchema(supabase) {
   const { error } = await supabase.from('pos_vendas').select('id').limit(1)
   if (!error) return { ready: true }
   if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
-    return { ready: false, error: 'Tabelas POS não criadas. Execute ATOMIC_POS_SCHEMA.sql' }
+    return { ready: false, error: 'POS tables not created. Run ATOMIC_POS_SCHEMA.sql' }
   }
   return { ready: false, error: error.message }
 }

@@ -1,3 +1,4 @@
+import { getGlobalLang } from './i18n'
 import { filterSupplierVendas } from '../components/utils'
 import { filterJbmDrinksFaturas, faturaPago, faturaRemaining, faturaValor } from './barPortal'
 import {
@@ -84,24 +85,33 @@ export async function fetchClientPortalSnapshot(supabase, bar) {
 
 export function buildClientChatSystem(snapshot) {
   const s = snapshot || {}
-  return `Você é o assistente IA do portal do cliente JBM Drinks para o bar "${s.bar?.nome || 'cliente'}".
-Responda em português, de forma clara e objetiva. Use os dados abaixo como fonte — não invente números.
+  const yen = n => `¥${Math.round(n || 0).toLocaleString('ja-JP')}`
+  const facts = `
+CURRENT DATA (${s.mes || 'this month'}):
+- JBM purchases this month: ${yen(s.comprasMes)} (${s.entregasMes || 0} deliveries)
+- Growth vs last month: ${s.crescimentoPct != null ? s.crescimentoPct + '%' : 'N/A'}
+- POS / counter sales (month): ${yen(s.projecaoPosMes)}
+- Estimated profit: ${yen(s.margemMes)} (${s.margemPct || 0}%)
+- Estimated ROI: ${s.roiPct || 0}%
+- Open invoices: ${s.faturasPendentes || 0} (${yen(s.totalPendente)}) — ${s.faturasAtraso || 0} overdue
+- Paid this month: ${yen(s.faturaPagaMes)}
 
-DADOS ATUAIS (${s.mes || 'mês atual'}):
-- Compras JBM no mês: ¥${Math.round(s.comprasMes || 0).toLocaleString('ja-JP')} (${s.entregasMes || 0} entregas)
-- Crescimento vs mês anterior: ${s.crescimentoPct != null ? s.crescimentoPct + '%' : 'N/A'}
-- Projeção de venda POS (mês): ¥${Math.round(s.projecaoPosMes || 0).toLocaleString('ja-JP')}
-- Margem estimada: ¥${Math.round(s.margemMes || 0).toLocaleString('ja-JP')} (${s.margemPct || 0}%)
-- ROI estimado: ${s.roiPct || 0}%
-- Faturas pendentes: ${s.faturasPendentes || 0} (¥${Math.round(s.totalPendente || 0).toLocaleString('ja-JP')}) — ${s.faturasAtraso || 0} em atraso
-- Fatura paga no mês: ¥${Math.round(s.faturaPagaMes || 0).toLocaleString('ja-JP')}
+Top products (margin): ${JSON.stringify(s.topProducts || [])}
+Recent orders: ${JSON.stringify(s.pedidosRecentes || [])}
+Low stock: ${JSON.stringify(s.estoqueBaixo || [])}
+Recent invoices: ${JSON.stringify(s.faturasResumo || [])}
+Spend last 6 months: ${JSON.stringify(s.gastoUltimos6Meses || [])}
 
-Top produtos (margem): ${JSON.stringify(s.topProducts || [])}
-Pedidos recentes: ${JSON.stringify(s.pedidosRecentes || [])}
-Estoque baixo: ${JSON.stringify(s.estoqueBaixo || [])}
-Faturas recentes: ${JSON.stringify(s.faturasResumo || [])}
-Gasto últimos 6 meses: ${JSON.stringify(s.gastoUltimos6Meses || [])}
+Scope: beverage purchases, orders, deliveries, JBM invoices, POS prices, margin and bar inventory.
+Do not talk about other bars or the holding. If you do not know, say what is missing (e.g. POS prices).`
 
-Escopo: compras de bebidas, pedidos, entregas, faturas JBM, preços POS, margem e estoque do bar.
-Não fale sobre dados de outros bares ou da holding. Se não souber, diga o que falta cadastrar (ex.: preços POS).`
+  if (getGlobalLang() === 'ja') {
+    return `あなたはバー「${s.bar?.nome || 'client'}」向け JBM Drinks クライアントポータルのAIです。
+日本語で、短く分かりやすく答えてください。下のデータを根拠にし、数字を捏造しないでください。
+${facts}`
+  }
+
+  return `You are the JBM Drinks client-portal AI for the bar "${s.bar?.nome || 'client'}".
+Answer in clear English. Use the data below as the source of truth — do not invent numbers.
+${facts}`
 }

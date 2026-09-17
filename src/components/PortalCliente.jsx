@@ -45,20 +45,23 @@ function Badge({ status }) {
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-function SparkLine({ data, color='var(--navy)', height=40 }) {
-  if (!data || data.length < 2) return null
-  const max = Math.max(...data, 1)
-  const w = 200, h = height
-  const pts = data.map((v,i) => {
-    const x = (i / (data.length-1)) * w
-    const y = h - (v/max)*h
-    return x+','+y
-  }).join(' ')
+function EasyMoneyCard({ kicker, value, hint, tone = 'navy', children }) {
+  const tones = {
+    navy: { bg: 'linear-gradient(135deg, var(--navy) 0%, #002855 100%)', color: 'white', hint: 'rgba(255,255,255,0.75)' },
+    light: { bg: 'var(--bg2)', color: 'var(--navy)', hint: 'var(--text2)', border: '1px solid var(--border)' },
+    green: { bg: 'var(--bg2)', color: 'var(--green)', hint: 'var(--text2)', border: '1px solid rgba(52,199,89,0.25)' },
+  }
+  const s = tones[tone] || tones.navy
   return (
-    <svg viewBox={'0 0 '+w+' '+h} style={{ width:'100%', height }} preserveAspectRatio="none">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <polyline points={'0,'+h+' '+pts+' '+w+','+h} fill={color} fillOpacity="0.08" stroke="none"/>
-    </svg>
+    <div className="easy-dash-card" style={{
+      background: s.bg, color: s.color, border: s.border || 'none',
+      borderRadius: 20, padding: '22px 24px',
+    }}>
+      <div className="easy-dash-kicker">{kicker}</div>
+      <div className="easy-dash-value">{value}</div>
+      {hint && <div className="easy-dash-hint" style={{ color: s.hint }}>{hint}</div>}
+      {children}
+    </div>
   )
 }
 
@@ -73,6 +76,7 @@ function HomeTab({ bar, onTab }) {
   const [loading,     setLoading]     = useState(true)
   const [periodo,     setPeriodo]     = useState('30')
   const [chartMonth,  setChartMonth]   = useState(null)
+  const [showMore,    setShowMore]    = useState(false)
 
   useEffect(() => { load() }, [bar])
 
@@ -166,13 +170,20 @@ function HomeTab({ bar, onTab }) {
     '',
   ]
 
+  const attentionItems = []
+  if (account.faturaPendente > 0) {
+    attentionItems.push({ tab: 'faturas', text: t('portal.home.pendingInvoice', { amount: fmtYen(account.faturaPendente) }) })
+  }
+  if (ativos.length > 0) {
+    attentionItems.push({ tab: 'pedidos', text: `${t('portal.home.activeOrders')}: ${ativos.length}` })
+  }
+
   return (
-    <div className="fade-in portal-page" style={{ maxWidth:1000 }}>
-      {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
+    <div className="fade-in portal-page easy-dash" style={{ maxWidth:1000 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, gap:12, flexWrap:'wrap' }}>
         <div>
           <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{t('portal.home.subtitle')}</div>
+          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{t('portal.home.atAGlance')}</div>
         </div>
         <div style={{ display:'flex', gap:6 }}>
           {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
@@ -185,18 +196,14 @@ function HomeTab({ bar, onTab }) {
         </div>
       </div>
 
-      {/* ── Monthly account + POS projection hero ── */}
-      <div className="portal-grid-hero" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:20 }}>
-        <div style={{
-          background:'linear-gradient(135deg, var(--navy) 0%, #002855 100%)',
-          borderRadius:20, padding:'22px 24px', color:'white',
-          boxShadow:'0 12px 40px rgba(0,16,40,0.25)'
-        }}>
-          <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', opacity:0.65, marginBottom:10, fontWeight:700 }}>
-            {t('portal.home.jbmAccount', { month: mes })}
-          </div>
-          <div style={{ fontSize:32, fontWeight:900, lineHeight:1, letterSpacing:-1 }}>{fmtYen(account.contaMes)}</div>
-          <div style={{ fontSize:12, opacity:0.75, marginTop:10 }}>
+      <div className="portal-grid-hero easy-dash-story" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:16 }}>
+        <EasyMoneyCard
+          kicker={t('portal.home.payJbm')}
+          value={fmtYen(account.contaMes)}
+          hint={t('portal.home.payJbmHint')}
+          tone="navy"
+        >
+          <div style={{ fontSize:12, opacity:0.8, marginTop:10 }}>
             {deliveriesLabel}
             {account.growth !== null && (
               <span style={{ marginLeft:8, color: account.growth >= 0 ? '#6ee7b7' : '#fca5a5', fontWeight:700 }}>
@@ -204,91 +211,48 @@ function HomeTab({ bar, onTab }) {
               </span>
             )}
           </div>
-          {account.faturaPendente > 0 && (
-            <div style={{ marginTop:14, padding:'10px 12px', background:'rgba(255,59,48,0.15)', borderRadius:10, fontSize:12, border:'1px solid rgba(255,59,48,0.3)' }}>
-              {t('portal.home.pendingInvoice', { amount: fmtYen(account.faturaPendente) })}
+        </EasyMoneyCard>
+
+        <EasyMoneyCard
+          kicker={t('portal.home.barSold')}
+          value={fmtYen(posMonthTotal != null ? posMonthTotal : monthProjection.posTotal)}
+          hint={posMonthTotal != null ? t('portal.home.barSoldHint') : t('portal.home.sellAtBarPrice', { pct: monthProjection.posCoveragePct })}
+          tone="light"
+        >
+          {monthProjection.estimatedSharePct > 0 && posMonthTotal == null && (
+            <div style={{ marginTop:12, fontSize:11, color:'var(--amber)', fontWeight:600 }}>
+              {t('portal.home.estimated', { pct: monthProjection.estimatedSharePct })}
             </div>
           )}
-          {account.faturasCount === 0 && account.contaMes > 0 && (
-            <div style={{ marginTop:14, fontSize:11, opacity:0.55 }}>{t('portal.home.monthPurchasesNote')}</div>
-          )}
-        </div>
+        </EasyMoneyCard>
 
-        <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:20, padding:'22px 24px' }}>
-          <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            {posMonthTotal != null ? t('portal.home.posCounter') : t('portal.home.projectedRevenue')}
-          </div>
-          <div style={{ fontSize:30, fontWeight:900, color:'var(--navy)', lineHeight:1, letterSpacing:-0.5 }}>
-            {fmtYen(posMonthTotal != null ? posMonthTotal : monthProjection.posTotal)}
-          </div>
-          <div style={{ fontSize:12, color:'var(--text2)', marginTop:10, lineHeight:1.5 }}>
-            {posMonthTotal != null
-              ? t('portal.home.posCounterHint')
-              : t('portal.home.sellAtBarPrice', { pct: monthProjection.posCoveragePct })}
-          </div>
-          <div style={{ marginTop:12, display:'flex', gap:8, flexWrap:'wrap' }}>
-            <span style={{ fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'#EAF0FA', color:'var(--navy)' }}>
-              ROI {monthProjection.roiPct}%
-            </span>
-            {monthProjection.estimatedSharePct > 0 && posMonthTotal == null && (
-              <span style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:20, background:'#fffbeb', color:'var(--amber)' }}>
-                {t('portal.home.estimated', { pct: monthProjection.estimatedSharePct })}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div style={{ background:'var(--bg2)', border:'1px solid rgba(52,199,89,0.25)', borderRadius:20, padding:'22px 24px' }}>
-          <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            {t('portal.home.projectedProfit')}
-          </div>
-          <div style={{ fontSize:30, fontWeight:900, color:'var(--green)', lineHeight:1, letterSpacing:-0.5 }}>
-            {fmtYen(monthProjection.margin)}
-          </div>
-          <div style={{ fontSize:12, color:'var(--text2)', marginTop:10 }}>
+        <EasyMoneyCard
+          kicker={t('portal.home.youKeep')}
+          value={fmtYen(monthProjection.margin)}
+          hint={t('portal.home.youKeepHint')}
+          tone="green"
+        >
+          <div style={{ fontSize:12, color:'var(--text2)', marginTop:8 }}>
             {t('portal.home.marginOnPos', { pct: monthProjection.marginPct })}
           </div>
-          <div style={{ marginTop:14, height:6, background:'var(--bg3)', borderRadius:3, overflow:'hidden' }}>
+          <div style={{ marginTop:12, height:6, background:'var(--bg3)', borderRadius:3, overflow:'hidden' }}>
             <div style={{ height:'100%', width:Math.min(monthProjection.marginPct,100)+'%', background:'var(--green)', borderRadius:3 }}/>
           </div>
-        </div>
+        </EasyMoneyCard>
       </div>
 
-      {/* Period projection strip */}
-      {periodo !== '30' || monthProjection.jbmTotal !== periodProjection.jbmTotal ? (
-        <div style={{ background:'#fffbeb', border:'1px solid #fcd34d', borderRadius:14, padding:'12px 16px', marginBottom:16, fontSize:12, display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
-          <span>
-            <strong>{t('portal.home.periodStrip', {
-              days: periodo,
-              jbm: fmtYen(periodProjection.jbmTotal),
-              pos: fmtYen(periodProjection.posTotal),
-              margin: fmtYen(periodProjection.margin),
-            })}</strong>
-          </span>
-          <button onClick={()=>onTab('precos')} style={{ border:'none', background:'transparent', color:'var(--navy)', fontWeight:700, cursor:'pointer', fontSize:12 }}>
-            {t('portal.home.adjustPosPrices')}
-          </button>
+      {attentionItems.length > 0 ? (
+        <div className="easy-dash-alert" style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:8 }}>{t('portal.home.needsAttention')}</div>
+          {attentionItems.map(item => (
+            <button key={item.tab} type="button" onClick={() => onTab(item.tab)} className="easy-dash-alert-item">
+              {item.text}
+            </button>
+          ))}
         </div>
-      ) : null}
-
-      {/* KPI row */}
-      <div className="portal-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
-        {[
-          { label:t('portal.home.totalSpend'), value:fmtYen(totalPeriod), sub: growthSub, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
-          { label:t('common.deliveries'), value:vendasPeriod.length, sub:t('portal.home.inDays', { days: periodo }), color:'var(--blue)' },
-          { label:t('portal.home.avgPerDelivery'), value:fmtYen(avgOrder), sub:t('portal.home.perDelivery'), color:'var(--green)' },
-          { label:t('portal.home.activeOrders'), value:ativos.length, sub:ativos.length>0?ativos.map(p=>t(`orderStatus.${p.status}`)).join(', '):t('portal.home.allOk'), color:ativos.length>0?'var(--gold)':'var(--green)' },
-        ].map(k => (
-          <div key={k.label} style={{
-            background:'var(--bg2)', border:'1px solid var(--border)',
-            borderRadius:16, padding:'16px 18px'
-          }}>
-            <div style={{ fontSize:10, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8, fontWeight:600 }}>{k.label}</div>
-            <div style={{ fontSize:22, fontWeight:800, color:k.color, lineHeight:1 }}>{k.value}</div>
-            {k.sub && <div style={{ fontSize:11, color:k.subColor||'var(--text2)', marginTop:6, fontWeight:k.subColor?600:400 }}>{k.sub}</div>}
-          </div>
-        ))}
-      </div>
+      ) : (
+        <div className="easy-dash-ok" style={{ marginBottom:16 }}>{t('portal.home.allClear')}</div>
+      )}
 
       {/* Spend chart — clickable */}
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>
@@ -518,6 +482,33 @@ function HomeTab({ bar, onTab }) {
           }
         </div>
       </div>
+
+      <button type="button" className="easy-dash-more" onClick={() => setShowMore(v => !v)}>
+        {showMore ? t('portal.home.hideDetails') : t('portal.home.showDetails')}
+      </button>
+
+      {showMore && (
+        <div className="easy-dash-details">
+          <div className="portal-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+            {[
+              { label:t('portal.home.totalSpend'), value:fmtYen(totalPeriod), sub: growthSub, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
+              { label:t('common.deliveries'), value:vendasPeriod.length, sub:t('portal.home.inDays', { days: periodo }), color:'var(--blue)' },
+              { label:t('portal.home.avgPerDelivery'), value:fmtYen(avgOrder), sub:t('portal.home.perDelivery'), color:'var(--green)' },
+              { label:t('portal.home.activeOrders'), value:ativos.length, sub:ativos.length>0?ativos.map(p=>t(`orderStatus.${p.status}`)).join(', '):t('portal.home.allOk'), color:ativos.length>0?'var(--gold)':'var(--green)' },
+            ].map(k => (
+              <div key={k.label} style={{
+                background:'var(--bg2)', border:'1px solid var(--border)',
+                borderRadius:16, padding:'16px 18px'
+              }}>
+                <div style={{ fontSize:10, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8, fontWeight:600 }}>{k.label}</div>
+                <div style={{ fontSize:22, fontWeight:800, color:k.color, lineHeight:1 }}>{k.value}</div>
+                {k.sub && <div style={{ fontSize:11, color:k.subColor||'var(--text2)', marginTop:6, fontWeight:k.subColor?600:400 }}>{k.sub}</div>}
+              </div>
+            ))}
+          </div>
+          <ClientAnalyticsTab bar={bar} onTab={onTab} />
+        </div>
+      )}
     </div>
   )
 }
@@ -2223,20 +2214,21 @@ function FaturasTab({ bar }) {
 
 // ── PREÇOS + CARDÁPIO (aba unificada) ─────────────────────────────────────────
 function PrecosCardapioTab({ bar }) {
+  const { t } = useI18n()
   const [sub, setSub] = useState('precos')
   return (
     <div className="fade-in portal-page">
       <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
         {[
-          { id:'precos', label:'Preços POS', icon:'💰' },
-          { id:'cardapio', label:'Cardápio', icon:'🍹' },
-        ].map(t => (
-          <button key={t.id} onClick={()=>setSub(t.id)} style={{
+          { id:'precos', label:t('portal.home.posPricesTab'), icon:'💰' },
+          { id:'cardapio', label:t('portal.home.menuTab'), icon:'🍹' },
+        ].map(item => (
+          <button key={item.id} onClick={()=>setSub(item.id)} style={{
             padding:'10px 18px', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer',
-            border: sub===t.id ? '2px solid var(--navy)' : '1px solid var(--border)',
-            background: sub===t.id ? 'var(--navy)' : 'var(--bg2)',
-            color: sub===t.id ? 'white' : 'var(--text)',
-          }}>{t.icon} {t.label}</button>
+            border: sub===item.id ? '2px solid var(--navy)' : '1px solid var(--border)',
+            background: sub===item.id ? 'var(--navy)' : 'var(--bg2)',
+            color: sub===item.id ? 'white' : 'var(--text)',
+          }}>{item.icon} {item.label}</button>
         ))}
       </div>
       {sub === 'precos' ? <PricingTab bar={bar} /> : <MenuTab bar={bar} />}
@@ -2302,12 +2294,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
       </aside>
       <main className="app-main app-main-wide">
         {tab==='inicio' && posAccess !== 'cashier' && (
-          <>
-            <HomeTab bar={bar} onTab={selectTab} />
-            <div style={{ marginTop: 32, paddingTop: 24, borderTop: '2px solid var(--border)' }}>
-              <ClientAnalyticsTab bar={bar} onTab={selectTab} />
-            </div>
-          </>
+          <HomeTab bar={bar} onTab={selectTab} />
         )}
         {tab==='pos'       && posAccess !== 'none' && <AtomicPosPanel bar={bar} onOrder={posAccess === 'owner' ? () => selectTab('pedidos') : undefined} access={posAccess} />}
         {tab==='ponto'     && <TimeClockPanel bar={bar} />}
