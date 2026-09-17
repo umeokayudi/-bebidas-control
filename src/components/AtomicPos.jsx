@@ -264,7 +264,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
 }
 
 // ── VIP ───────────────────────────────────────────────────────────────────────
-function PosVipTab({ bar, drinks, onUpdate }) {
+export function PosVipTab({ bar, drinks, onUpdate }) {
   const { user } = useAuth()
   const [members, setMembers] = useState([])
   const [usages, setUsages] = useState([])
@@ -518,7 +518,7 @@ function PosPricesTab({ bar, drinks, onRefresh }) {
 }
 
 // ── DISCOUNT CODES ────────────────────────────────────────────────────────────
-function PosDiscountTab({ bar, drinks, onUpdate }) {
+export function PosDiscountTab({ bar, drinks, onUpdate }) {
   const [codes, setCodes] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({

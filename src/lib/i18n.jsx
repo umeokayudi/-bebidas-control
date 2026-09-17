@@ -10,6 +10,7 @@ export const LANGS = {
 }
 
 function loadLang() {
+  if (typeof localStorage === 'undefined') return 'en'
   const saved = localStorage.getItem(LANG_KEY)
   return saved === 'ja' ? 'ja' : 'en'
 }
