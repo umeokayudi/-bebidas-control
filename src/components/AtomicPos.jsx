@@ -3,29 +3,29 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { fmtYen, fmtDate, Spinner, SectionTitle } from './utils'
 import {
-  applyDiscount,
   cartTotal,
   checkPosSchema,
-  fetchPosSetupStatus,
   generateDiscountCode,
+  hourlySalesSummary,
+  posSalePayload,
   resolveItemPrice,
+  stockLevels,
   todayKey,
   validateDiscountCode,
 } from '../lib/atomicPos'
 import { useI18n } from '../lib/i18n'
 
 const SUB_TAB_IDS = [
+  { id: 'dashboard', key: 'tabDashboard', icon: '📊' },
   { id: 'checkout', key: 'tabCheckout', icon: '🧾' },
   { id: 'vip', key: 'tabVip', icon: '⭐' },
   { id: 'prices', key: 'tabPrices', icon: '💴' },
   { id: 'discounts', key: 'tabDiscounts', icon: '🏷️' },
 ]
 
-function SetupBanner({ onRefresh }) {
+function SetupBanner({ ready, onRefresh }) {
   const { t } = useI18n()
-  const [setup, setSetup] = useState(null)
-  useEffect(() => { fetchPosSetupStatus().then(setSetup) }, [])
-  if (setup?.ready || setup?.tables?.pos_vendas === 'ok') return null
+  if (ready !== false) return null
   return (
     <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 16, marginBottom: 20, fontSize: 13 }}>
       <strong>{t('atomicPos.setupRequired')}</strong>
@@ -89,6 +89,13 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
   }
 
   function addToCart(item) {
+    if (activeCode) {
+      const validation = validateDiscountCode(activeCode, {
+        drinkMenuId: item.kind === 'drink' ? item.id : null,
+        produtoId: item.kind === 'shot' ? item.id : null,
+      })
+      if (!validation.ok) return alert(validation.error)
+    }
     const pricing = resolveItemPrice(item, priceType === 'codigo' ? 'regular' : priceType, activeCode)
     setCart(prev => {
       const ex = prev.find(x => x.key === item.key && x.tipo_preco === pricing.tipo_preco)
@@ -108,78 +115,46 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, onSale 
   async function completeSale() {
     if (!cart.length) return
     setSaving(true)
-    const subtotal = cart.reduce((a, it) => a + (it.preco_lista || it.preco_unitario) * it.qtd, 0)
-    const total = cartTotal(cart)
-    const desconto = subtotal - total
-    const tipo = priceType === 'vip' || vipId ? 'vip' : activeCode ? 'desconto' : 'balcao'
+    const payload = posSalePayload({
+      barId: bar.id,
+      userId: user?.id,
+      cart,
+      paymentMethod: payMethod,
+      vipMemberId: vipId,
+      discountCode: activeCode,
+    })
+    const { error } = await supabase.rpc('register_pos_sale', payload)
 
-    const { data: venda, error } = await supabase.from('pos_vendas').insert({
-      bar_id: bar.id,
-      data: todayKey(),
-      subtotal,
-      desconto_total: desconto,
-      total,
-      metodo_pagamento: payMethod,
-      tipo,
-      vip_member_id: vipId || null,
-      discount_code_id: activeCode?.id || null,
-      criado_por: user?.id,
-    }).select().single()
-
-    if (error) { alert(error.message); setSaving(false); return }
-
-    await supabase.from('pos_vendas_itens').insert(
-      cart.map(it => ({
-        pos_venda_id: venda.id,
-        drink_menu_id: it.drink_menu_id,
-        produto_id: it.produto_id,
-        nome: it.nome,
-        qtd: it.qtd,
-        preco_unitario: it.preco_unitario,
-        preco_lista: it.preco_lista,
-        tipo_preco: it.tipo_preco,
-        desconto_valor: it.desconto_valor || 0,
-      }))
-    )
-
-    if (activeCode) {
-      await supabase.from('discount_codes').update({ usos_atual: (activeCode.usos_atual || 0) + 1 }).eq('id', activeCode.id)
-      await supabase.from('discount_usages').insert({
-        bar_id: bar.id,
-        discount_code_id: activeCode.id,
-        pos_venda_id: venda.id,
-        valor_desconto: desconto,
-      })
+    if (error) {
+      alert(t('atomicPos.saleError', { message: error.message }))
+      setSaving(false)
+      return
     }
 
-    if (vipId) {
-      for (const it of cart) {
-        await supabase.from('vip_usages').insert({
-          bar_id: bar.id,
-          vip_member_id: vipId,
-          drink_menu_id: it.drink_menu_id,
-          produto_id: it.produto_id,
-          nome: it.nome,
-          qtd: it.qtd,
-          preco_aplicado: it.preco_unitario,
-          preco_lista: it.preco_lista,
-          tipo: 'vip',
-          pos_venda_id: venda.id,
-          criado_por: user?.id,
-        })
-      }
-    }
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token
+      if (!token) return
+      fetch('/api/pos-restock-webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ barId: bar.id }),
+      }).catch(() => {})
+    })
 
     setCart([])
     setActiveCode(null)
     setCodeInput('')
+    setVipId('')
     setSaving(false)
     onSale?.()
-    alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }))
+    alert(t('atomicPos.saleRegistered', { amount: fmtYen(payload.p_total) }))
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+    <div className="pos-checkout-layout">
       <div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           {['regular', 'vip', 'codigo'].map(pt => (
@@ -613,6 +588,121 @@ function PosDiscountTab({ bar, drinks, onUpdate }) {
   )
 }
 
+function PosDashboardTab({ bar, refreshKey }) {
+  const { t } = useI18n()
+  const [sales, setSales] = useState([])
+  const [stock, setStock] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    async function load() {
+      setLoading(true)
+      setError('')
+      const [salesResult, productsResult, movementsResult, rulesResult] = await Promise.all([
+        supabase.from('pos_vendas').select('id,total,metodo_pagamento,tipo,criado_em,pos_vendas_itens(nome,qtd,preco_unitario)').eq('bar_id', bar.id).eq('data', todayKey()).order('criado_em'),
+        supabase.from('produtos_public').select('id,nome,categoria').eq('ativo', true).order('nome'),
+        supabase.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', bar.id),
+        supabase.from('estoque_regras').select('produto_id,minimo').eq('bar_id', bar.id),
+      ])
+      if (!active) return
+      const firstError = [salesResult, productsResult, movementsResult, rulesResult].find(result => result.error)?.error
+      if (firstError) setError(firstError.message)
+      setSales(salesResult.data || [])
+      setStock(stockLevels(productsResult.data, movementsResult.data, rulesResult.data))
+      setLoading(false)
+    }
+    load()
+    return () => { active = false }
+  }, [bar.id, refreshKey])
+
+  if (loading) return <Spinner text={t('atomicPos.loadingDashboard')} />
+  if (error) return <div className="pos-error">{t('atomicPos.dashboardError', { message: error })}</div>
+
+  const hourly = hourlySalesSummary(sales)
+  const activeHours = hourly.filter(row => row.count > 0)
+  const chartRows = activeHours.length > 0 ? activeHours : hourly.filter(row => row.hour >= 18 || row.hour <= 5)
+  const maxHourly = Math.max(...chartRows.map(row => row.total), 1)
+  const total = sales.reduce((sum, sale) => sum + (+sale.total || 0), 0)
+  const ticket = sales.length ? Math.round(total / sales.length) : 0
+  const lowStock = stock.filter(item => item.low)
+  const items = sales.flatMap(sale => sale.pos_vendas_itens || [])
+  const itemTotals = {}
+  for (const item of items) {
+    const current = itemTotals[item.nome] || { name: item.nome, quantity: 0, total: 0 }
+    current.quantity += +item.qtd || 0
+    current.total += (+item.preco_unitario || 0) * (+item.qtd || 0)
+    itemTotals[item.nome] = current
+  }
+  const topItems = Object.values(itemTotals).sort((a, b) => b.total - a.total).slice(0, 5)
+
+  return (
+    <div className="pos-dashboard">
+      <div className="pos-kpi-grid">
+        <StatCard label={t('atomicPos.revenueToday')} value={fmtYen(total)} />
+        <StatCard label={t('atomicPos.salesToday')} value={sales.length} />
+        <StatCard label={t('atomicPos.averageTicket')} value={fmtYen(ticket)} />
+        <StatCard label={t('atomicPos.lowStock')} value={lowStock.length} />
+      </div>
+
+      <div className="pos-dashboard-grid">
+        <div className="card">
+          <SectionTitle>{t('atomicPos.hourlyRevenue')}</SectionTitle>
+          <div className="pos-hourly-chart" aria-label={t('atomicPos.hourlyRevenue')}>
+            {chartRows.map(row => (
+              <div className="pos-hour-cell" key={row.hour} title={`${row.label} · ${fmtYen(row.total)} · ${row.count}`}>
+                <div className="pos-hour-value">{row.total ? fmtYen(row.total) : '—'}</div>
+                <div className="pos-hour-track">
+                  <div className="pos-hour-bar" style={{ height: `${Math.max(row.total ? 8 : 0, (row.total / maxHourly) * 100)}%` }} />
+                </div>
+                <div className="pos-hour-label">{row.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <SectionTitle>{t('atomicPos.stockAlerts')}</SectionTitle>
+          {lowStock.length === 0 ? (
+            <div className="pos-empty">{t('atomicPos.stockOk')}</div>
+          ) : lowStock.slice(0, 6).map(item => (
+            <div className="pos-list-row" key={item.id}>
+              <span>{item.nome}</span>
+              <strong className="pos-stock-low">{item.stock} / {item.minimum}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <SectionTitle>{t('atomicPos.topItems')}</SectionTitle>
+          {topItems.length === 0 ? (
+            <div className="pos-empty">{t('atomicPos.noSalesYet')}</div>
+          ) : topItems.map(item => (
+            <div className="pos-list-row" key={item.name}>
+              <span>{item.name} <small>× {item.quantity}</small></span>
+              <strong>{fmtYen(item.total)}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <SectionTitle>{t('atomicPos.salesMix')}</SectionTitle>
+          {['balcao', 'vip', 'desconto'].map(type => {
+            const count = sales.filter(sale => sale.tipo === type).length
+            return (
+              <div className="pos-list-row" key={type}>
+                <span>{t(`atomicPos.saleType_${type}`)}</span>
+                <strong>{count}</strong>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatCard({ label, value }) {
   return (
     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
@@ -625,7 +715,7 @@ function StatCard({ label, value }) {
 // ── MAIN PANEL ────────────────────────────────────────────────────────────────
 export default function AtomicPosPanel({ bar }) {
   const { t } = useI18n()
-  const [subTab, setSubTab] = useState('checkout')
+  const [subTab, setSubTab] = useState('dashboard')
   const [ready, setReady] = useState(null)
   const [drinks, setDrinks] = useState([])
   const [shots, setShots] = useState([])
@@ -633,6 +723,7 @@ export default function AtomicPosPanel({ bar }) {
   const [vipMembers, setVipMembers] = useState([])
   const [todaySales, setTodaySales] = useState({ count: 0, total: 0 })
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => { init() }, [bar])
 
@@ -661,7 +752,7 @@ export default function AtomicPosPanel({ bar }) {
 
   return (
     <div className="fade-in">
-      <SetupBanner onRefresh={init} />
+      <SetupBanner ready={ready} onRefresh={init} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
@@ -698,8 +789,19 @@ export default function AtomicPosPanel({ bar }) {
 
       {(ready || subTab !== 'checkout') && (
         <>
+          {subTab === 'dashboard' && <PosDashboardTab bar={bar} refreshKey={refreshKey} />}
           {subTab === 'checkout' && ready && (
-            <PosCheckoutTab bar={bar} drinks={drinks} shots={shots} discountCodes={discountCodes} vipMembers={vipMembers} onSale={init} />
+            <PosCheckoutTab
+              bar={bar}
+              drinks={drinks}
+              shots={shots}
+              discountCodes={discountCodes}
+              vipMembers={vipMembers}
+              onSale={() => {
+                setRefreshKey(key => key + 1)
+                init()
+              }}
+            />
           )}
           {subTab === 'vip' && <PosVipTab bar={bar} drinks={drinks} onUpdate={init} />}
           {subTab === 'prices' && <PosPricesTab bar={bar} drinks={drinks} onRefresh={init} />}

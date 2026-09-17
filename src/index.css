@@ -1782,3 +1782,121 @@ html[data-layout="mobile"] .metric-card-hover:hover {
   align-items: center;
   gap: 8px;
 }
+
+/* Bar POS — isolated operational workspace */
+.pos-checkout-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.pos-kpi-grid,
+.pos-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pos-dashboard-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.pos-hourly-chart {
+  display: flex;
+  gap: 8px;
+  height: 180px;
+  align-items: flex-end;
+  overflow-x: auto;
+  padding: 18px 2px 2px;
+}
+
+.pos-hour-cell {
+  min-width: 46px;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pos-hour-value {
+  min-height: 18px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text2);
+}
+
+.pos-hour-track {
+  flex: 1;
+  width: 70%;
+  display: flex;
+  align-items: flex-end;
+  background: var(--bg3);
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
+}
+
+.pos-hour-bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--gold2), var(--gold));
+  border-radius: 6px 6px 0 0;
+}
+
+.pos-hour-label {
+  margin-top: 6px;
+  font-size: 9px;
+  color: var(--text3);
+}
+
+.pos-list-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.pos-list-row:last-child {
+  border-bottom: 0;
+}
+
+.pos-list-row small,
+.pos-empty {
+  color: var(--text3);
+}
+
+.pos-stock-low {
+  color: var(--red);
+}
+
+.pos-error {
+  padding: 16px;
+  border: 1px solid rgba(160, 41, 28, 0.25);
+  border-radius: 12px;
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+@media (max-width: 900px) {
+  .pos-checkout-layout,
+  .pos-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pos-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pos-checkout-layout > :last-child {
+    position: static !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .pos-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
