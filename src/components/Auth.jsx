@@ -118,6 +118,18 @@ export function LoginPage() {
           backdropFilter:'blur(10px)'
         }}>
           <LoginLanguagePicker />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:18 }}>
+            {[
+              { k: 'auth.laneJbm', d: 'JBM' },
+              { k: 'auth.laneOwner', d: 'Bar' },
+              { k: 'auth.lanePos', d: 'POS' },
+              { k: 'auth.laneStaff', d: 'Staff' },
+            ].map(lane => (
+              <div key={lane.k} style={{ fontSize:9, textAlign:'center', padding:'6px 4px', borderRadius:8, border:'1px solid rgba(193,156,86,0.2)', color:'rgba(255,255,255,0.45)' }}>
+                {t(lane.k)}
+              </div>
+            ))}
+          </div>
           <div style={{fontSize:14,fontWeight:600,color:'rgba(255,255,255,0.6)',
             marginBottom:24,textAlign:'center',letterSpacing:'0.05em',textTransform:'uppercase'}}>
             {mode==='login'?t('auth.systemAccess'):t('auth.createAccount')}

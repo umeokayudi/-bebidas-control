@@ -923,9 +923,10 @@ function PosDrinkBackTab({ bar, onUpdate }) {
 }
 
 // ── MAIN PANEL ────────────────────────────────────────────────────────────────
-export default function AtomicPosPanel({ bar, onOrder }) {
+export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
   const { t } = useI18n()
-  const [subTab, setSubTab] = useState('dashboard')
+  const [subTab, setSubTab] = useState(access === 'cashier' ? 'checkout' : 'dashboard')
+  const tabs = access === 'cashier' ? SUB_TAB_IDS.filter(t => t.id === 'checkout') : SUB_TAB_IDS
   const [ready, setReady] = useState(null)
   const [drinks, setDrinks] = useState([])
   const [shots, setShots] = useState([])
@@ -983,7 +984,7 @@ export default function AtomicPosPanel({ bar, onOrder }) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {SUB_TAB_IDS.map(tab => (
+        {tabs.map(tab => (
           <button key={tab.id} onClick={() => setSubTab(tab.id)} style={{
             padding: '10px 18px', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer',
             background: subTab === tab.id ? 'var(--navy)' : 'var(--bg2)',

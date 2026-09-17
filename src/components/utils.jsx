@@ -72,6 +72,8 @@ export function roleLabel(role) {
   if (role === 'admin') return translate('shell.roles.admin')
   if (role === 'cliente') return translate('shell.roles.cliente')
   if (role === 'funcionario') return translate('shell.roles.funcionario')
+  if (role === 'caixa') return translate('shell.roles.caixa')
+  if (role === 'bar_staff') return translate('shell.roles.bar_staff')
   return translate('shell.roles.staff')
 }
 

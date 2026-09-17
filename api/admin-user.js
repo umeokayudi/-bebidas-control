@@ -1,6 +1,10 @@
 import { requireStaff } from './_requireStaff.js'
 import { drinksAdminClient } from './_supabaseAdmin.js'
 
+function needsBar(role) {
+  return ['cliente', 'caixa', 'bar_staff'].includes(role)
+}
+
 function authEmail(user) {
   return user?.email || ''
 }
@@ -40,8 +44,8 @@ export default async function handler(req, res) {
       if (!email || !password || !nome || !role) {
         return res.status(400).json({ error: 'Missing fields: email, password, name, role' })
       }
-      if (role === 'cliente' && !bar_id) {
-        return res.status(400).json({ error: 'Bar clients must be linked to a bar' })
+      if (needsBar(role) && !bar_id) {
+        return res.status(400).json({ error: 'Bar clients/staff must be linked to a bar' })
       }
 
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
@@ -58,7 +62,7 @@ export default async function handler(req, res) {
         nome,
         email: email.trim().toLowerCase(),
         role,
-        bar_id: role === 'cliente' ? bar_id : null,
+        bar_id: needsBar(role) ? bar_id : null,
       }
 
       const { error: pErr } = await admin.from('perfis').upsert(perfilPayload, { onConflict: 'id' })
@@ -86,8 +90,8 @@ export default async function handler(req, res) {
       if (nome != null) perfilPatch.nome = nome
       if (role != null) perfilPatch.role = role
       if (email) perfilPatch.email = email.trim().toLowerCase()
-      if (role === 'cliente') {
-        if (!bar_id) return res.status(400).json({ error: 'Bar clients must be linked to a bar' })
+      if (needsBar(role)) {
+        if (!bar_id) return res.status(400).json({ error: 'Bar clients/staff must be linked to a bar' })
         perfilPatch.bar_id = bar_id
       } else if (role != null) {
         perfilPatch.bar_id = null

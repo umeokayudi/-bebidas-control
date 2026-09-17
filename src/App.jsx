@@ -20,6 +20,7 @@ import RelatorioTab from './components/Relatorio'
 import RyoshushoTab from './components/Ryoshusho'
 import SeikyushoTab from './components/Seikyusho'
 import PortalCliente from './components/PortalCliente'
+import { isBarRole } from './lib/access'
 import { ProductsTab, BarsTab, UsuariosTab } from './components/Configs'
 import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
@@ -347,7 +348,7 @@ function Shell() {
   }
 
   useEffect(() => {
-    if (perfil?.role === 'cliente' && perfil.bar_id) {
+    if (isBarRole(perfil?.role) && perfil.bar_id) {
       supabase.from('bars').select('*').eq('id', perfil.bar_id).single()
         .then(({ data }) => setBar(data))
     }
@@ -366,8 +367,8 @@ function Shell() {
 
   if (!user) return <LoginPage />
 
-  // PORTAL DO CLIENTE
-  if (perfil?.role === 'cliente') {
+  // PORTAL DO BAR (dono / caixa tablet / staff) — isolado do painel JBM
+  if (isBarRole(perfil?.role)) {
     if (!perfil.bar_id) {
       return (
         <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--navy)', color:'white', flexDirection:'column', gap:16, padding:24, textAlign:'center' }}>

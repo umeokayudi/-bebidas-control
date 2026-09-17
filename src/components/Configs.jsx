@@ -230,9 +230,11 @@ export function UsuariosTab() {
   }
 
   async function saveEdit(id) {
-    if (form.role === 'cliente' && !form.bar_id) {
-      setErr('Select a bar for client accounts')
-      return
+    if (form.role === 'cliente' || form.role === 'caixa' || form.role === 'bar_staff') {
+      if (!form.bar_id) {
+        setErr('Select a bar for this login')
+        return
+      }
     }
     setSaving(true)
     setErr('')
@@ -245,7 +247,7 @@ export function UsuariosTab() {
           nome: form.nome,
           email: form.email,
           role: form.role,
-          bar_id: form.role === 'cliente' ? form.bar_id : null,
+          bar_id: (form.role === 'cliente' || form.role === 'caixa' || form.role === 'bar_staff') ? form.bar_id : null,
           password: editPw || undefined,
         }),
       })
@@ -279,8 +281,8 @@ export function UsuariosTab() {
     })
   }
 
-  const roleColor = { admin:'var(--gold)', staff:'var(--navy)', funcionario:'var(--navy)', cliente:'var(--green)' }
-  const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Cliente' }[r] || r)
+  const roleColor = { admin:'var(--gold)', staff:'var(--navy)', funcionario:'var(--navy)', cliente:'var(--green)', caixa:'#7c3aed', bar_staff:'#0f766e' }
+  const roleLabel = r => ({ admin:'Admin', staff:'Staff', funcionario:'Staff', cliente:'Dono do bar', caixa:'Caixa tablet', bar_staff:'Staff do bar' }[r] || r)
 
   if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:200,color:'var(--text2)'}}><span className="spinner"/>{t('configs.usersLoading')}</div>
 
@@ -312,8 +314,10 @@ export function UsuariosTab() {
               <option value="admin">Admin</option>
               <option value="staff">{t('shell.roles.staff')}</option>
               <option value="cliente">{t('configs.roleClientPortal')}</option>
+              <option value="caixa">{t('shell.roles.caixa')}</option>
+              <option value="bar_staff">{t('shell.roles.bar_staff')}</option>
             </select>
-            {form.role === 'cliente' && (
+            {(form.role === 'cliente' || form.role === 'caixa' || form.role === 'bar_staff') && (
               <select className="input" value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} style={{ gridColumn:'span 2' }}>
                 <option value="">{t('configs.selectBarRequired')}</option>
                 {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
@@ -321,7 +325,7 @@ export function UsuariosTab() {
             )}
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} disabled={creating||!newEmail||!newPw||!form.nome||(form.role==='cliente'&&!form.bar_id)}
+            <button className="btn-primary" style={{fontSize:12,padding:'8px 16px'}} disabled={creating||!newEmail||!newPw||!form.nome||((form.role==='cliente'||form.role==='caixa'||form.role==='bar_staff')&&!form.bar_id)}
               onClick={async()=>{
                 setCreating(true)
                 setErr('')
@@ -369,10 +373,12 @@ export function UsuariosTab() {
                         <option value="admin">Admin</option>
                         <option value="staff">Staff</option>
                         <option value="cliente">Cliente</option>
+                        <option value="caixa">Caixa</option>
+                        <option value="bar_staff">Bar staff</option>
                       </select>
                     </td>
                     <td style={{padding:'8px 14px'}}>
-                      <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} disabled={form.role !== 'cliente'}>
+                      <select className="input" style={{padding:'4px 8px',fontSize:12}} value={form.bar_id} onChange={e=>setForm({...form,bar_id:e.target.value})} disabled={!(form.role==='cliente'||form.role==='caixa'||form.role==='bar_staff')}>
                         <option value="">—</option>
                         {bars.map(b=><option key={b.id} value={b.id}>{b.nome}</option>)}
                       </select>

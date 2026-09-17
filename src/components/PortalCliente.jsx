@@ -24,7 +24,10 @@ import ClientAnalyticsTab from './ClientAnalyticsTab'
 import PortalRecibosTab from './PortalRecibosTab'
 import PortalClienteAI from './PortalClienteAI'
 import AtomicPosPanel from './AtomicPos'
+import TimeClockPanel from './TimeClock'
+import BarTeamTab from './BarTeamTab'
 import { isRestockPedido } from '../lib/posSupply'
+import { navForBarRole, defaultBarTab, posAccessForRole, canManageBarTeam } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 
@@ -2245,7 +2248,9 @@ function PrecosCardapioTab({ bar }) {
 import { NotificationBell } from './Notifications'
 
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
-  const [tab, setTab] = useState('inicio')
+  const { perfil } = useAuth()
+  const NAV = navForBarRole(perfil?.role)
+  const [tab, setTab] = useState(() => defaultBarTab(perfil?.role))
   const [menuOpen, setMenuOpen] = useState(false)
   const { t } = useI18n()
 
@@ -2256,17 +2261,8 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
     setMenuOpen(false)
   }
 
-  const NAV = [
-    { id:'inicio',    labelKey:'nav.portalHome', icon:'🏠' },
-    { id:'pos',       labelKey:'nav.portalPos', icon:'🧾' },
-    { id:'pedidos',   labelKey:'nav.portalOrders', icon:'🛒' },
-    { id:'entregas',  labelKey:'nav.portalDeliveries', icon:'📦' },
-    { id:'estoque',   labelKey:'nav.portalInventory', icon:'📊' },
-    { id:'precos',    labelKey:'nav.portalPrices', icon:'💰' },
-    { id:'faturas',   labelKey:'nav.portalInvoices', icon:'💳' },
-    { id:'recibos',   labelKey:'nav.portalReceipts', icon:'🧾' },
-    { id:'ia',        labelKey:'nav.portalAi', icon:'🤖' },
-  ]
+  const posAccess = posAccessForRole(perfil?.role)
+  const footerKey = perfil?.role === 'caixa' ? 'portal.footerCaixa' : perfil?.role === 'bar_staff' ? 'portal.footerStaff' : 'portal.footerHint'
 
   return (
     <div className="app-shell">
@@ -2295,7 +2291,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>{t('shell.clientPortal')}</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--gold)',marginBottom:12}}>{bar.nome}</div>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',marginBottom:10,lineHeight:1.5}}>
-            {t('portal.footerHint')}
+            {t(footerKey)}
           </div>
           <div className="sidebar-footer-notifs">
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
@@ -2305,7 +2301,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         </div>
       </aside>
       <main className="app-main app-main-wide">
-        {tab==='inicio' && (
+        {tab==='inicio' && posAccess !== 'cashier' && (
           <>
             <HomeTab bar={bar} onTab={selectTab} />
             <div style={{ marginTop: 32, paddingTop: 24, borderTop: '2px solid var(--border)' }}>
@@ -2313,14 +2309,16 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
             </div>
           </>
         )}
-        {tab==='pos'       && <AtomicPosPanel bar={bar} onOrder={() => selectTab('pedidos')} />}
-        {tab==='pedidos'   && <OrdersTab bar={bar} />}
-        {tab==='entregas'  && <DeliveriesTab bar={bar} />}
-        {tab==='estoque'   && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}
-        {tab==='precos'    && <PrecosCardapioTab bar={bar} />}
-        {tab==='faturas'   && <FaturasTab bar={bar} />}
-        {tab==='recibos'  && <PortalRecibosTab bar={bar} />}
-        {tab==='ia'       && <PortalClienteAI bar={bar} />}
+        {tab==='pos'       && posAccess !== 'none' && <AtomicPosPanel bar={bar} onOrder={posAccess === 'owner' ? () => selectTab('pedidos') : undefined} access={posAccess} />}
+        {tab==='ponto'     && <TimeClockPanel bar={bar} />}
+        {tab==='equipe'    && canManageBarTeam(perfil?.role) && <BarTeamTab bar={bar} />}
+        {tab==='pedidos'   && canManageBarTeam(perfil?.role) && <OrdersTab bar={bar} />}
+        {tab==='entregas'  && canManageBarTeam(perfil?.role) && <DeliveriesTab bar={bar} />}
+        {tab==='estoque'   && canManageBarTeam(perfil?.role) && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}
+        {tab==='precos'    && canManageBarTeam(perfil?.role) && <PrecosCardapioTab bar={bar} />}
+        {tab==='faturas'   && canManageBarTeam(perfil?.role) && <FaturasTab bar={bar} />}
+        {tab==='recibos'  && canManageBarTeam(perfil?.role) && <PortalRecibosTab bar={bar} />}
+        {tab==='ia'       && canManageBarTeam(perfil?.role) && <PortalClienteAI bar={bar} />}
       </main>
     </div>
   )

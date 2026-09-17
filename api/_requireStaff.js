@@ -49,7 +49,9 @@ export async function requireStaff(req, _admin, opts = {}) {
 
   const userDb = createStaffUserClient(token)
   const { data: perfil } = await userDb.from('perfis').select('role').eq('id', user.id).single()
-  if (!perfil || perfil.role === 'cliente') return { error: 'Sem permissão', status: 403 }
+  if (!perfil || perfil.role === 'cliente' || perfil.role === 'caixa' || perfil.role === 'bar_staff') {
+    return { error: 'Sem permissão', status: 403 }
+  }
   if (adminOnly && perfil.role !== 'admin' && perfil.role !== 'staff') {
     return { error: 'Sem permissão', status: 403 }
   }
@@ -57,6 +59,23 @@ export async function requireStaff(req, _admin, opts = {}) {
     return { error: 'Sem permissão', status: 403 }
   }
 
+  return { user, perfil, token }
+}
+
+/** Conta do bar (dono, caixa tablet, staff). Nunca libera painel JBM. */
+export async function requireBarAccount(req, _admin, opts = {}) {
+  const allowed = opts.roles || ['cliente', 'caixa', 'bar_staff']
+  const token = bearerToken(req)
+  if (!token) return { error: 'Não autenticado', status: 401 }
+
+  const authClient = drinksAuthClient()
+  const { data: { user }, error } = await authClient.auth.getUser(token)
+  if (error || !user) return { error: 'Sessão inválida', status: 401 }
+
+  const userDb = createStaffUserClient(token)
+  const { data: perfil } = await userDb.from('perfis').select('*').eq('id', user.id).single()
+  if (!perfil || !allowed.includes(perfil.role)) return { error: 'Sem permissão', status: 403 }
+  if (!perfil.bar_id) return { error: 'Conta sem bar vinculado', status: 403 }
   return { user, perfil, token }
 }
 
