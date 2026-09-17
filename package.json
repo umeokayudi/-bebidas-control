@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "dev:pos": "vite --config dev/pos-preview/vite.config.js",
     "build": "vite build",
     "build:holding": "cd jbm-master-app && npm ci --silent && npm run build:holding && cd .. && rm -rf public/holding && cp -r jbm-master-app/dist public/holding && vite build",
     "preview": "vite preview",
