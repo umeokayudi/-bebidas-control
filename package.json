@@ -7,6 +7,8 @@
     "build": "vite build",
     "build:holding": "cd jbm-master-app && npm ci --silent && npm run build:holding && cd .. && rm -rf public/holding && cp -r jbm-master-app/dist public/holding && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "deploy": "bash scripts/deploy-vercel.sh",
     "deploy:bebidas": "bash scripts/deploy-vercel.sh bebidas",
     "deploy:jbm": "bash scripts/deploy-vercel.sh jbm",
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
     "pg": "^8.23.0",
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vitest": "^2.1.9"
   }
 }
