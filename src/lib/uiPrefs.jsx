@@ -5,7 +5,23 @@ const LAYOUT_KEY = 'jbm_drinks_layout'
 
 /** Igual JBM Holding: classic = escuro, modern = claro */
 export const THEMES = { classic: 'classic', modern: 'modern' }
-export const LAYOUTS = { auto: 'auto', desktop: 'desktop', mobile: 'mobile' }
+export const LAYOUTS = { auto: 'auto', desktop: 'desktop', tablet: 'tablet', mobile: 'mobile' }
+
+function detectDevice() {
+  if (typeof window === 'undefined') return { device: 'desktop', pointer: 'fine', orientation: 'landscape' }
+  const w = window.innerWidth
+  const device = w < 768 ? 'phone' : w < 1280 ? 'tablet' : 'desktop'
+  const pointer = window.matchMedia('(pointer: coarse)').matches ? 'coarse' : 'fine'
+  const orientation = window.innerHeight >= window.innerWidth ? 'portrait' : 'landscape'
+  return { device, pointer, orientation }
+}
+
+function applyDeviceAttrs() {
+  const { device, pointer, orientation } = detectDevice()
+  document.documentElement.setAttribute('data-device', device)
+  document.documentElement.setAttribute('data-pointer', pointer)
+  document.documentElement.setAttribute('data-orientation', orientation)
+}
 
 function loadTheme() {
   const t = localStorage.getItem(THEME_KEY)
@@ -35,6 +51,20 @@ export function UiPrefsProvider({ children }) {
     document.documentElement.setAttribute('data-layout', layout)
     localStorage.setItem(LAYOUT_KEY, layout)
   }, [layout])
+
+  useEffect(() => {
+    applyDeviceAttrs()
+    const onChange = () => applyDeviceAttrs()
+    window.addEventListener('resize', onChange)
+    window.addEventListener('orientationchange', onChange)
+    const mq = window.matchMedia('(pointer: coarse)')
+    mq.addEventListener?.('change', onChange)
+    return () => {
+      window.removeEventListener('resize', onChange)
+      window.removeEventListener('orientationchange', onChange)
+      mq.removeEventListener?.('change', onChange)
+    }
+  }, [])
 
   function setTheme(t) {
     setThemeState(t === THEMES.classic ? THEMES.classic : THEMES.modern)

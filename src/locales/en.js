@@ -692,6 +692,7 @@ export default {
     layout: 'Layout',
     layoutAuto: 'Auto',
     layoutDesktop: 'Desktop',
+    layoutTablet: 'Tablet',
     layoutMobile: 'Mobile',
     language: 'Language',
     clientPortal: 'Client portal',

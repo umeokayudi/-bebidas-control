@@ -692,6 +692,7 @@ export default {
     layout: 'レイアウト',
     layoutAuto: '自動',
     layoutDesktop: 'デスクトップ',
+    layoutTablet: 'タブレット',
     layoutMobile: 'モバイル',
     language: '言語',
     clientPortal: 'クライアントポータル',

@@ -339,7 +339,7 @@ function Shell() {
   useMobileMenuLock(menuOpen)
 
   useEffect(() => {
-    if (layout === LAYOUTS.desktop) setMenuOpen(false)
+    if (layout === LAYOUTS.desktop || layout === LAYOUTS.tablet) setMenuOpen(false)
   }, [layout])
 
   function selectTab(id) {

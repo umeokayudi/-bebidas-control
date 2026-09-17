@@ -79,7 +79,7 @@ function PunchKiosk({ bar, staffIdLocked, onPunched }) {
   }
 
   return (
-    <div className="card" style={{ maxWidth: 440 }}>
+    <div className="card clock-kiosk">
       <SectionTitle>{t('clock.title')}</SectionTitle>
       <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{t('clock.localOnly')}</div>
       {!staffIdLocked && (
@@ -88,7 +88,21 @@ function PunchKiosk({ bar, staffIdLocked, onPunched }) {
           {roster.map(s => <option key={s.id} value={s.id}>{s.nome}{s.cargo ? ` · ${s.cargo}` : ''}</option>)}
         </select>
       )}
-      <input type="password" inputMode="numeric" placeholder={t('clock.pin')} value={pin} onChange={e => setPin(e.target.value)} style={{ width: '100%', marginBottom: 10, letterSpacing: 4 }} />
+      <input type="password" inputMode="numeric" readOnly placeholder={t('clock.pin')} value={pin} className="pin-display" />
+      <div className="pin-pad">
+        {['1','2','3','4','5','6','7','8','9','←','0','C'].map(k => (
+          <button
+            key={k}
+            type="button"
+            className="pin-key"
+            onClick={() => {
+              if (k === 'C') setPin('')
+              else if (k === '←') setPin(p => p.slice(0, -1))
+              else if (pin.length < 8) setPin(p => p + k)
+            }}
+          >{k}</button>
+        ))}
+      </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {['in', 'out'].map(x => (
           <button key={x} onClick={() => setTipo(x)} style={{
@@ -111,6 +125,7 @@ function PayrollTable({ rows }) {
   const { t } = useI18n()
   if (!rows.length) return <div style={{ color: 'var(--text3)', fontSize: 13 }}>{t('clock.noHours')}</div>
   return (
+    <div className="table-scroll">
     <table style={{ width: '100%', fontSize: 13 }}>
       <thead>
         <tr>
@@ -130,6 +145,7 @@ function PayrollTable({ rows }) {
         ))}
       </tbody>
     </table>
+    </div>
   )
 }
 
@@ -165,7 +181,7 @@ export default function TimeClockPanel({ bar }) {
     <div className="fade-in">
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{t('clock.title')}</div>
       <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>{t('clock.subtitle')}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,420px) 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="fluid-2 clock-layout">
         <PunchKiosk bar={bar} staffIdLocked={perfil?.role === 'bar_staff' ? perfil.id : ''} onPunched={load} />
         <div className="card">
           <SectionTitle>{t('clock.monthPay')}</SectionTitle>

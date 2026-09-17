@@ -47,6 +47,7 @@ export function LayoutToggle() {
         {[
           { id: LAYOUTS.auto, label: t('shell.layoutAuto') },
           { id: LAYOUTS.desktop, label: t('shell.layoutDesktop') },
+          { id: LAYOUTS.tablet, label: t('shell.layoutTablet') },
           { id: LAYOUTS.mobile, label: t('shell.layoutMobile') },
         ].map(opt => (
           <button

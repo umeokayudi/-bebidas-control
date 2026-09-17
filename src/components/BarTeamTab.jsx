@@ -96,7 +96,7 @@ export default function BarTeamTab({ bar }) {
       {msg && <div style={{ color: 'var(--green)', fontSize: 13, marginBottom: 12 }}>{msg}</div>}
       {err && <div style={{ color: 'var(--red)', fontSize: 13, marginBottom: 12 }}>{err}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+      <div className="fluid-2">
         <div className="card">
           <SectionTitle>{t('team.localTablet')}</SectionTitle>
           <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10 }}>
