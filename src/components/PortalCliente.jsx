@@ -25,6 +25,7 @@ import PortalRecibosTab from './PortalRecibosTab'
 import PortalClienteAI from './PortalClienteAI'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
+import AtomicPosPanel from './AtomicPos'
 
 const STATUS_PEDIDO = {
   pendente:   { labelKey:'orderStatus.pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -476,6 +477,7 @@ function HomeTab({ bar, onTab }) {
         <div style={{ background:'var(--navy)', borderRadius:16, padding:'20px 24px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>{t('portal.home.quickActions')}</div>
           {[
+            { label:t('nav.portalPos'), icon:'🧾', tab:'pos' },
             { label:t('portal.home.newOrder'), icon:'🛒', tab:'pedidos' },
             { label:t('portal.home.viewDeliveries'), icon:'📦', tab:'entregas' },
             { label:t('portal.home.viewInventory'), icon:'📊', tab:'estoque' },
@@ -2238,14 +2240,15 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   }
 
   const NAV = [
-    { id:'inicio',    labelKey:'nav.portalHome', icon:'🏠' },
-    { id:'pedidos',   labelKey:'nav.portalOrders', icon:'🛒' },
-    { id:'entregas',  labelKey:'nav.portalDeliveries', icon:'📦' },
-    { id:'estoque',   labelKey:'nav.portalInventory', icon:'📊' },
-    { id:'precos',    labelKey:'nav.portalPrices', icon:'💰' },
-    { id:'faturas',   labelKey:'nav.portalInvoices', icon:'💳' },
-    { id:'recibos',   labelKey:'nav.portalReceipts', icon:'🧾' },
-    { id:'ia',        labelKey:'nav.portalAi', icon:'🤖' },
+    { id:'inicio',    labelKey:'nav.portalHome', icon:'🏠', group:'bar' },
+    { id:'pos',       labelKey:'nav.portalPos', icon:'🧾', group:'bar' },
+    { id:'estoque',   labelKey:'nav.portalInventory', icon:'📊', group:'bar' },
+    { id:'precos',    labelKey:'nav.portalPrices', icon:'💰', group:'bar' },
+    { id:'pedidos',   labelKey:'nav.portalOrders', icon:'🛒', group:'jbm' },
+    { id:'entregas',  labelKey:'nav.portalDeliveries', icon:'📦', group:'jbm' },
+    { id:'faturas',   labelKey:'nav.portalInvoices', icon:'💳', group:'jbm' },
+    { id:'recibos',   labelKey:'nav.portalReceipts', icon:'📄', group:'jbm' },
+    { id:'ia',        labelKey:'nav.portalAi', icon:'🤖', group:'jbm' },
   ]
 
   return (
@@ -2264,11 +2267,16 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <LogoSidebar />
         </div>
         <nav className="sidebar-nav">
-          {NAV.map(n => (
-            <button key={n.id} onClick={() => selectTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
-              <span>{n.icon}</span>
-              <span>{t(n.labelKey)}</span>
-            </button>
+          {['bar', 'jbm'].map(group => (
+            <div key={group} className="sidebar-nav-group">
+              <div className="sidebar-nav-label">{t(group === 'bar' ? 'nav.groupBar' : 'nav.groupJbm')}</div>
+              {NAV.filter(n => n.group === group).map(n => (
+                <button key={n.id} onClick={() => selectTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
+                  <span>{n.icon}</span>
+                  <span>{t(n.labelKey)}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="sidebar-footer">
@@ -2293,6 +2301,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
             </div>
           </>
         )}
+        {tab==='pos'      && <AtomicPosPanel bar={bar} />}
         {tab==='pedidos'   && <OrdersTab bar={bar} />}
         {tab==='entregas'  && <DeliveriesTab bar={bar} />}
         {tab==='estoque'   && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}

@@ -33,6 +33,7 @@ import { UiPrefsProvider, useUiPrefs, LAYOUTS } from './lib/uiPrefs'
 import { loadDashboard } from './lib/loadDashboard'
 import { PageHeader, PortalHero, PortalKpi, PortalSurface, PortalAlert } from './components/ui/PageLayout'
 import DashboardMetricModal from './components/DashboardMetricModal'
+import PosDemoPage from './components/pos/PosDemoPage'
 
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
@@ -472,7 +473,21 @@ function Shell() {
   )
 }
 
+function isPosDemo() {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).has('pos-demo')
+}
+
 function AppInner() {
+  if (isPosDemo()) {
+    return (
+      <UiPrefsProvider>
+        <I18nProvider>
+          <PosDemoPage />
+        </I18nProvider>
+      </UiPrefsProvider>
+    )
+  }
   return (
     <UiPrefsProvider>
       <I18nProvider>

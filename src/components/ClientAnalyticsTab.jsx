@@ -224,7 +224,7 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
           }}>
             {t('portal.analytics.exportCsv')}
           </button>
-          <button type="button" onClick={() => onTab?.('pos')} style={{
+          <button type="button" onClick={() => onTab?.('precos')} style={{
             padding: '8px 14px', borderRadius: 10, border: 'none',
             background: 'var(--navy)', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
           }}>
@@ -402,7 +402,7 @@ export default function ClientAnalyticsTab({ bar, onTab }) {
             count: missingPricing.length,
             amount: fmtYen(missingPricing.reduce((a, p) => a + p.jbmTotal, 0)),
           })}</strong>
-          <button type="button" onClick={() => onTab?.('pos')} style={{ marginLeft: 8, border: 'none', background: 'transparent', color: 'var(--navy)', fontWeight: 700, cursor: 'pointer' }}>
+          <button type="button" onClick={() => onTab?.('precos')} style={{ marginLeft: 8, border: 'none', background: 'transparent', color: 'var(--navy)', fontWeight: 700, cursor: 'pointer' }}>
             {t('portal.analytics.registerPrices')}
           </button>
         </div>
