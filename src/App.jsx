@@ -16,6 +16,7 @@ import { AuthProvider, useAuth, LoginPage } from './components/Auth'
 import { supabase } from './lib/supabase'
 import ComprasTab   from './components/Compras'
 import VendasTab    from './components/Vendas'
+import BarPosSuite  from './components/BarPos'
 import RelatorioTab from './components/Relatorio'
 import RyoshushoTab from './components/Ryoshusho'
 import SeikyushoTab from './components/Seikyusho'
@@ -40,6 +41,7 @@ const ADMIN_TABS = [
   { id:'billingHub', labelKey:'nav.billingHub', icon:'📱' },
   { id:'purchases', labelKey:'nav.purchases', icon:'🛒' },
   { id:'sales',    labelKey:'nav.sales', icon:'💴' },
+  { id:'pos',      labelKey:'nav.pos', icon:'🍸' },
   { id:'pedidos',   labelKey:'nav.orders', icon:'📋' },
   { id:'relatorio', labelKey:'nav.report', icon:'📈' },
   { id:'ryoshusho', labelKey:'nav.ryoshusho', icon:'🧾' },
@@ -456,6 +458,7 @@ function Shell() {
           {tab==='billingHub' && <ReportsBilling onNav={selectTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
           {tab==='sales'    && <VendasTab/>}
+          {tab==='pos'      && <BarPosSuite/>}
           {tab==='pedidos'   && <PedidosAdminTab/>}
           {tab==='relatorio' && <RelatorioTab/>}
           {tab==='ryoshusho' && <RyoshushoTab/>}
