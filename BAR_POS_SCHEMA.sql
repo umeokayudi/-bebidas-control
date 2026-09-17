@@ -279,7 +279,7 @@ begin
   ] loop
     execute format('alter table %I enable row level security', t);
     begin
-      execute format('create policy %L on %I for all using (auth.role() = %L)', 'auth ' || t, t, 'authenticated');
+      execute format('create policy %I on %I for all using (auth.role() = %L)', 'auth ' || t, t, 'authenticated');
     exception when duplicate_object then null;
     end;
   end loop;
