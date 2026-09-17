@@ -1782,3 +1782,19 @@ html[data-layout="mobile"] .metric-card-hover:hover {
   align-items: center;
   gap: 8px;
 }
+
+/* ── Bar POS ─────────────────────────────────────────────────────────────── */
+.pos-checkout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+.pos-item-btn:hover {
+  border-color: var(--gold) !important;
+  background: var(--gold-bg) !important;
+}
+@media (max-width: 900px) {
+  .pos-checkout-grid { grid-template-columns: 1fr; }
+  .pos-checkout-grid > div:last-child { position: static !important; }
+}

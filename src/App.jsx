@@ -26,6 +26,7 @@ import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
 import ReportsBilling from './components/ReportsBilling'
 import { PedidosAdminTab } from './components/Configs'
+import { BarPosAdmin } from './components/pos/BarPos'
 import { fmtYen, fmtDate, roleLabel } from './components/utils'
 import { I18nProvider, useI18n } from './lib/i18n'
 import UiPrefsPanel from './components/UiPrefsPanel'
@@ -46,6 +47,7 @@ const ADMIN_TABS = [
   { id:'seikyusho', labelKey:'nav.seikyusho', icon:'📄' },
   { id:'products',  labelKey:'nav.products', icon:'🍾' },
   { id:'bars',      labelKey:'nav.bars', icon:'🏪' },
+  { id:'pos',       labelKey:'nav.pos', icon:'🍸' },
   { id:'usuarios',  labelKey:'nav.users', icon:'👥' },
   { id:'faturas',    labelKey:'nav.invoices', icon:'💰' },
   { id:'suppliers',  labelKey:'nav.suppliers', icon:'🏭' },
@@ -462,6 +464,7 @@ function Shell() {
           {tab==='seikyusho' && <SeikyushoTab/>}
           {tab==='products'  && <ProductsTab/>}
           {tab==='bars'      && <BarsTab/>}
+          {tab==='pos'       && <BarPosAdmin/>}
           {tab==='usuarios'  && <UsuariosTab/>}
           {tab==='faturas'   && <Faturas />}
           {tab==='cashflow'   && <Cashflow />}
