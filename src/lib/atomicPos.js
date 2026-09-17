@@ -115,64 +115,16 @@ export function findLowStockProducts(produtos = [], stockMap = {}, regras = {}) 
     .sort((a, b) => a.stock - b.stock)
 }
 
-/** Baixa estoque após venda POS (apenas itens com produto_id — shots) */
-export async function deductStockForSale(supabase, { barId, cart, vendaId, userId }) {
-  const shotItems = (cart || []).filter(it => it.produto_id)
-  if (!shotItems.length) return { deducted: 0 }
-
-  const moves = shotItems.map(it => ({
-    produto_id: it.produto_id,
-    bar_id: barId,
-    tipo: 'saida',
-    qtd: it.qtd || 1,
-    criado_por: userId || null,
-    obs: `POS venda ${vendaId?.slice(0, 8) || ''}`,
-  }))
-
-  const { error } = await supabase.from('estoque_movimentos').insert(moves)
-  if (error) throw error
-  return { deducted: moves.length }
-}
-
-/** Verifica estoque baixo e dispara webhook de reposição (se configurado) */
-export async function checkReorderAfterSale(supabase, bar, produtoIds = []) {
-  if (!produtoIds.length) return { alerts: [] }
-
-  const [mR, rR, pR] = await Promise.all([
-    supabase.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', bar.id),
-    supabase.from('estoque_regras').select('produto_id,minimo').eq('bar_id', bar.id),
-    supabase.from('produtos_public').select('id,nome,sku').in('id', produtoIds),
-  ])
-
-  const stockMap = buildStockMap(mR.data || [])
-  const regras = Object.fromEntries((rR.data || []).map(r => [r.produto_id, r.minimo]))
-  const alerts = findLowStockProducts(pR.data || [], stockMap, regras)
-
-  if (!alerts.length) return { alerts: [] }
-
-  try {
-    await fetch('/api/pos-reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        bar_id: bar.id,
-        bar_nome: bar.nome,
-        items: alerts.map(a => ({
-          produto_id: a.id,
-          nome: a.nome,
-          sku: a.sku,
-          stock_atual: a.stock,
-          min_stock: a.minimo,
-          qty_sugerida: Math.max(a.minimo * 2 - a.stock, a.minimo),
-        })),
-      }),
-    })
-  } catch {
-    // webhook opcional — não bloqueia a venda
-  }
-
-  return { alerts }
-}
+export {
+  bottlesFromShots,
+  bottlesConsumedFromCart,
+  pricingMapFromShots,
+  suggestedReorderQty,
+  buildRestockItems,
+  productsAlreadyOnOpenOrders,
+  isRestockPedido,
+  syncPosStockAndReorder,
+} from './posSupply'
 
 /** Métricas rápidas do dia para o dashboard POS */
 export function computeDayMetrics(sales = []) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { ensureVendaFromPedido, findVendaForPedido, findVendaKeysForPedidos, pedidoSaleDate, billingPeriodForDate } from '../lib/pedidoVenda'
+import { addStockFromDelivery } from '../lib/posSupply'
 import { useAuth } from './Auth'
 import { fmtYen, Badge, Spinner, Empty, DelBtn, CATEGORIAS, filterSupplierVendas, PedidoItemChip } from './utils'
 import { SupplierCostHint } from './SupplierPriceCheck'
@@ -494,6 +495,7 @@ export function PedidosAdminTab() {
     const fresh = await fetchPedidoCompleto(pedido.id)
     const { venda } = await ensureVendaFromPedido(supabase, fresh)
     if (!venda) throw new Error('Não foi possível criar a venda')
+    try { await addStockFromDelivery(supabase, fresh) } catch (e) { console.warn('estoque entrega:', e.message) }
     return venda
   }
 

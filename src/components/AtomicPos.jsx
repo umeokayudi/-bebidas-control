@@ -3,19 +3,19 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { fmtYen, fmtDate, Spinner, SectionTitle } from './utils'
 import {
-  applyDiscount,
   cartTotal,
   checkPosSchema,
   computeDayMetrics,
-  deductStockForSale,
-  checkReorderAfterSale,
   findLowStockProducts,
   buildStockMap,
   generateDiscountCode,
   resolveItemPrice,
   todayKey,
   validateDiscountCode,
+  pricingMapFromShots,
+  isRestockPedido,
 } from '../lib/atomicPos'
+import { syncPosStockAndReorder } from '../lib/posSupply'
 import { isSupplierProduct } from './utils'
 import { useI18n } from '../lib/i18n'
 
@@ -186,20 +186,35 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     }
 
     try {
-      await deductStockForSale(supabase, { barId: bar.id, cart, vendaId: venda.id, userId: user?.id })
-      const produtoIds = cart.filter(it => it.produto_id).map(it => it.produto_id)
-      await checkReorderAfterSale(supabase, bar, produtoIds)
+      const result = await syncPosStockAndReorder(supabase, {
+        bar,
+        cart,
+        vendaId: venda.id,
+        userId: user?.id,
+        pricingByProduto: pricingMapFromShots(shots),
+        buildStockMap,
+        findLowStockProducts,
+      })
+      setCart([])
+      setActiveCode(null)
+      setCodeInput('')
+      setAgentId('')
+      setSaving(false)
+      onSale?.()
+      const restockNote = result.pedido
+        ? `\n${t('atomicPos.restockSent', { count: result.restockItems?.length || 0 })}`
+        : ''
+      alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }) + restockNote)
     } catch (stockErr) {
       console.warn('POS stock update:', stockErr.message)
+      setCart([])
+      setActiveCode(null)
+      setCodeInput('')
+      setAgentId('')
+      setSaving(false)
+      onSale?.()
+      alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }))
     }
-
-    setCart([])
-    setActiveCode(null)
-    setCodeInput('')
-    setAgentId('')
-    setSaving(false)
-    onSale?.()
-    alert(t('atomicPos.saleRegistered', { amount: fmtYen(total) }))
   }
 
   return (
@@ -685,6 +700,7 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
   const { t } = useI18n()
   const [lowStock, setLowStock] = useState([])
   const [agentStats, setAgentStats] = useState([])
+  const [openRestock, setOpenRestock] = useState([])
   const [loading, setLoading] = useState(true)
 
   const metrics = useMemo(() => computeDayMetrics(salesList || []), [salesList])
@@ -692,12 +708,13 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [mR, rR, pR, aR, sR] = await Promise.all([
+      const [mR, rR, pR, aR, sR, pedR] = await Promise.all([
         supabase.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', bar.id),
         supabase.from('estoque_regras').select('produto_id,minimo').eq('bar_id', bar.id),
         supabase.from('produtos_public').select('id,nome,categoria').eq('ativo', true),
         supabase.from('drink_back_agents').select('id,nome,comissao_pct').eq('bar_id', bar.id).eq('ativo', true),
         supabase.from('pos_vendas').select('total,drink_back_agent_id').eq('bar_id', bar.id).eq('data', todayKey()).not('drink_back_agent_id', 'is', null),
+        supabase.from('pedidos').select('id,status,obs,total_estimado,pedidos_itens(produto_id,qtd,produtos(nome))').eq('bar_id', bar.id).in('status', ['pendente', 'confirmado']),
       ])
 
       const stockMap = buildStockMap(mR.data || [])
@@ -721,6 +738,8 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
         comissao: Math.round((agentMap[a.id]?.total || 0) * (+a.comissao_pct || 0) / 100),
       })).filter(a => a.vendas > 0).sort((a, b) => b.faturamento - a.faturamento))
 
+      setOpenRestock((pedR.data || []).filter(isRestockPedido))
+
       setLoading(false)
     }
     load()
@@ -743,6 +762,30 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
         <SectionTitle>{t('atomicPos.hourlyRevenue')}</SectionTitle>
         <HourlyChart data={metrics.hourly} />
       </div>
+
+      {openRestock.length > 0 && (
+        <div style={{
+          background: 'var(--navy)', borderRadius: 16, padding: '16px 20px', marginBottom: 20,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+        }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'white', marginBottom: 4 }}>
+              {t('atomicPos.restockPending', { count: openRestock.length })}
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+              {t('atomicPos.restockPendingHint')}
+            </div>
+          </div>
+          {onOrder && (
+            <button onClick={onOrder} style={{
+              background: 'white', color: 'var(--navy)', border: 'none', borderRadius: 12,
+              padding: '10px 18px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            }}>
+              {t('atomicPos.seeJbmOrders')}
+            </button>
+          )}
+        </div>
+      )}
 
       {lowStock.length > 0 && (
         <div style={{

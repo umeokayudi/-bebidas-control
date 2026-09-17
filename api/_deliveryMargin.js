@@ -150,6 +150,7 @@ export async function syncPedidosEntregues(sb, opts = {}) {
       total,
       obs: `Auto: order ${p.id.slice(0, 8)}`,
       criado_por: p.criado_por,
+      origem: 'fornecedor',
     }).select().single()
 
     if (vErr) throw new Error(`venda pedido ${p.id}: ${vErr.message}`)

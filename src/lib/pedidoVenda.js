@@ -92,14 +92,20 @@ export async function createVendaFromPedido(supabase, pedido) {
 
   const saleDate = pedidoSaleDate(pedido)
   const total = pedidoTotal(pedido)
-  const { data: venda, error } = await supabase.from('vendas').insert({
+  const payload = {
     data: saleDate,
     data_venda: saleDate,
     bar_id: pedido.bar_id,
     total,
     obs: pedidoVendaObs(pedido.id),
     criado_por: pedido.criado_por,
-  }).select().single()
+    origem: 'fornecedor',
+  }
+  let { data: venda, error } = await supabase.from('vendas').insert(payload).select().single()
+  if (error?.message?.includes('origem')) {
+    delete payload.origem
+    ;({ data: venda, error } = await supabase.from('vendas').insert(payload).select().single())
+  }
 
   if (error) throw new Error(`venda: ${error.message}`)
 

@@ -24,6 +24,7 @@ import ClientAnalyticsTab from './ClientAnalyticsTab'
 import PortalRecibosTab from './PortalRecibosTab'
 import PortalClienteAI from './PortalClienteAI'
 import AtomicPosPanel from './AtomicPos'
+import { isRestockPedido } from '../lib/posSupply'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 
@@ -65,6 +66,7 @@ function HomeTab({ bar, onTab }) {
   const [itens,       setItens]       = useState([])
   const [barPricing,  setBarPricing]  = useState([])
   const [faturas,     setFaturas]     = useState([])
+  const [posMonthTotal, setPosMonthTotal] = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [periodo,     setPeriodo]     = useState('30')
   const [chartMonth,  setChartMonth]   = useState(null)
@@ -72,18 +74,26 @@ function HomeTab({ bar, onTab }) {
   useEffect(() => { load() }, [bar])
 
   async function load() {
-    const [vR, pR, iR, bpR, fR] = await Promise.all([
+    const [vR, pR, iR, bpR, fR, posR] = await Promise.all([
       supabase.from('vendas').select('*').eq('bar_id', bar.id).order('data', { ascending:true }),
       supabase.from('pedidos').select('*').eq('bar_id', bar.id).order('criado_em', { ascending:false }),
       supabase.from('vendas_itens').select('*, produtos(nome,categoria,preco_venda,volume_ml), vendas(data,bar_id,obs)').eq('vendas.bar_id', bar.id),
       supabase.from('bar_pricing').select('produto_id,drinks_por_garrafa,preco_drink').eq('bar_id', bar.id),
       supabase.from('faturas').select('*').eq('bar_id', bar.id).order('data_vencimento', { ascending:false }),
+      supabase.from('pos_vendas').select('total,data').eq('bar_id', bar.id),
     ])
     setVendas(filterSupplierVendas(vR.data || []))
     setPedidos(pR.data || [])
     setItens((iR.data || []).filter(i => i.vendas && filterSupplierVendas([i.vendas]).length))
     setBarPricing(bpR.data || [])
     setFaturas(filterJbmDrinksFaturas(fR.data || []))
+    const mesKey = new Date().toISOString().slice(0, 7)
+    if (!posR.error && (posR.data || []).length) {
+      const posSales = posR.data || []
+      setPosMonthTotal(posSales.filter(s => (s.data || '').startsWith(mesKey)).reduce((a, s) => a + (+s.total || 0), 0))
+    } else {
+      setPosMonthTotal(null)
+    }
     setLoading(false)
   }
 
@@ -203,19 +213,21 @@ function HomeTab({ bar, onTab }) {
 
         <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:20, padding:'22px 24px' }}>
           <div style={{ fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase', color:'var(--text2)', marginBottom:10, fontWeight:700 }}>
-            {t('portal.home.projectedRevenue')}
+            {posMonthTotal != null ? t('portal.home.posCounter') : t('portal.home.projectedRevenue')}
           </div>
           <div style={{ fontSize:30, fontWeight:900, color:'var(--navy)', lineHeight:1, letterSpacing:-0.5 }}>
-            {fmtYen(monthProjection.posTotal)}
+            {fmtYen(posMonthTotal != null ? posMonthTotal : monthProjection.posTotal)}
           </div>
           <div style={{ fontSize:12, color:'var(--text2)', marginTop:10, lineHeight:1.5 }}>
-            {t('portal.home.sellAtBarPrice', { pct: monthProjection.posCoveragePct })}
+            {posMonthTotal != null
+              ? t('portal.home.posCounterHint')
+              : t('portal.home.sellAtBarPrice', { pct: monthProjection.posCoveragePct })}
           </div>
           <div style={{ marginTop:12, display:'flex', gap:8, flexWrap:'wrap' }}>
             <span style={{ fontSize:10, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'#EAF0FA', color:'var(--navy)' }}>
               ROI {monthProjection.roiPct}%
             </span>
-            {monthProjection.estimatedSharePct > 0 && (
+            {monthProjection.estimatedSharePct > 0 && posMonthTotal == null && (
               <span style={{ fontSize:10, fontWeight:600, padding:'4px 10px', borderRadius:20, background:'#fffbeb', color:'var(--amber)' }}>
                 {t('portal.home.estimated', { pct: monthProjection.estimatedSharePct })}
               </span>
@@ -477,6 +489,7 @@ function HomeTab({ bar, onTab }) {
         <div style={{ background:'var(--navy)', borderRadius:16, padding:'20px 24px', display:'flex', flexDirection:'column', gap:10 }}>
           <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>{t('portal.home.quickActions')}</div>
           {[
+            { label:t('portal.home.openPos'), icon:'🧾', tab:'pos' },
             { label:t('portal.home.newOrder'), icon:'🛒', tab:'pedidos' },
             { label:t('portal.home.viewDeliveries'), icon:'📦', tab:'entregas' },
             { label:t('portal.home.viewInventory'), icon:'📊', tab:'estoque' },
@@ -871,11 +884,16 @@ function OrdersTab({ bar }) {
           return (
             <div key={p.id} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'16px', marginBottom:10 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:14 }}>{fmtDate(p.criado_em?.slice(0,10))}</div>
-                  {p.data_entrega_prevista && <div style={{ fontSize:12, color:'var(--text2)' }}>Expected: {p.data_entrega_prevista}</div>}
-                  {p.obs && <div style={{ fontSize:12, color:'var(--text2)' }}>{p.obs}</div>}
-                </div>
+                  <div>
+                    <div style={{ fontWeight:700, fontSize:14 }}>{fmtDate(p.criado_em?.slice(0,10))}</div>
+                    {isRestockPedido(p) && (
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--navy)', marginTop:2 }}>
+                        Restock from counter → JBM
+                      </div>
+                    )}
+                    {p.data_entrega_prevista && <div style={{ fontSize:12, color:'var(--text2)' }}>Expected: {p.data_entrega_prevista}</div>}
+                    {p.obs && !isRestockPedido(p) && <div style={{ fontSize:12, color:'var(--text2)' }}>{p.obs}</div>}
+                  </div>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                   <span style={{ fontWeight:700 }}>{fmtYen(p.total_estimado)}</span>
                   <Badge status={p.status} />
