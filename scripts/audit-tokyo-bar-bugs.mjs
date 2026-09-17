@@ -81,6 +81,7 @@ const apiClock = readFileSync(new URL('../api/time-clock.js', import.meta.url), 
 assert('API requires PIN even for selfPunch', apiClock.includes('if (!pinOk)') && !apiClock.includes('if (!pinOk && !selfPunch)'))
 const inv = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
 assert('inventory stock no longer caps at 500', !inv.includes('.limit(500)') && inv.includes('fetchAllStockMovements'))
+assert('home POS month uses Tokyo calendar', inv.includes('tokyoMonthKey') && inv.includes('birthdayThisMonth'))
 assert('orders/inventory/pricing use i18n keys', inv.includes("t('portal.orders.title')") && inv.includes("t('portal.inventory.outOfStock") && inv.includes("t('portal.pricing.title')"))
 const reorder = readFileSync(new URL('../api/pos-reorder.js', import.meta.url), 'utf8')
 assert('pos-reorder requires auth', reorder.includes('requireBarAccount') && reorder.includes('requireStaff'))

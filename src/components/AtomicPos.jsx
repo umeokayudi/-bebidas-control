@@ -22,6 +22,7 @@ import { isSupplierProduct } from './utils'
 import { includedTaxBreakdown } from '../lib/consumptionTax'
 import { tokyoMonthKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
+import { matchCheckoutVisit, spacesByZone, zoneLabelKey, activeKeeps } from '../lib/barCrm'
 
 const SUB_TAB_IDS = [
   { id: 'dashboard', key: 'tabDashboard', icon: '📊' },
@@ -59,8 +60,28 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [activeCode, setActiveCode] = useState(null)
   const [vipId, setVipId] = useState('')
   const [agentId, setAgentId] = useState('')
+  const [spaceId, setSpaceId] = useState('')
+  const [guestId, setGuestId] = useState('')
+  const [spaces, setSpaces] = useState([])
+  const [guests, setGuests] = useState([])
+  const [visits, setVisits] = useState([])
+  const [keeps, setKeeps] = useState([])
   const [payMethod, setPayMethod] = useState('Cash')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('bar_spaces').select('id,nome,tipo,zona,ordem,ativo').eq('bar_id', bar.id).eq('ativo', true).order('ordem'),
+      supabase.from('bar_guests').select('id,nome,line_id,vip_member_id,preferencias,alergias,ativo').eq('bar_id', bar.id).eq('ativo', true).order('nome'),
+      supabase.from('bar_visits').select('id,space_id,guest_id,status').eq('bar_id', bar.id).in('status', ['seated', 'reserved']),
+      supabase.from('bar_bottle_keeps').select('id,guest_id,nome,remaining_pct,expires_on,ativo').eq('bar_id', bar.id).eq('ativo', true),
+    ]).then(([sR, gR, vR, kR]) => {
+      setSpaces(sR.data || [])
+      setGuests(gR.data || [])
+      setVisits(vR.data || [])
+      setKeeps(kR.error ? [] : (kR.data || []))
+    }).catch(() => {})
+  }, [bar.id])
 
   const catalog = useMemo(() => {
     const menuItems = (drinks || []).map(d => ({
@@ -122,14 +143,19 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     if (!cart.length) return
     if (priceType === 'vip' && !vipId) return alert(t('atomicPos.vipMemberRequired'))
     setSaving(true)
+    const openVisit = matchCheckoutVisit(visits, { spaceId, guestId })
+    const guest = guests.find(g => g.id === guestId)
     const result = await commitPosSale(supabase, {
       bar,
       cart,
       payMethod,
       priceType,
-      vipId,
+      vipId: priceType === 'vip' ? (vipId || guest?.vip_member_id || null) : null,
       activeCode,
       agentId,
+      spaceId: spaceId || null,
+      guestId: guestId || null,
+      visitId: openVisit?.id || null,
       userId: user?.id,
       shots,
       syncStock: args => syncPosStockAndReorder(supabase, {
@@ -147,6 +173,8 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     setActiveCode(null)
     setCodeInput('')
     setAgentId('')
+    setSpaceId('')
+    setGuestId('')
     onSale?.()
     const tax = includedTaxBreakdown(result.total)
     const restockNote = result.stock?.pedido
@@ -196,6 +224,63 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             ))}
           </select>
         )}
+
+        {spaces.length > 0 && (
+          <select
+            value={spaceId}
+            onChange={e => {
+              const id = e.target.value
+              setSpaceId(id)
+              const visit = matchCheckoutVisit(visits, { spaceId: id })
+              if (visit?.guest_id) setGuestId(visit.guest_id)
+            }}
+            className="pos-select"
+          >
+            <option value="">{t('atomicPos.spaceOptional')}</option>
+            {spacesByZone(spaces).map(z => (
+              <optgroup key={z.zona} label={zoneLabelKey(z.zona) ? t(zoneLabelKey(z.zona)) : z.zona}>
+                {z.spaces.map(s => {
+                  const visit = matchCheckoutVisit(visits, { spaceId: s.id })
+                  const who = visit ? (guests.find(g => g.id === visit.guest_id)?.nome || t('atomicPos.walkIn')) : ''
+                  return <option key={s.id} value={s.id}>{who ? `${s.nome} · ${who}` : s.nome}</option>
+                })}
+              </optgroup>
+            ))}
+          </select>
+        )}
+
+        {guests.length > 0 && (
+          <select
+            value={guestId}
+            onChange={e => {
+              const id = e.target.value
+              setGuestId(id)
+              const g = guests.find(x => x.id === id)
+              if (g?.vip_member_id && priceType === 'vip') setVipId(g.vip_member_id)
+              const visit = matchCheckoutVisit(visits, { guestId: id })
+              if (visit?.space_id) setSpaceId(visit.space_id)
+            }}
+            className="pos-select"
+          >
+            <option value="">{t('atomicPos.guestOptional')}</option>
+            {guests.map(g => <option key={g.id} value={g.id}>{g.nome}{g.line_id ? ` · LINE ${g.line_id}` : ''}</option>)}
+          </select>
+        )}
+
+        {guestId && (() => {
+          const g = guests.find(x => x.id === guestId)
+          const guestKeeps = activeKeeps(keeps, guestId)
+          if (!g && !guestKeeps.length) return null
+          return (
+            <div className="pos-guest-chip" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.45 }}>
+              {g?.alergias && <div style={{ color: 'var(--red)', fontWeight: 700 }}>{t('guests.allergies')}: {g.alergias}</div>}
+              {g?.preferencias && <div>{t('guests.prefs')}: {g.preferencias}</div>}
+              {guestKeeps.map(k => (
+                <div key={k.id}>{t('atomicPos.keepChip', { name: k.nome, pct: k.remaining_pct })}</div>
+              ))}
+            </div>
+          )
+        })()}
 
         <input className="pos-search" placeholder={t('atomicPos.searchDrinks')} value={search} onChange={e => setSearch(e.target.value)} />
 

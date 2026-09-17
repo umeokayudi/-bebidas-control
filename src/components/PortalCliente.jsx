@@ -26,10 +26,14 @@ import PortalClienteAI from './PortalClienteAI'
 import AtomicPosPanel from './AtomicPos'
 import TimeClockPanel from './TimeClock'
 import BarTeamTab from './BarTeamTab'
+import BarGuestsTab from './BarGuestsTab'
+import BarSpacesTab from './BarSpacesTab'
 import { isRestockPedido, fetchAllStockMovements } from '../lib/posSupply'
 import { navForBarRole, defaultBarTab, posAccessForRole, canManageBarTeam } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
+import { tokyoMonthKey } from '../lib/tokyo'
+import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
 
 const STATUS_PEDIDO = {
   pendente:   { labelKey:'orderStatus.pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -73,6 +77,7 @@ function HomeTab({ bar, onTab }) {
   const [barPricing,  setBarPricing]  = useState([])
   const [faturas,     setFaturas]     = useState([])
   const [posMonthTotal, setPosMonthTotal] = useState(null)
+  const [floorGlance, setFloorGlance] = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [periodo,     setPeriodo]     = useState('30')
   const [chartMonth,  setChartMonth]   = useState(null)
@@ -94,18 +99,38 @@ function HomeTab({ bar, onTab }) {
     setItens((iR.data || []).filter(i => i.vendas && filterSupplierVendas([i.vendas]).length))
     setBarPricing(bpR.data || [])
     setFaturas(filterJbmDrinksFaturas(fR.data || []))
-    const mesKey = new Date().toISOString().slice(0, 7)
+    const mesKey = tokyoMonthKey()
     if (!posR.error && (posR.data || []).length) {
       const posSales = posR.data || []
       setPosMonthTotal(posSales.filter(s => (s.data || '').startsWith(mesKey)).reduce((a, s) => a + (+s.total || 0), 0))
     } else {
       setPosMonthTotal(null)
     }
+    try {
+      const [spR, viR, guR] = await Promise.all([
+        supabase.from('bar_spaces').select('id,ativo,ordem,tipo,zona').eq('bar_id', bar.id).eq('ativo', true),
+        supabase.from('bar_visits').select('id,space_id,status,guest_id').eq('bar_id', bar.id).in('status', ['seated', 'reserved']),
+        supabase.from('bar_guests').select('id,nome,aniversario,ativo').eq('bar_id', bar.id).eq('ativo', true),
+      ])
+      if (!spR.error) {
+        const floor = decorateSpaces(spR.data || [], viR.data || [])
+        setFloorGlance({
+          seated: floor.filter(s => s.occupied).length,
+          reserved: floor.filter(s => s.reserved).length,
+          free: floor.filter(s => !s.occupied && !s.reserved).length,
+          birthdays: birthdayThisMonth(guR.data || []).length,
+        })
+      } else {
+        setFloorGlance(null)
+      }
+    } catch {
+      setFloorGlance(null)
+    }
     setLoading(false)
   }
 
   const pricingMap = buildPricingMap(barPricing)
-  const mes = new Date().toISOString().slice(0, 7)
+  const mes = tokyoMonthKey()
   const account = monthlyAccountSummary(vendas, faturas, mes)
   const monthProjection = analyzePurchases(itens, pricingMap, { monthKey: mes })
 
@@ -177,6 +202,9 @@ function HomeTab({ bar, onTab }) {
   if (ativos.length > 0) {
     attentionItems.push({ tab: 'pedidos', text: `${t('portal.home.activeOrders')}: ${ativos.length}` })
   }
+  if (floorGlance?.birthdays > 0) {
+    attentionItems.push({ tab: 'clientes', text: t('portal.home.birthdaysMonth', { count: floorGlance.birthdays }) })
+  }
 
   return (
     <div className="fade-in portal-page easy-dash" style={{ maxWidth:1000 }}>
@@ -240,6 +268,19 @@ function HomeTab({ bar, onTab }) {
           </div>
         </EasyMoneyCard>
       </div>
+
+      {floorGlance && (
+        <div className="card" style={{ marginBottom: 16, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => onTab('espacos')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', fontWeight: 700 }}>{t('portal.home.floorGlance')}</div>
+            <div style={{ fontWeight: 800 }}>{t('portal.home.seatedFree', { seated: floorGlance.seated, free: floorGlance.free, reserved: floorGlance.reserved })}</div>
+          </button>
+          <button onClick={() => onTab('clientes')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', fontWeight: 700 }}>{t('portal.home.birthdaysLabel')}</div>
+            <div style={{ fontWeight: 800 }}>{t('portal.home.birthdaysMonth', { count: floorGlance.birthdays })}</div>
+          </button>
+        </div>
+      )}
 
       {attentionItems.length > 0 ? (
         <div className="easy-dash-alert" style={{ marginBottom:16 }}>
@@ -457,6 +498,8 @@ function HomeTab({ bar, onTab }) {
           <div style={{ fontSize:14, fontWeight:700, color:'white', marginBottom:4 }}>{t('portal.home.quickActions')}</div>
           {[
             { label:t('portal.home.openPos'), icon:'🧾', tab:'pos' },
+            { label:t('portal.home.openGuests'), icon:'🥂', tab:'clientes' },
+            { label:t('portal.home.openFloor'), icon:'🪑', tab:'espacos' },
             { label:t('portal.home.newOrder'), icon:'🛒', tab:'pedidos' },
             { label:t('portal.home.viewDeliveries'), icon:'📦', tab:'entregas' },
             { label:t('portal.home.viewInventory'), icon:'📊', tab:'estoque' },
@@ -2303,6 +2346,8 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='pos'       && posAccess !== 'none' && <AtomicPosPanel bar={bar} onOrder={posAccess === 'owner' ? () => selectTab('pedidos') : undefined} access={posAccess} />}
         {tab==='ponto'     && <TimeClockPanel bar={bar} />}
         {tab==='equipe'    && canManageBarTeam(perfil?.role) && <BarTeamTab bar={bar} />}
+        {tab==='clientes'  && canManageBarTeam(perfil?.role) && <BarGuestsTab bar={bar} />}
+        {tab==='espacos'   && canManageBarTeam(perfil?.role) && <BarSpacesTab bar={bar} />}
         {tab==='pedidos'   && canManageBarTeam(perfil?.role) && <OrdersTab bar={bar} />}
         {tab==='entregas'  && canManageBarTeam(perfil?.role) && <DeliveriesTab bar={bar} />}
         {tab==='estoque'   && canManageBarTeam(perfil?.role) && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}

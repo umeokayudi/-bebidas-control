@@ -35,6 +35,8 @@ const OWNER_NAV = [
   { id: 'pos', labelKey: 'nav.portalPos', icon: '🧾' },
   { id: 'ponto', labelKey: 'nav.portalClock', icon: '🕒' },
   { id: 'equipe', labelKey: 'nav.portalTeam', icon: '👥' },
+  { id: 'clientes', labelKey: 'nav.portalGuests', icon: '🥂' },
+  { id: 'espacos', labelKey: 'nav.portalSpaces', icon: '🪑' },
   { id: 'pedidos', labelKey: 'nav.portalOrders', icon: '🛒' },
   { id: 'entregas', labelKey: 'nav.portalDeliveries', icon: '📦' },
   { id: 'estoque', labelKey: 'nav.portalInventory', icon: '📊' },

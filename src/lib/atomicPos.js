@@ -195,6 +195,9 @@ export async function commitPosSale(supabase, {
   vipId = null,
   activeCode = null,
   agentId = null,
+  spaceId = null,
+  guestId = null,
+  visitId = null,
   userId = null,
   shots = [],
   syncStock,
@@ -220,11 +223,17 @@ export async function commitPosSale(supabase, {
     criado_por: userId || null,
   }
   if (agentId) vendaPayload.drink_back_agent_id = agentId
+  if (spaceId) vendaPayload.space_id = spaceId
+  if (guestId) vendaPayload.guest_id = guestId
+  if (visitId) vendaPayload.visit_id = visitId
 
   let venda, error
   ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
-  if (error?.message?.includes('drink_back_agent_id')) {
+  if (error?.message?.includes('drink_back_agent_id') || error?.message?.includes('space_id') || error?.message?.includes('guest_id') || error?.message?.includes('visit_id')) {
     delete vendaPayload.drink_back_agent_id
+    delete vendaPayload.space_id
+    delete vendaPayload.guest_id
+    delete vendaPayload.visit_id
     ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
   }
   if (error) return { ok: false, error: error.message }
@@ -288,6 +297,10 @@ export async function commitPosSale(supabase, {
         criado_por: userId || null,
       })
     }
+  }
+
+  if (visitId && venda?.id) {
+    await supabase.from('bar_visits').update({ pos_venda_id: venda.id }).eq('id', visitId).catch(() => {})
   }
 
   return { ok: true, venda, total, desconto, stock, shots }

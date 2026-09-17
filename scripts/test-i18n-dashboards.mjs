@@ -42,6 +42,7 @@ assert('discount errors exist in both langs', !!(en.atomicPos.codeInvalid && ja.
 const posSrc = readFileSync(new URL('../src/lib/atomicPos.js', import.meta.url), 'utf8')
 assert('discount errors use i18n keys', posSrc.includes("errorKey: 'atomicPos.codeInvalid'") && !posSrc.includes('Código inválido'))
 assert('discount is scoped per item', posSrc.includes('discountAppliesToItem'))
+assert('guest CRM keys exist in both langs', !!(en.guests?.title && ja.guests?.title && en.spaces?.title && ja.spaces?.types?.vipRoom))
 
 if (failed) {
   console.log(`\n${failed} failed`)

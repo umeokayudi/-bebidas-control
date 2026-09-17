@@ -15,6 +15,8 @@ assert('caixa não vê faturas JBM', !navForBarRole('caixa').some(n => n.id === 
 assert('caixa só POS + ponto', navForBarRole('caixa').map(n => n.id).join() === 'pos,ponto')
 assert('staff só ponto', navForBarRole('bar_staff').map(n => n.id).join() === 'ponto')
 assert('dono vê POS e JBM', navForBarRole('cliente').some(n => n.id === 'pos') && navForBarRole('cliente').some(n => n.id === 'faturas'))
+assert('dono vê CRM de hóspedes e espaços', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
+assert('caixa não vê CRM nem espaços', !navForBarRole('caixa').some(n => n.id === 'clientes' || n.id === 'espacos'))
 assert('caixa POS cashier', posAccessForRole('caixa') === 'cashier')
 assert('staff sem POS', posAccessForRole('bar_staff') === 'none')
 assert('staff não vê supply JBM', !canSeeJbmSupply('bar_staff') && canSeeJbmSupply('cliente'))
