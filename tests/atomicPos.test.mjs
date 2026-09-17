@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import {
   hourlySalesSummary,
   posSalePayload,
@@ -82,4 +83,13 @@ test('rejects exhausted and product-restricted discount codes', () => {
     ).ok,
     false,
   )
+})
+
+test('keeps POS persistence isolated from JBM supply tables', async () => {
+  const sql = await readFile(new URL('../ATOMIC_POS_SCHEMA.sql', import.meta.url), 'utf8')
+  const functionSql = sql.slice(sql.indexOf('create or replace function register_pos_sale'))
+
+  assert.match(functionSql, /insert into pos_vendas/)
+  assert.match(functionSql, /insert into pos_vendas_itens/)
+  assert.doesNotMatch(functionSql, /\b(insert into|update|delete from)\s+(vendas|vendas_itens|pedidos|pedidos_itens|faturas)\b/i)
 })

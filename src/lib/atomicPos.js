@@ -104,12 +104,13 @@ export function posSalePayload({ barId, userId, cart, paymentMethod, vipMemberId
   }))
   const subtotal = items.reduce((sum, item) => sum + item.preco_lista * item.qtd, 0)
   const total = items.reduce((sum, item) => sum + item.preco_unitario * item.qtd, 0)
+  const hasVipPrice = items.some(item => item.tipo_preco === 'vip')
 
   return {
     p_bar_id: barId,
     p_criado_por: userId || null,
     p_metodo_pagamento: paymentMethod || 'Cash',
-    p_tipo: vipMemberId ? 'vip' : discountCode ? 'desconto' : 'balcao',
+    p_tipo: vipMemberId || hasVipPrice ? 'vip' : discountCode ? 'desconto' : 'balcao',
     p_vip_member_id: vipMemberId || null,
     p_discount_code_id: discountCode?.id || null,
     p_subtotal: subtotal,

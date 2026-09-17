@@ -271,6 +271,9 @@ begin
   if p_total < 0 or p_subtotal < p_total then
     raise exception 'Valores da venda são inválidos';
   end if;
+  if p_tipo not in ('balcao', 'vip', 'desconto') then
+    raise exception 'Tipo de venda inválido';
+  end if;
 
   if p_vip_member_id is not null and not exists (
     select 1 from vip_members where id = p_vip_member_id and bar_id = p_bar_id and ativo
