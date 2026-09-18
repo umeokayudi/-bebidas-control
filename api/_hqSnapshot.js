@@ -71,7 +71,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '') {
 
   const [vendasR, pedR, fatR, estR, posR, clockR, rentR, staff] = await Promise.all([
     admin.from('vendas').select('id,data,total,obs,bar_id,cast_id').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
-    admin.from('pedidos').select('id,status,total,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(80),
+    admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(80),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
     admin.from('estoque').select('qtd,minimo,produtos(nome)').eq('bar_id', barId),
     pgOrLive(admin, 'pos_vendas', [{ op: 'eq', k: 'bar_id', v: barId }], 'id,total,data,obs'),
@@ -84,7 +84,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '') {
     listStaffWithExtras(admin, barId).catch(() => []),
   ])
 
-  const jbmOk = !vendasR.error && !pedR.error && !fatR.error
+  const jbmOk = !vendasR.error && !fatR.error
   const jbm = monthBill(vendasR.data || [], fatR.data || [], mes)
   const pedidos = pedR.data || []
   const lowStock = (estR.data || [])
@@ -115,9 +115,9 @@ export async function buildHqSnapshot(admin, barId, barNome = '') {
     jbm: source(jbmOk, {
       via: 'postgres',
       vendas: filterSupplierVendas(vendasR.data || []).length,
-      pedidos: pedidos.length,
+      pedidos: pedR.error ? 0 : pedidos.length,
       faturas: filterJbmDrinksFaturas(fatR.data || []).length,
-      error: vendasR.error?.message || pedR.error?.message || fatR.error?.message || null,
+      error: [vendasR.error?.message, pedR.error?.message, fatR.error?.message].filter(Boolean).join(' | ') || null,
     }),
     pos: source(!posR.error, {
       via: posR.via,
@@ -177,7 +177,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '') {
       faturasResumo: jbm.faturasResumo,
       pedidosRecentes: pedidos.slice(0, 5).map(p => ({
         status: p.status,
-        total: p.total,
+        total: p.total_estimado ?? p.total,
         criado: p.criado_em?.slice(0, 10),
       })),
       estoqueBaixo: lowStock,

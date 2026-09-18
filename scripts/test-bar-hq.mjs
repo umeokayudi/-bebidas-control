@@ -40,6 +40,7 @@ assert('HQ never inserts vendas', !/\.insert\(/.test(hqApi.split('vendas')[0]) &
 assert('HQ never writes pedidos', !/\.from\('pedidos'\)\.(insert|upsert|update|delete)/.test(hqApi))
 assert('HQ never writes faturas', !/\.from\('faturas'\)\.(insert|upsert|update|delete)/.test(hqApi))
 assert('HQ does not select vendas.origem (column may be missing)', !/from\('vendas'\)\.select\([^)]*origem/.test(hqApi))
+assert('HQ reads pedidos.total_estimado not pedidos.total', /from\('pedidos'\)\.select\([^)]*total_estimado/.test(hqApi) && !/from\('pedidos'\)\.select\([^)]*total[,)]/.test(hqApi))
 const route = readFileSync(new URL('../api/bar/[fn].js', import.meta.url), 'utf8')
 assert('hq-sync is wired in bar router', route.includes("fn === 'hq-sync'"))
 
