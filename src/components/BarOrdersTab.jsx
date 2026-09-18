@@ -74,6 +74,7 @@ export default function BarOrdersTab({ bar }) {
     const p = produtos.find(x => x.id === it.produto_id)
     return a + (p ? p.preco_venda * it.qtd : 0)
   }, 0)
+  const bottleCount = items.reduce((a, it) => a + it.qtd, 0)
 
   const cats = useMemo(() => [...new Set(produtos.map(p => p.categoria).filter(Boolean))], [produtos])
   const q = search.trim().toLowerCase()
@@ -328,7 +329,7 @@ export default function BarOrdersTab({ bar }) {
               {castName
                 ? <div className="ord-cast-tag">💃 {castName}</div>
                 : <div className="ord-send-kicker">{t('portal.orders.cast')}</div>}
-              <div className="ord-send-kicker">{items.length} {t('portal.orders.items')}</div>
+              <div className="ord-send-kicker">{bottleCount} {t('portal.orders.items')}</div>
               <div className="ord-send-total">{t('portal.orders.estimatedTotal', { amount: fmtYen(totalOrder) })}</div>
             </div>
             <button type="button" className="btn-primary ord-send-btn" onClick={enviarOrder} disabled={saving || items.length === 0}>
