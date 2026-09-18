@@ -15,6 +15,8 @@ export const LIVE_TABLES = new Set([
   'time_clock',
   'bar_geo',
   'staff_extras',
+  'drink_menu',
+  'bar_pricing',
 ])
 
 let sourcePromise = null
@@ -102,12 +104,13 @@ class LiveQuery {
   }
 
   async execute() {
+    const token = await this.getToken()
     const source = await detectSource()
-    if (source === 'postgres') {
+    const lane = token && String(token).startsWith('lane:')
+    if (source === 'postgres' && !lane) {
       return this.executeRaw()
     }
     try {
-      const token = await this.getToken()
       const r = await fetch('/api/bar/live-db', {
         method: 'POST',
         headers: {
@@ -160,6 +163,9 @@ export function wrapBarLive(client) {
         return (table) => {
           if (!LIVE_TABLES.has(table)) return rawFrom(table)
           return new LiveQuery(table, () => rawFrom(table), async () => {
+            const { readLaneToken } = await import('./barLanes.js')
+            const lane = readLaneToken()
+            if (lane) return lane
             const { data } = await client.auth.getSession()
             return data?.session?.access_token || null
           })

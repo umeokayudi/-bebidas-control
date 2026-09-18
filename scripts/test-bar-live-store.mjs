@@ -12,6 +12,7 @@ const storeSrc = await import('node:fs').then(fs => fs.readFileSync(new URL('../
 assert('no vendas writes', !/from\('vendas'\)/.test(storeSrc))
 assert('no pedidos writes', !/from\('pedidos'\)/.test(storeSrc))
 assert('no faturas writes', !/from\('faturas'\)/.test(storeSrc))
+assert('seeds POS and staff lane logins', storeSrc.includes('pos@atomic.bar') && storeSrc.includes('funcionario@atomic.bar'))
 
 console.log('\n== Query filters ==')
 const rows = [

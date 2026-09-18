@@ -1,7 +1,4 @@
-/**
- * POS/CRM/clock rows when Postgres tables are missing.
- * Uses Storage only — never vendas / pedidos / faturas.
- */
+import { hashSecret } from './_hash.js'
 
 export const ATOMIC_BAR_ID = 'b23a5f97-ad4c-4c2a-baa6-72a0d3ba85b9'
 export const LIVE_BUCKET = 'system-private'
@@ -22,6 +19,8 @@ export const LIVE_TABLES = [
   'time_clock',
   'bar_geo',
   'staff_extras',
+  'bar_logins',
+  'bar_sessions',
 ]
 
 const locks = new Map()
@@ -308,16 +307,52 @@ async function seedAtomic(admin) {
   await saveTable(admin, 'time_clock', [])
   await saveTable(admin, 'bar_geo', [])
   await saveTable(admin, 'staff_extras', [])
+  await saveTable(admin, 'bar_logins', [])
+  await saveTable(admin, 'bar_sessions', [])
+}
+
+const POS_LOGIN_ID = '11111111-1111-4111-8111-111111111111'
+const STAFF_LOGIN_ID = '22222222-2222-4222-8222-222222222222'
+
+export async function seedLaneLogins(admin) {
+  const existing = await loadTable(admin, 'bar_logins')
+  const lanes = [
+    {
+      id: POS_LOGIN_ID,
+      bar_id: ATOMIC_BAR_ID,
+      email: 'pos@atomic.bar',
+      password_hash: hashSecret('PosOnly#2026'),
+      role: 'caixa',
+      nome: 'Atomic POS',
+      ativo: true,
+    },
+    {
+      id: STAFF_LOGIN_ID,
+      bar_id: ATOMIC_BAR_ID,
+      email: 'funcionario@atomic.bar',
+      password_hash: hashSecret('Funcionario#2026'),
+      role: 'bar_staff',
+      nome: 'Funcionário Atomic',
+      cargo: 'Floor',
+      salario_hora: 1500,
+      pin_hash: hashSecret('2468'),
+      ativo: true,
+    },
+  ]
+  const byId = new Map(existing.map(r => [r.id, r]))
+  for (const lane of lanes) byId.set(lane.id, { ...(byId.get(lane.id) || {}), ...lane })
+  await saveTable(admin, 'bar_logins', [...byId.values()])
+  const sessions = await loadTable(admin, 'bar_sessions')
+  if (!sessions.length) await saveTable(admin, 'bar_sessions', [])
+  return { seeded: true }
 }
 
 export async function ensureBarLiveReady(admin) {
   return withLock('_meta', async () => {
     const spaces = await loadTable(admin, 'bar_spaces')
-    if (!spaces.length) {
-      await seedAtomic(admin)
-      return { seeded: true, via: 'live-store' }
-    }
-    return { seeded: false, via: 'live-store' }
+    if (!spaces.length) await seedAtomic(admin)
+    const lanes = await seedLaneLogins(admin)
+    return { seeded: !spaces.length || !!lanes.seeded, via: 'live-store', lanes }
   })
 }
 
@@ -363,7 +398,6 @@ export async function loadStaffWithExtras(admin, staffId) {
   const full = await admin.from('perfis').select('id,bar_id,role,clock_pin_hash,ativo,nome,email,cargo,salario_hora').eq('id', staffId).single()
   if (!full.error && full.data) return full.data
   const basic = await admin.from('perfis').select('id,bar_id,role,nome,email').eq('id', staffId).single()
-  if (basic.error || !basic.data) return null
   const extra = await runLiveOp(admin, {
     table: 'staff_extras',
     mode: 'select',
@@ -371,7 +405,29 @@ export async function loadStaffWithExtras(admin, staffId) {
     filters: [{ op: 'eq', k: 'id', v: staffId }],
     wantSingle: 'maybe',
   })
-  return { ...basic.data, ativo: true, ...(extra.data || {}) }
+  if (!basic.error && basic.data) {
+    return { ...basic.data, ativo: true, ...(extra.data || {}) }
+  }
+  const login = await runLiveOp(admin, {
+    table: 'bar_logins',
+    mode: 'select',
+    columns: '*',
+    filters: [{ op: 'eq', k: 'id', v: staffId }],
+    wantSingle: 'maybe',
+  })
+  if (!login.data) return null
+  return {
+    id: login.data.id,
+    bar_id: login.data.bar_id,
+    role: login.data.role,
+    nome: login.data.nome,
+    email: login.data.email,
+    cargo: login.data.cargo || login.data.role,
+    salario_hora: login.data.salario_hora || 0,
+    clock_pin_hash: login.data.pin_hash,
+    ativo: login.data.ativo !== false,
+    ...(extra.data || {}),
+  }
 }
 
 export async function saveStaffExtras(admin, staffId, patch) {
@@ -398,10 +454,33 @@ export async function saveStaffExtras(admin, staffId, patch) {
 }
 
 export async function listStaffWithExtras(admin, barId) {
-  const full = await admin.from('perfis').select('id,nome,email,role,cargo,salario_hora,ativo,bar_id').eq('bar_id', barId).in('role', ['cliente', 'caixa', 'bar_staff']).order('nome')
-  if (!full.error) return full.data || []
-  const basic = await admin.from('perfis').select('id,nome,email,role,bar_id').eq('bar_id', barId).in('role', ['cliente', 'caixa', 'bar_staff']).order('nome')
-  const extras = await runLiveOp(admin, { table: 'staff_extras', mode: 'select', columns: '*' })
-  const byId = Object.fromEntries((extras.data || []).map(r => [r.id, r]))
-  return (basic.data || []).map(p => ({ ativo: true, ...p, ...(byId[p.id] || {}) }))
+  const full = await admin.from('perfis').select('id,nome,email,role,cargo,salario_hora,ativo,bar_id').eq('bar_id', barId).in('role', ['cliente', 'caixa', 'bar_staff', 'gerente']).order('nome')
+  let rows = []
+  if (!full.error) rows = full.data || []
+  else {
+    const basic = await admin.from('perfis').select('id,nome,email,role,bar_id').eq('bar_id', barId).in('role', ['cliente', 'caixa', 'bar_staff']).order('nome')
+    const extras = await runLiveOp(admin, { table: 'staff_extras', mode: 'select', columns: '*' })
+    const byId = Object.fromEntries((extras.data || []).map(r => [r.id, r]))
+    rows = (basic.data || []).map(p => ({ ativo: true, ...p, ...(byId[p.id] || {}) }))
+  }
+  const lanes = await runLiveOp(admin, {
+    table: 'bar_logins',
+    mode: 'select',
+    columns: '*',
+    filters: [{ op: 'eq', k: 'bar_id', v: barId }],
+  })
+  for (const login of lanes.data || []) {
+    if (rows.some(r => r.id === login.id || r.email === login.email)) continue
+    rows.push({
+      id: login.id,
+      nome: login.nome,
+      email: login.email,
+      role: login.role,
+      cargo: login.cargo || login.role,
+      salario_hora: login.salario_hora || 0,
+      ativo: login.ativo !== false,
+      bar_id: login.bar_id,
+    })
+  }
+  return rows
 }

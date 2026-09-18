@@ -2,8 +2,10 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply, defaultBarTab } from '../src/lib/access.js'
+import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply, defaultBarTab, costAccessForRole } from '../src/lib/access.js'
 import { haversineMeters, isInsideGeofence, hoursBetween, calcPay, pairPunches, payrollFromPunches } from '../src/lib/timeClock.js'
+import { WRITTEN_LOGINS } from '../src/lib/barLanes.js'
+import { splitCostBooks, booksAreSeparate } from '../src/lib/costBooks.js'
 
 let failed = 0
 function assert(name, cond, extra) {
@@ -15,15 +17,36 @@ console.log('\n== Logins separados ==')
 assert('admin é JBM', isJbmRole('admin') && !isBarRole('admin'))
 assert('caixa é bar, não JBM', isBarRole('caixa') && !isJbmRole('caixa'))
 assert('caixa não vê faturas JBM', !navForBarRole('caixa').some(n => n.id === 'faturas' || n.id === 'pedidos'))
-assert('caixa só POS + ponto', navForBarRole('caixa').map(n => n.id).join() === 'pos,ponto')
+assert('caixa só POS', navForBarRole('caixa').map(n => n.id).join() === 'pos')
 assert('staff só ponto', navForBarRole('bar_staff').map(n => n.id).join() === 'ponto')
 assert('dono vê POS e JBM', navForBarRole('cliente').some(n => n.id === 'pos') && navForBarRole('cliente').some(n => n.id === 'faturas'))
+assert('dono vê livros de custo', navForBarRole('cliente').some(n => n.id === 'custos'))
 assert('dono vê CRM de hóspedes e espaços', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
 assert('caixa não vê CRM nem espaços', !navForBarRole('caixa').some(n => n.id === 'clientes' || n.id === 'espacos'))
 assert('caixa POS cashier', posAccessForRole('caixa') === 'cashier')
 assert('staff sem POS', posAccessForRole('bar_staff') === 'none')
 assert('staff não vê supply JBM', !canSeeJbmSupply('bar_staff') && canSeeJbmSupply('cliente'))
 assert('tab inicial caixa = pos', defaultBarTab('caixa') === 'pos')
+assert('tab inicial gerente = custos', defaultBarTab('cliente') === 'custos')
+assert('tab inicial staff = ponto', defaultBarTab('bar_staff') === 'ponto')
+
+const caixaCost = costAccessForRole('caixa')
+assert('caixa só vê caixa POS', caixaCost.posTill && !caixaCost.jbmBill && !caixaCost.staffWages && !caixaCost.ownWage)
+const gerCost = costAccessForRole('cliente')
+assert('gerente vê 3 livros', gerCost.posTill && gerCost.jbmBill && gerCost.staffWages)
+const staffCost = costAccessForRole('bar_staff')
+assert('funcionário só salário próprio', staffCost.ownWage && !staffCost.posTill && !staffCost.jbmBill && !staffCost.staffWages)
+
+assert('POS login escrito', WRITTEN_LOGINS.pos.email === 'pos@atomic.bar' && WRITTEN_LOGINS.pos.password === 'PosOnly#2026')
+assert('gerente login escrito', WRITTEN_LOGINS.gerente.email === 'umeokayudi@gmail.com')
+assert('funcionário login escrito', WRITTEN_LOGINS.funcionario.email === 'funcionario@atomic.bar' && WRITTEN_LOGINS.funcionario.pin === '2468')
+assert('emails dos 3 acessos são distintos', new Set([WRITTEN_LOGINS.pos.email, WRITTEN_LOGINS.gerente.email, WRITTEN_LOGINS.funcionario.email]).size === 3)
+assert('senhas POS e funcionário diferentes', WRITTEN_LOGINS.pos.password !== WRITTEN_LOGINS.funcionario.password)
+
+const books = splitCostBooks({ posMonthTotal: 3900, jbmMonthBill: 120000, staffMonthPay: 3000 })
+assert('livros separados por tipo', booksAreSeparate(books))
+assert('não soma os 3 livros', books.pos.amount === 3900 && books.jbm.amount === 120000 && books.staff.amount === 3000)
+assert('POS não é JBM', books.pos.kind === 'till' && books.jbm.kind === 'bill' && books.staff.kind === 'wages')
 
 function listFns(dir, prefix = '') {
   const out = []
@@ -39,6 +62,7 @@ const fns = listFns(fileURLToPath(new URL('../api', import.meta.url)))
 assert('Vercel Hobby: no máximo 12 funções', fns.length <= 12, String(fns.length) + ' ' + fns.join(','))
 const vjson = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
 assert('time-clock rewrite keeps path (query preserved)', vjson.rewrites.some(r => r.source === '/api/time-clock' && !String(r.destination).includes('?')))
+assert('lane-login rewrite keeps path', vjson.rewrites.some(r => r.source === '/api/lane-login' && r.destination === '/api/bar/lane-login'))
 
 
 console.log('\n== Geofence do local ==')

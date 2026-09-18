@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message })
   }
 
-  const auth = await requireBarAccount(req, admin, { roles: ['cliente'] })
+  const auth = await requireBarAccount(req, admin, { roles: ['cliente', 'gerente'] })
   if (auth.error) return res.status(auth.status).json({ error: auth.error })
   const barId = auth.perfil.bar_id
 

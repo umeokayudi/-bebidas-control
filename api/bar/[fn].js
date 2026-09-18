@@ -4,6 +4,7 @@ import barStaff from '../_routeBarStaff.js'
 import posReorder from '../_routePosReorder.js'
 import posStatus from '../_routePosStatus.js'
 import liveDb from '../_routeBarLive.js'
+import laneLogin from '../_routeLaneLogin.js'
 
 export default async function handler(req, res) {
   const fn = String(req.query?.fn || '')
@@ -12,5 +13,6 @@ export default async function handler(req, res) {
   if (fn === 'pos-reorder') return posReorder(req, res)
   if (fn === 'pos-status') return posStatus(req, res)
   if (fn === 'live-db') return liveDb(req, res)
+  if (fn === 'lane-login') return laneLogin(req, res)
   return res.status(404).json({ error: 'Unknown bar route' })
 }

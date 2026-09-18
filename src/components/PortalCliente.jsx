@@ -29,11 +29,12 @@ import BarTeamTab from './BarTeamTab'
 import BarGuestsTab from './BarGuestsTab'
 import BarSpacesTab from './BarSpacesTab'
 import { isRestockPedido, fetchAllStockMovements } from '../lib/posSupply'
-import { navForBarRole, defaultBarTab, posAccessForRole, canManageBarTeam } from '../lib/access'
+import { navForBarRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
+import BarCostsTab, { CostBooksHero, loadCostBooks } from './BarCostsTab'
 
 const STATUS_PEDIDO = {
   pendente:   { labelKey:'orderStatus.pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -71,12 +72,15 @@ function EasyMoneyCard({ kicker, value, hint, tone = 'navy', children }) {
 
 function HomeTab({ bar, onTab }) {
   const { t } = useI18n()
+  const { perfil } = useAuth()
+  const access = costAccessForRole(perfil?.role)
   const [vendas,      setVendas]      = useState([])
   const [pedidos,     setPedidos]     = useState([])
   const [itens,       setItens]       = useState([])
   const [barPricing,  setBarPricing]  = useState([])
   const [faturas,     setFaturas]     = useState([])
   const [posMonthTotal, setPosMonthTotal] = useState(null)
+  const [costBooks,   setCostBooks]   = useState(null)
   const [floorGlance, setFloorGlance] = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [periodo,     setPeriodo]     = useState('30')
@@ -125,6 +129,12 @@ function HomeTab({ bar, onTab }) {
       }
     } catch {
       setFloorGlance(null)
+    }
+    try {
+      const books = await loadCostBooks(bar.id)
+      setCostBooks(books)
+    } catch {
+      setCostBooks(null)
     }
     setLoading(false)
   }
@@ -224,6 +234,9 @@ function HomeTab({ bar, onTab }) {
         </div>
       </div>
 
+      {costBooks ? (
+        <CostBooksHero books={costBooks} access={access} />
+      ) : (
       <div className="portal-grid-hero easy-dash-story" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:16 }}>
         <EasyMoneyCard
           kicker={t('portal.home.payJbm')}
@@ -268,6 +281,7 @@ function HomeTab({ bar, onTab }) {
           </div>
         </EasyMoneyCard>
       </div>
+      )}
 
       {floorGlance && (
         <div className="card" style={{ marginBottom: 16, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2340,6 +2354,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         </div>
       </aside>
       <main className="app-main app-main-wide">
+        {tab==='custos'    && isGerente(perfil?.role) && <BarCostsTab bar={bar} />}
         {tab==='inicio' && posAccess !== 'cashier' && (
           <HomeTab bar={bar} onTab={selectTab} />
         )}

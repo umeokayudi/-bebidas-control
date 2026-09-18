@@ -187,6 +187,9 @@ export default function TimeClockPanel({ bar }) {
           <SectionTitle>{t('clock.monthPay')}</SectionTitle>
           {loading ? <Spinner /> : (
             <>
+              <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.5 }}>
+                {canManageBarTeam(perfil?.role) ? t('clock.staffCostHint') : t('clock.ownPayHint')}
+              </div>
               {perfil?.role === 'bar_staff' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                   <div>

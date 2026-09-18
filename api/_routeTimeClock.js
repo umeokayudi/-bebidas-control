@@ -4,7 +4,7 @@ import { drinksAdminClient } from './_supabaseAdmin.js'
 import { requireBarAccount, bearerToken } from './_requireStaff.js'
 import { secretsMatch, hashSecret } from './_hash.js'
 import { isInsideGeofence } from './_geo.js'
-import { isMissingSchemaError, loadBarWithGeo, loadStaffWithExtras, runLiveOp } from './_barLiveStore.js'
+import { isMissingSchemaError, loadBarWithGeo, loadStaffWithExtras, listStaffWithExtras, runLiveOp } from './_barLiveStore.js'
 
 function bodyOf(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
@@ -58,22 +58,22 @@ export default async function handler(req, res) {
         if (!tabletOk(bar, q.tabletToken || q.tablet_token)) {
           return res.status(403).json({ error: 'Tablet not paired' })
         }
-        const { data } = await admin.from('perfis')
-          .select('id,nome,cargo,role')
-          .eq('bar_id', bar.id)
-          .in('role', ['caixa', 'bar_staff', 'cliente'])
-          .eq('ativo', true)
-          .order('nome')
-        return res.status(200).json({ staff: (data || []).map(s => ({ id: s.id, nome: s.nome, cargo: s.cargo || s.role })) })
+        const roster = await listStaffWithExtras(admin, bar.id)
+        return res.status(200).json({
+          staff: (roster || [])
+            .filter(s => s.ativo !== false)
+            .map(s => ({ id: s.id, nome: s.nome, cargo: s.cargo || s.role })),
+        })
       }
 
       const auth = await requireBarAccount(req, admin)
       if (auth.error) return res.status(auth.status).json({ error: auth.error })
       const from = q.from
       const to = q.to
+      const manager = auth.perfil.role === 'cliente' || auth.perfil.role === 'gerente'
       const { data, error } = await listPunches(admin, {
         barId: auth.perfil.bar_id,
-        staffId: auth.perfil.role !== 'cliente' ? auth.user.id : null,
+        staffId: manager ? null : (auth.user?.id || auth.perfil.id),
         from,
         to,
       })
@@ -92,7 +92,8 @@ export default async function handler(req, res) {
     const auth = bearerToken(req) ? await requireBarAccount(req, admin) : null
     if (auth && !auth.error) {
       barId = auth.perfil.bar_id
-      if (!staffId || auth.perfil.role !== 'cliente') staffId = auth.user.id
+      const manager = auth.perfil.role === 'cliente' || auth.perfil.role === 'gerente'
+      if (!staffId || !manager) staffId = auth.user?.id || auth.perfil.id
     }
 
     if (!barId || !staffId) return res.status(400).json({ error: 'bar_id and staff_id required' })

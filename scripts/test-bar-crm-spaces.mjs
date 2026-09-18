@@ -82,7 +82,7 @@ assert('SQL does not create vendas/pedidos/faturas', !/create table if not exist
 assert('checkout can attach guest/space on pos_vendas', pos.includes('space_id') && pos.includes('guest_id'))
 assert('POS auto-links seated guest from space', posUi.includes('matchCheckoutVisit') && posUi.includes('keepChip'))
 assert('owner nav has guests+spaces', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
-assert('caixa stays POS+clock', navForBarRole('caixa').map(n => n.id).join() === 'pos,ponto')
+assert('caixa stays POS only', navForBarRole('caixa').map(n => n.id).join() === 'pos')
 
 console.log('\n== Checkout still never writes JBM vendas ==')
 function mockSb() {

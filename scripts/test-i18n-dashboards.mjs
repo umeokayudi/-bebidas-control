@@ -22,6 +22,8 @@ function flatten(obj, prefix = '') {
 console.log('\n== Language: English default, Japanese optional ==')
 assert('en and ja are the only UI langs', Object.keys({ en, ja }).join() === 'en,ja')
 assert('home glance is English', en.portal.home.payJbm === 'Pay JBM' && en.portal.home.barSold === 'Bar sold' && en.portal.home.youKeep === 'You keep')
+assert('three cost books are separate labels', en.portal.costs.posTill === 'POS till' && en.portal.costs.jbmBill === 'JBM bill' && en.portal.costs.staffWages === 'Staff wages')
+assert('written login doors exist', !!(en.auth.doorPosTitle && en.auth.doorGerenteTitle && en.auth.doorStaffTitle))
 assert('Japanese is optional copy', en.shell.langJaOptional.toLowerCase().includes('optional'))
 assert('default hint mentions English', /english/i.test(en.shell.languageHint))
 assert('POS hero is English', en.atomicPos.todayAtCounter === 'Today at the counter')

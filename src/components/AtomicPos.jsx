@@ -1007,6 +1007,9 @@ export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
         <div>
           <div className="pos-head-title">{t('atomicPos.title')}</div>
           <div className="pos-head-sub">{t('atomicPos.subtitle')}</div>
+          {access === 'cashier' && (
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>{t('atomicPos.tillOnly')}</div>
+          )}
         </div>
         <div className="pos-head-today">
           <div className="pos-head-label">{t('atomicPos.today')}</div>

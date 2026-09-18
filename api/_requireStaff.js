@@ -64,19 +64,18 @@ export async function requireStaff(req, _admin, opts = {}) {
 
 /** Conta do bar (dono, caixa tablet, staff). Nunca libera painel JBM. */
 export async function requireBarAccount(req, _admin, opts = {}) {
-  const allowed = opts.roles || ['cliente', 'caixa', 'bar_staff']
-  const token = bearerToken(req)
-  if (!token) return { error: 'Não autenticado', status: 401 }
-
-  const authClient = drinksAuthClient()
-  const { data: { user }, error } = await authClient.auth.getUser(token)
-  if (error || !user) return { error: 'Sessão inválida', status: 401 }
-
-  const userDb = createStaffUserClient(token)
-  const { data: perfil } = await userDb.from('perfis').select('*').eq('id', user.id).single()
-  if (!perfil || !allowed.includes(perfil.role)) return { error: 'Sem permissão', status: 403 }
-  if (!perfil.bar_id) return { error: 'Conta sem bar vinculado', status: 403 }
-  return { user, perfil, token }
+  const allowed = opts.roles || ['cliente', 'gerente', 'caixa', 'bar_staff']
+  let admin = _admin
+  if (!admin) {
+    const { drinksAdminClient } = await import('./_supabaseAdmin.js')
+    admin = drinksAdminClient()
+  }
+  const { resolveBarActor } = await import('./_barLaneAuth.js')
+  const actor = await resolveBarActor(req, admin)
+  if (actor.error) return actor
+  if (!allowed.includes(actor.perfil.role)) return { error: 'Sem permissão', status: 403 }
+  if (!actor.perfil.bar_id) return { error: 'Conta sem bar vinculado', status: 403 }
+  return actor
 }
 
 /** Staff JWT, service secret, ou origem permitida (jbm-master / bebidas SPA). */

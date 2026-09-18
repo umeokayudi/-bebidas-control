@@ -349,8 +349,14 @@ function Shell() {
 
   useEffect(() => {
     if (isBarRole(perfil?.role) && perfil.bar_id) {
+      let cancelled = false
       supabase.from('bars').select('*').eq('id', perfil.bar_id).single()
-        .then(({ data }) => setBar(data))
+        .then(({ data }) => {
+          if (!cancelled) setBar(data || { id: perfil.bar_id, nome: 'Atomic Bar' })
+        })
+        .catch(() => {
+          if (!cancelled) setBar({ id: perfil.bar_id, nome: 'Atomic Bar' })
+        })
     }
     if (perfil?.role === 'admin') {
       supabase.from('pedidos').select('id', { count:'exact' }).eq('status','pendente')
@@ -365,7 +371,7 @@ function Shell() {
     </div>
   )
 
-  if (!user) return <LoginPage />
+  if (!user && !perfil) return <LoginPage />
 
   // PORTAL DO BAR (dono / caixa tablet / staff) — isolado do painel JBM
   if (isBarRole(perfil?.role)) {
@@ -436,10 +442,10 @@ function Shell() {
         <div className="sidebar-footer">
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
             <div style={{width:34,height:34,borderRadius:10,background:'rgba(193,156,86,0.2)',border:'1px solid rgba(193,156,86,0.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'var(--gold)',flexShrink:0}}>
-              {(perfil?.nome||user.email||'U')[0].toUpperCase()}
+              {(perfil?.nome||user?.email||'U')[0].toUpperCase()}
             </div>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.85)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{perfil?.nome||user.email}</div>
+              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.85)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{perfil?.nome||user?.email}</div>
               <div style={{fontSize:10,color:'rgba(193,156,86,0.7)'}}>{roleLabel(perfil?.role)}</div>
             </div>
           </div>

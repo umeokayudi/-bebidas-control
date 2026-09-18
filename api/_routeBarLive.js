@@ -1,29 +1,39 @@
 /** HTTP CRUD for POS/CRM live-store. Never touches JBM ledgers. */
 
 import { drinksAdminClient } from './_supabaseAdmin.js'
-import { bearerToken } from './_requireStaff.js'
-import { drinksAuthClient, createStaffUserClient } from './_supabaseAdmin.js'
 import { handleCorsPreflight, setCorsHeaders } from './_cors.js'
 import { LIVE_TABLES, ensureBarLiveReady, runLiveOp } from './_barLiveStore.js'
+import { resolveBarActor } from './_barLaneAuth.js'
+
+const SECRET_TABLES = new Set(['bar_logins', 'bar_sessions'])
+const PG_MENU_TABLES = new Set(['drink_menu', 'bar_pricing', 'bars'])
 
 function bodyOf(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
 }
 
-async function requireAnyPerfil(req) {
-  const token = bearerToken(req)
-  if (!token) return { error: 'Não autenticado', status: 401 }
-  const authClient = drinksAuthClient()
-  const { data: { user }, error } = await authClient.auth.getUser(token)
-  if (error || !user) return { error: 'Sessão inválida', status: 401 }
-  const userDb = createStaffUserClient(token)
-  const { data: perfil } = await userDb.from('perfis').select('*').eq('id', user.id).single()
-  if (!perfil) return { error: 'Sem perfil', status: 403 }
-  return { user, perfil, token }
+async function runPgSelect(admin, spec) {
+  let q = admin.from(spec.table).select(spec.columns || '*')
+  for (const f of spec.filters || []) {
+    if (f.op === 'eq') q = q.eq(f.k, f.v)
+    else if (f.op === 'neq') q = q.neq(f.k, f.v)
+    else if (f.op === 'in') q = q.in(f.k, f.v)
+    else if (f.op === 'gte') q = q.gte(f.k, f.v)
+    else if (f.op === 'lte') q = q.lte(f.k, f.v)
+    else if (f.op === 'gt') q = q.gt(f.k, f.v)
+    else if (f.op === 'lt') q = q.lt(f.k, f.v)
+    else if (f.op === 'is') q = q.is(f.k, f.v)
+    else if (f.op === 'not') q = q.not(f.k, f.sub, f.v)
+  }
+  if (spec.orderBy) q = q.order(spec.orderBy.k, { ascending: spec.orderBy.ascending !== false })
+  if (spec.limitN != null) q = q.limit(spec.limitN)
+  if (spec.wantSingle === true) q = q.single()
+  if (spec.wantSingle === 'maybe') q = q.maybeSingle()
+  return q
 }
 
 function scopedFilters(auth, table, filters, row) {
-  const barRoles = ['cliente', 'caixa', 'bar_staff']
+  const barRoles = ['cliente', 'gerente', 'caixa', 'bar_staff']
   if (!barRoles.includes(auth.perfil?.role) || !auth.perfil.bar_id) return { filters, row, error: null }
   const barId = auth.perfil.bar_id
   if (table === 'staff_extras') return { filters, row, error: null }
@@ -46,14 +56,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message })
   }
 
-  const auth = await requireAnyPerfil(req)
+  const auth = await resolveBarActor(req, admin)
   if (auth.error) return res.status(auth.status).json({ error: auth.error })
 
   try {
     await ensureBarLiveReady(admin)
     const body = req.method === 'GET' ? { table: req.query?.table, mode: 'select' } : bodyOf(req)
     const table = String(body.table || '')
-    if (!LIVE_TABLES.includes(table)) return res.status(400).json({ error: 'Unknown table' })
+    if (SECRET_TABLES.has(table)) return res.status(403).json({ error: 'Forbidden table' })
+    if (!LIVE_TABLES.includes(table) && !PG_MENU_TABLES.has(table)) {
+      return res.status(400).json({ error: 'Unknown table' })
+    }
 
     const spec = {
       table,
@@ -72,12 +85,19 @@ export default async function handler(req, res) {
         const scoped = scopedFilters(auth, table, spec.filters, { ...row })
         return scoped.row
       })
-      const bad = spec.insertRows.find(r => r && auth.perfil.bar_id && r.bar_id && r.bar_id !== auth.perfil.bar_id && ['cliente', 'caixa', 'bar_staff'].includes(auth.perfil.role))
+      const bad = spec.insertRows.find(r => r && auth.perfil.bar_id && r.bar_id && r.bar_id !== auth.perfil.bar_id && ['cliente', 'gerente', 'caixa', 'bar_staff'].includes(auth.perfil.role))
       if (bad) return res.status(403).json({ error: 'bar_id mismatch' })
     } else {
       const scoped = scopedFilters(auth, table, spec.filters, null)
       if (scoped.error) return res.status(403).json({ error: scoped.error })
       spec.filters = scoped.filters
+    }
+
+    if (PG_MENU_TABLES.has(table)) {
+      if (spec.mode !== 'select') return res.status(403).json({ error: 'Menu tables are read-only here' })
+      const result = await runPgSelect(admin, spec)
+      if (result.error) return res.status(400).json(result)
+      return res.status(200).json({ data: result.data, error: null })
     }
 
     const result = await runLiveOp(admin, spec)
