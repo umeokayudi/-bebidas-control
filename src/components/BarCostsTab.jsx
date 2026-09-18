@@ -240,6 +240,11 @@ export default function BarCostsTab({ bar, onTab }) {
   }
   const show = id => book === 'all' || book === id
   const loading = !books && !err
+  const emptyBook = book !== 'all'
+    && !(books?.[book]?.amount)
+    && !(book === 'jbm' && (hq?.jbm?.totalPendente || hq?.jbm?.pedidosMes || hq?.jbm?.entregasMes))
+    && !(book === 'pos' && hq?.pos?.salesCount)
+    && !(book === 'staff' && (hq?.hoursTotal || hq?.payroll?.length))
   const q = query.trim()
   const notes = (hq?.jbm?.notesMes || []).filter(r => matchHqSearch(r, q))
   const orders = (hq?.jbm?.pedidosRecentes || []).filter(r => matchHqSearch(r, q))
@@ -337,7 +342,7 @@ export default function BarCostsTab({ bar, onTab }) {
       {loading && <Spinner text={t('portal.costs.loading')} />}
       {books && <CostBooksHero books={books} access={access} selected={book} onSelect={setBook} />}
 
-      {books && book !== 'all' && !(books[book]?.amount) && (
+      {books && emptyBook && (
         <div className="hq-empty" style={{ marginBottom: 12 }}>{t('portal.hq.emptyMonth')}</div>
       )}
 
