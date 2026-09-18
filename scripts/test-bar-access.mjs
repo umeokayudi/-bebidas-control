@@ -63,6 +63,9 @@ assert('Vercel Hobby: no máximo 12 funções', fns.length <= 12, String(fns.len
 const vjson = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
 assert('time-clock rewrite keeps path (query preserved)', vjson.rewrites.some(r => r.source === '/api/time-clock' && !String(r.destination).includes('?')))
 assert('lane-login rewrite keeps path', vjson.rewrites.some(r => r.source === '/api/lane-login' && r.destination === '/api/bar/lane-login'))
+const authUi = readFileSync(new URL('../src/components/Auth.jsx', import.meta.url), 'utf8')
+assert('login é só email e senha', authUi.includes('type="email"') && authUi.includes('type="password"') && !authUi.includes('DoorCard') && !authUi.includes('WRITTEN_LOGINS'))
+assert('login não imprime senhas na tela', !authUi.includes('PosOnly#2026') && !authUi.includes('Funcionario#2026') && !authUi.includes('JbmVer#2026'))
 
 
 console.log('\n== Geofence do local ==')
