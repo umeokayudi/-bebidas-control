@@ -203,6 +203,7 @@ export async function commitPosSale(supabase, {
   spaceId = null,
   guestId = null,
   visitId = null,
+  obs = '',
   userId = null,
   shots = [],
   syncStock,
@@ -227,6 +228,8 @@ export async function commitPosSale(supabase, {
     discount_code_id: activeCode?.id || null,
     criado_por: userId || null,
   }
+  const note = String(obs || '').trim()
+  if (note) vendaPayload.obs = note
   if (agentId) vendaPayload.drink_back_agent_id = agentId
   if (spaceId) vendaPayload.space_id = spaceId
   if (guestId) vendaPayload.guest_id = guestId
@@ -234,11 +237,12 @@ export async function commitPosSale(supabase, {
 
   let venda, error
   ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
-  if (error?.message?.includes('drink_back_agent_id') || error?.message?.includes('space_id') || error?.message?.includes('guest_id') || error?.message?.includes('visit_id')) {
+  if (error?.message?.includes('drink_back_agent_id') || error?.message?.includes('space_id') || error?.message?.includes('guest_id') || error?.message?.includes('visit_id') || error?.message?.includes('obs')) {
     delete vendaPayload.drink_back_agent_id
     delete vendaPayload.space_id
     delete vendaPayload.guest_id
     delete vendaPayload.visit_id
+    if (error.message.includes('obs')) delete vendaPayload.obs
     ;({ data: venda, error } = await supabase.from('pos_vendas').insert(vendaPayload).select().single())
   }
   if (error) return { ok: false, error: error.message }

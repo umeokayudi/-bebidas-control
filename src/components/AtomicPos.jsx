@@ -22,7 +22,7 @@ import { isSupplierProduct } from './utils'
 import { includedTaxBreakdown } from '../lib/consumptionTax'
 import { tokyoMonthKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
-import { matchCheckoutVisit, spacesByZone, zoneLabelKey, activeKeeps } from '../lib/barCrm'
+import { matchCheckoutVisit, spacesByZone, activeKeeps } from '../lib/barCrm'
 
 const SUB_TAB_IDS = [
   { id: 'dashboard', key: 'tabDashboard', icon: '📊' },
@@ -62,12 +62,18 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [agentId, setAgentId] = useState('')
   const [spaceId, setSpaceId] = useState('')
   const [guestId, setGuestId] = useState('')
+  const [ticketNote, setTicketNote] = useState('')
+  const [addCastOpen, setAddCastOpen] = useState(false)
+  const [newCastName, setNewCastName] = useState('')
   const [spaces, setSpaces] = useState([])
   const [guests, setGuests] = useState([])
   const [visits, setVisits] = useState([])
   const [keeps, setKeeps] = useState([])
+  const [agents, setAgents] = useState(drinkBackAgents || [])
   const [payMethod, setPayMethod] = useState('Cash')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => { setAgents(drinkBackAgents || []) }, [drinkBackAgents])
 
   useEffect(() => {
     Promise.all([
@@ -156,6 +162,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       spaceId: spaceId || null,
       guestId: guestId || null,
       visitId: openVisit?.id || null,
+      obs: ticketNote,
       userId: user?.id,
       shots,
       syncStock: args => syncPosStockAndReorder(supabase, {
@@ -175,6 +182,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     setAgentId('')
     setSpaceId('')
     setGuestId('')
+    setTicketNote('')
     onSale?.()
     const tax = includedTaxBreakdown(result.total)
     const restockNote = result.stock?.pedido
@@ -216,40 +224,65 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
           </select>
         )}
 
-        {(drinkBackAgents || []).length > 0 && (
-          <select value={agentId} onChange={e => setAgentId(e.target.value)} className="pos-select">
-            <option value="">{t('atomicPos.drinkBackOptional')}</option>
-            {drinkBackAgents.filter(a => a.ativo).map(a => (
-              <option key={a.id} value={a.id}>{a.nome}{a.regiao ? ` · ${a.regiao}` : ''} ({a.comissao_pct}%)</option>
+        <div className="pos-ticket">
+          <div className="pos-ticket-label">{t('atomicPos.castLabel')}</div>
+          <div className="pos-ticket-chips">
+            {agents.filter(a => a.ativo !== false).map(a => (
+              <button
+                key={a.id}
+                type="button"
+                className={`pos-chip${agentId === a.id ? ' is-on' : ''}`}
+                onClick={() => setAgentId(agentId === a.id ? '' : a.id)}
+              >💃 {a.nome}</button>
             ))}
-          </select>
-        )}
+            <button type="button" className="pos-chip" onClick={() => setAddCastOpen(v => !v)}>{t('atomicPos.addCast')}</button>
+          </div>
+          {addCastOpen && (
+            <div className="pos-code-row">
+              <input value={newCastName} onChange={e => setNewCastName(e.target.value)} placeholder={t('atomicPos.castPlaceholder')} />
+              <button type="button" className="btn-primary" onClick={async () => {
+                const nome = newCastName.trim()
+                if (!nome) return
+                const { data, error } = await supabase.from('drink_back_agents').insert({
+                  bar_id: bar.id, nome, comissao_pct: 10, ativo: true,
+                }).select('*').single()
+                if (!error && data) {
+                  setAgents(prev => [...prev, data])
+                  setAgentId(data.id)
+                  setNewCastName('')
+                  setAddCastOpen(false)
+                } else {
+                  alert(error?.message || t('atomicPos.drinkBackSetup'))
+                }
+              }}>{t('common.confirm')}</button>
+            </div>
+          )}
 
-        {spaces.length > 0 && (
-          <select
-            value={spaceId}
-            onChange={e => {
-              const id = e.target.value
-              setSpaceId(id)
-              const visit = matchCheckoutVisit(visits, { spaceId: id })
-              if (visit?.guest_id) setGuestId(visit.guest_id)
-            }}
-            className="pos-select"
-          >
-            <option value="">{t('atomicPos.spaceOptional')}</option>
-            {spacesByZone(spaces).map(z => (
-              <optgroup key={z.zona} label={zoneLabelKey(z.zona) ? t(zoneLabelKey(z.zona)) : z.zona}>
-                {z.spaces.map(s => {
-                  const visit = matchCheckoutVisit(visits, { spaceId: s.id })
-                  const who = visit ? (guests.find(g => g.id === visit.guest_id)?.nome || t('atomicPos.walkIn')) : ''
-                  return <option key={s.id} value={s.id}>{who ? `${s.nome} · ${who}` : s.nome}</option>
-                })}
-              </optgroup>
-            ))}
-          </select>
-        )}
+          <div className="pos-ticket-label">{t('atomicPos.spaceLabel')}</div>
+          <div className="pos-ticket-chips">
+            {spaces.length === 0 && <span className="pos-ticket-empty">{t('atomicPos.spaceOptional')}</span>}
+            {spacesByZone(spaces).flatMap(z => z.spaces).map(s => {
+              const visit = matchCheckoutVisit(visits, { spaceId: s.id })
+              const who = visit ? (guests.find(g => g.id === visit.guest_id)?.nome || t('atomicPos.walkIn')) : ''
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`pos-chip${spaceId === s.id ? ' is-on' : ''}`}
+                  onClick={() => {
+                    const id = spaceId === s.id ? '' : s.id
+                    setSpaceId(id)
+                    if (id) {
+                      const v = matchCheckoutVisit(visits, { spaceId: id })
+                      if (v?.guest_id) setGuestId(v.guest_id)
+                    }
+                  }}
+                >{who ? `${s.nome} · ${who}` : s.nome}</button>
+              )
+            })}
+          </div>
 
-        {guests.length > 0 && (
+          <div className="pos-ticket-label">{t('atomicPos.guestLabel')}</div>
           <select
             value={guestId}
             onChange={e => {
@@ -265,22 +298,32 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             <option value="">{t('atomicPos.guestOptional')}</option>
             {guests.map(g => <option key={g.id} value={g.id}>{g.nome}{g.line_id ? ` · LINE ${g.line_id}` : ''}</option>)}
           </select>
-        )}
 
-        {guestId && (() => {
-          const g = guests.find(x => x.id === guestId)
-          const guestKeeps = activeKeeps(keeps, guestId)
-          if (!g && !guestKeeps.length) return null
-          return (
-            <div className="pos-guest-chip" style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.45 }}>
-              {g?.alergias && <div style={{ color: 'var(--red)', fontWeight: 700 }}>{t('guests.allergies')}: {g.alergias}</div>}
-              {g?.preferencias && <div>{t('guests.prefs')}: {g.preferencias}</div>}
-              {guestKeeps.map(k => (
-                <div key={k.id}>{t('atomicPos.keepChip', { name: k.nome, pct: k.remaining_pct })}</div>
-              ))}
-            </div>
-          )
-        })()}
+          {guestId && (() => {
+            const g = guests.find(x => x.id === guestId)
+            const guestKeeps = activeKeeps(keeps, guestId)
+            if (!g && !guestKeeps.length) return null
+            return (
+              <div className="pos-guest-chip">
+                {g?.alergias && <div className="pos-guest-alert">{t('guests.allergies')}: {g.alergias}</div>}
+                {g?.preferencias && <div>{t('guests.prefs')}: {g.preferencias}</div>}
+                {guestKeeps.map(k => (
+                  <div key={k.id}>{t('atomicPos.keepChip', { name: k.nome, pct: k.remaining_pct })}</div>
+                ))}
+              </div>
+            )
+          })()}
+
+          <label className="pos-ticket-label" htmlFor="pos-ticket-note">{t('atomicPos.detailsLabel')}</label>
+          <textarea
+            id="pos-ticket-note"
+            className="pos-ticket-note"
+            rows={2}
+            value={ticketNote}
+            onChange={e => setTicketNote(e.target.value)}
+            placeholder={t('atomicPos.detailsPlaceholder')}
+          />
+        </div>
 
         <input className="pos-search" placeholder={t('atomicPos.searchDrinks')} value={search} onChange={e => setSearch(e.target.value)} />
 
@@ -301,6 +344,14 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
 
       <div className="pos-cart">
         <div className="pos-cart-title">{t('atomicPos.cart')}</div>
+        {(agentId || spaceId || guestId || ticketNote) && (
+          <div className="pos-cart-ticket">
+            {agentId && <span>💃 {(agents.find(a => a.id === agentId)?.nome) || 'CAST'}</span>}
+            {spaceId && <span>🪑 {(spaces.find(s => s.id === spaceId)?.nome)}</span>}
+            {guestId && <span>🥂 {(guests.find(g => g.id === guestId)?.nome)}</span>}
+            {ticketNote && <span>{ticketNote}</span>}
+          </div>
+        )}
         {cart.length === 0 ? <div className="pos-cart-empty">{t('atomicPos.tapToAdd')}</div> : (
           <>
             <div className="pos-cart-list">

@@ -80,8 +80,13 @@ assert('guest UI has bottle keep, never pedidos', guestsUi.includes("from('bar_b
 assert('spaces UI never touches faturas/compras', !spacesUi.includes("from('faturas')") && !spacesUi.includes("from('compras')"))
 assert('SQL does not create vendas/pedidos/faturas', !/create table if not exists vendas/i.test(schema) && schema.includes('pos_vendas') && schema.includes('bar_bottle_keeps'))
 assert('checkout can attach guest/space on pos_vendas', pos.includes('space_id') && pos.includes('guest_id'))
+assert('checkout saves CAST agent and details note', pos.includes('drink_back_agent_id') && pos.includes('vendaPayload.obs'))
 assert('POS auto-links seated guest from space', posUi.includes('matchCheckoutVisit') && posUi.includes('keepChip'))
+assert('POS ticket shows CAST chips', posUi.includes('castLabel') && posUi.includes('pos-ticket'))
 assert('owner nav has guests+spaces', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
+const ordersUi = readFileSync(new URL('../src/components/BarOrdersTab.jsx', import.meta.url), 'utf8')
+assert('JBM order UI never writes vendas', !ordersUi.includes("from('vendas')") && ordersUi.includes("from('pedidos')"))
+assert('JBM order has CAST + details', ordersUi.includes('portal.orders.cast') && ordersUi.includes('withOrderCast'))
 assert('caixa stays POS only', navForBarRole('caixa').map(n => n.id).join() === 'pos')
 
 console.log('\n== Checkout still never writes JBM vendas ==')
@@ -115,10 +120,14 @@ const sold = await commitPosSale(sb, {
   spaceId: 'sp1',
   guestId: 'g1',
   visitId: 'v1',
+  agentId: 'cast-1',
+  obs: 'キープ Hibiki · アレルギーなし',
 })
 assert('POS sale ok with guest/space', sold.ok === true)
 assert('inserts pos_vendas not vendas', sb.ops.some(o => o[0] === 'insert' && o[1] === 'pos_vendas') && !sb.ops.some(o => o[1] === 'vendas'))
 assert('links visit to POS sale only', sb.ops.some(o => o[0] === 'update' && o[1] === 'bar_visits'))
+const posInsert = sb.ops.find(o => o[0] === 'insert' && o[1] === 'pos_vendas')
+assert('ticket keeps CAST + details', posInsert?.[2]?.drink_back_agent_id === 'cast-1' && posInsert?.[2]?.obs.includes('Hibiki'))
 
 if (failed) {
   console.log(`\n${failed} failed`)

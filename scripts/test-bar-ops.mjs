@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { placeNotifPanel, panelBoxStyle } from '../src/lib/notifPanel.js'
 import { buildBarOpsGlance, opsGlanceItems, posTodayFromTickets } from '../src/lib/barOpsGlance.js'
+import { orderCastFromObs, orderDetailsFromObs, withOrderCast } from '../src/lib/orderMeta.js'
 import { splitCostBooks } from '../src/lib/costBooks.js'
 import en from '../src/locales/en.js'
 import ja from '../src/locales/ja.js'
@@ -114,6 +115,13 @@ assert('without HQ, AR comes from invoices not month notes', fallback.openAr ===
 assert('without HQ, overdue is 2', fallback.overdue === 2)
 assert('without HQ, rent still from books', fallback.rent === 450000)
 assert('without HQ, POS month from books', fallback.posMonth === 3900)
+
+console.log('\n== Order CAST / details stay in obs ==')
+assert('pack CAST + details', withOrderCast('morning delivery', 'Yuki') === 'Cast: Yuki\nmorning delivery')
+assert('read CAST', orderCastFromObs('Cast: Yuki\nmorning delivery') === 'Yuki')
+assert('read details without CAST line', orderDetailsFromObs('Cast: Yuki\nmorning delivery') === 'morning delivery')
+assert('empty CAST is just details', withOrderCast('urgent', '') === 'urgent')
+
 
 if (failed) {
   console.log(`\n${failed} failed`)
