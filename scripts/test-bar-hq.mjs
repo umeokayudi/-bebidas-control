@@ -2,9 +2,10 @@
 import { readFileSync } from 'node:fs'
 import { splitCostBooks, booksAreSeparate, booksGrandTotal, rentForMonth } from '../src/lib/costBooks.js'
 import { localHoursPay, calcPayWithLateNight } from '../src/lib/timeClock.js'
-import { buildHqChatSystem } from '../src/lib/hqChat.js'
+import { buildHqChatSystem, localHqAnswer } from '../src/lib/hqChat.js'
 import { costAccessForRole } from '../src/lib/access.js'
 import { filterSupplierVendas } from '../api/_supplierVenda.js'
+import { recentMonthKeys, shiftMonthKey, isMonthKey } from '../src/lib/tokyo.js'
 
 let failed = 0
 function assert(name, cond, extra) {
@@ -58,6 +59,44 @@ const sys = buildHqChatSystem({
 })
 assert('AI told not to mix books', /never add/i.test(sys) && /FOUR SEPARATE BOOKS/.test(sys))
 assert('AI sees rent and wages', sys.includes('450,000') && sys.includes('12,750'))
+
+console.log('\n== Month filters ==')
+assert('month key shape', isMonthKey('2026-08') && !isMonthKey('2026-8') && !isMonthKey('aug'))
+assert('shift back one month', shiftMonthKey('2026-09', -1) === '2026-08')
+assert('recent months include current then previous', recentMonthKeys(4, '2026-09').join() === '2026-09,2026-08,2026-07,2026-06')
+
+console.log('\n== Local HQ answers stay on one book ==')
+const snap = {
+  mes: '2026-09',
+  books,
+  hoursTotal: 8,
+  rent: { note: 'Roppongi' },
+  payroll: [{ nome: 'Floor', hours: 8, pay: 12750 }],
+  pos: { salesCount: 2 },
+  jbm: { totalPendente: 0, faturasAtraso: 0, estoqueBaixo: [] },
+}
+const posA = localHqAnswer('POS till this month?', snap)
+const jbmA = localHqAnswer('JBM bill and open invoices', snap)
+const wageA = localHqAnswer('Staff hours × rate', snap)
+const rentA = localHqAnswer('Rent this month', snap)
+assert('POS answer is till only', /POS till/.test(posA) && /2,400/.test(posA) && !/450,000/.test(posA))
+assert('JBM answer is bill only', /JBM bill/.test(jbmA) && /88,000/.test(jbmA) && !/2,400/.test(jbmA))
+assert('hours answer is wages only', /Hours book/.test(wageA) && /12,750/.test(wageA) && !/88,000/.test(wageA))
+assert('rent answer is rent only', /Rent book/.test(rentA) && /450,000/.test(rentA) && !/2,400/.test(rentA))
+assert('fallback lists four books not a sum', /not added together/.test(localHqAnswer('overview', snap)))
+
+const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+assert('HQ command CSS is present', css.includes('.hq-actions') && css.includes('.hq-ai-dock') && css.includes('.hq-filters'))
+const posSrc = readFileSync(new URL('../src/lib/atomicPos.js', import.meta.url), 'utf8')
+assert('POS schema checks pos-status first', posSrc.indexOf("fetch('/api/pos-status')") < posSrc.indexOf("from('pos_vendas')"))
+const hqRoute = readFileSync(new URL('../api/_routeHqSync.js', import.meta.url), 'utf8')
+assert('hq-sync accepts month filter', hqRoute.includes('req.query?.month') && hqRoute.includes('bodyOf(req).month'))
+const dash = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
+const hqUi = dash.slice(dash.indexOf('export default function BarCostsTab'))
+assert('HQ puts actions and filters in front', hqUi.indexOf('hq-filters') < hqUi.indexOf('<HqAiDock') && hqUi.includes('BarCommandActions'))
+assert('HQ always mounts AI slot', hqUi.includes('<HqAiDock'))
+const home = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
+assert('home has command actions and AI slot', home.includes('BarCommandActions') && home.includes('HqAiDock'))
 
 if (failed) {
   console.log(`\n${failed} falha(s)`)

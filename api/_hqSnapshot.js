@@ -64,10 +64,10 @@ function monthBill(vendas, faturas, mes) {
   }
 }
 
-export async function buildHqSnapshot(admin, barId, barNome = '') {
+export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   await ensureBarLiveReady(admin)
-  const mes = tokyoMonthKey()
-  const range = monthRange()
+  const mes = /^\d{4}-\d{2}$/.test(String(monthKey || '')) ? String(monthKey) : tokyoMonthKey()
+  const range = monthRange(`${mes}-01`)
 
   const [vendasR, pedR, fatR, estR, posR, clockR, rentR, staff] = await Promise.all([
     admin.from('vendas').select('id,data,total,obs,bar_id,cast_id').eq('bar_id', barId).order('data', { ascending: false }).limit(400),

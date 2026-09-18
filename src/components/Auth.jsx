@@ -103,7 +103,7 @@ export function AuthProvider({ children }) {
     clearLaneSession()
     setUser(null)
     setPerfil(null)
-    await supabase.auth.signOut()
+    try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* already cleared */ }
   }
 
   return (

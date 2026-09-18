@@ -24,6 +24,7 @@ assert('en and ja are the only UI langs', Object.keys({ en, ja }).join() === 'en
 assert('home glance is English', en.portal.home.payJbm === 'Pay JBM' && en.portal.home.barSold === 'Bar sold' && en.portal.home.youKeep === 'You keep')
 assert('three cost books are separate labels', en.portal.costs.posTill === 'POS till' && en.portal.costs.jbmBill === 'JBM bill' && en.portal.costs.staffWages === 'Staff wages')
 assert('rent is a fourth book', en.portal.costs.rent === 'Rent' && en.nav.portalCosts === 'Bar HQ')
+assert('HQ command copy', en.portal.hq.actionsTitle === 'Run the bar' && en.portal.hq.aiSlot === 'AI slot' && en.portal.hq.filterSpecify === 'Specify')
 assert('written login doors exist as copy keys', !!(en.auth.doorPosTitle && en.auth.doorGerenteTitle && en.auth.doorStaffTitle))
 const authSrc = readFileSync(new URL('../src/components/Auth.jsx', import.meta.url), 'utf8')
 assert('login page does not print door passwords', !authSrc.includes('PosOnly#2026') && !authSrc.includes('DoorCard'))

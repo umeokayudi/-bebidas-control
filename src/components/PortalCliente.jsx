@@ -34,7 +34,9 @@ import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
-import BarCostsTab, { CostBooksHero, loadCostBooks } from './BarCostsTab'
+import BarCostsTab, { CostBooksHero, loadCostBooks, BarCommandActions } from './BarCostsTab'
+import HqAiDock from './HqAiDock'
+import { fetchHqSnapshot } from '../lib/hqSnapshot'
 
 const STATUS_PEDIDO = {
   pendente:   { labelKey:'orderStatus.pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -81,6 +83,7 @@ function HomeTab({ bar, onTab }) {
   const [faturas,     setFaturas]     = useState([])
   const [posMonthTotal, setPosMonthTotal] = useState(null)
   const [costBooks,   setCostBooks]   = useState(null)
+  const [hq,          setHq]          = useState(null)
   const [floorGlance, setFloorGlance] = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [periodo,     setPeriodo]     = useState('30')
@@ -131,10 +134,17 @@ function HomeTab({ bar, onTab }) {
       setFloorGlance(null)
     }
     try {
-      const books = await loadCostBooks(bar.id)
-      setCostBooks(books)
+      const snap = await fetchHqSnapshot()
+      setHq(snap)
+      setCostBooks(snap.books)
     } catch {
-      setCostBooks(null)
+      setHq(null)
+      try {
+        const books = await loadCostBooks(bar.id)
+        setCostBooks(books)
+      } catch {
+        setCostBooks(null)
+      }
     }
     setLoading(false)
   }
@@ -217,27 +227,30 @@ function HomeTab({ bar, onTab }) {
   }
 
   return (
-    <div className="fade-in portal-page easy-dash" style={{ maxWidth:1000 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, gap:12, flexWrap:'wrap' }}>
+    <div className="fade-in portal-page easy-dash hq-dash">
+      <div className="hq-top">
         <div>
-          <div style={{ fontSize:24, fontWeight:800, letterSpacing:-0.5 }}>{bar.nome}</div>
-          <div style={{ fontSize:13, color:'var(--text2)', marginTop:2 }}>{t('portal.home.atAGlance')}</div>
-        </div>
-        <div style={{ display:'flex', gap:6 }}>
-          {[['7','7d'],['30','30d'],['90','90d'],['365','1y']].map(([v,l])=>(
-            <button key={v} onClick={()=>setPeriodo(v)} style={{
-              padding:'6px 12px', borderRadius:8, fontSize:12, fontWeight:600,
-              background:periodo===v?'var(--navy)':'var(--bg3)',
-              color:periodo===v?'white':'var(--text2)', border:'none', cursor:'pointer'
-            }}>{l}</button>
-          ))}
+          <div className="hq-title">{bar.nome}</div>
+          <div className="hq-sub">{t('portal.home.atAGlance')}</div>
         </div>
       </div>
 
-      {costBooks ? (
-        <CostBooksHero books={costBooks} access={access} />
-      ) : (
-      <div className="portal-grid-hero easy-dash-story" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:16 }}>
+      <div className="hq-actions-label">{t('portal.hq.actionsTitle')}</div>
+      <BarCommandActions onTab={onTab} />
+
+      <div className="hq-filters">
+        <span className="hq-filter-label">{t('portal.hq.filterSpecify')}</span>
+        {[['7', '7d'], ['30', '30d'], ['90', '90d'], ['365', '1y']].map(([v, l]) => (
+          <button key={v} type="button" className={`hq-chip${periodo === v ? ' is-on' : ''}`} onClick={() => setPeriodo(v)}>{l}</button>
+        ))}
+      </div>
+
+      <div className="hq-layout" style={{ marginBottom: 16 }}>
+        <div>
+          {costBooks ? (
+            <CostBooksHero books={costBooks} access={access} onSelect={() => onTab('custos')} />
+          ) : (
+            <div className="portal-grid-hero easy-dash-story" style={{ display:'grid', gridTemplateColumns:'1.1fr 1fr 1fr', gap:14, marginBottom:16 }}>
         <EasyMoneyCard
           kicker={t('portal.home.payJbm')}
           value={fmtYen(account.contaMes)}
@@ -308,6 +321,9 @@ function HomeTab({ bar, onTab }) {
       ) : (
         <div className="easy-dash-ok" style={{ marginBottom:16 }}>{t('portal.home.allClear')}</div>
       )}
+        </div>
+        <HqAiDock snapshot={hq} compact />
+      </div>
 
       {/* Spend chart — clickable */}
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, padding:'20px 24px', marginBottom:16 }}>

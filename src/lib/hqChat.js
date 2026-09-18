@@ -36,3 +36,48 @@ ${facts}`
 Answer in clear English. Use the data below. Never add the four books together.
 ${facts}`
 }
+
+function yen(n) {
+  return `¥${Math.round(n || 0).toLocaleString('ja-JP')}`
+}
+
+/** Offline HQ answers until an external AI API key is plugged into /api/chat. Never mixes books. */
+export function localHqAnswer(question, snapshot, lang = 'en') {
+  const s = snapshot || {}
+  const books = s.books || {}
+  const q = String(question || '').toLowerCase()
+  const ja = lang === 'ja'
+
+  const four = ja
+    ? `4つの帳簿（合算しない） ${s.mes || ''}：\n- POSレジ ${yen(books.pos?.amount)}\n- JBM請求 ${yen(books.jbm?.amount)}\n- スタッフ給与 ${yen(books.staff?.amount)}（${s.hoursTotal || 0}h）\n- 家賃 ${yen(books.rent?.amount)}${s.rent?.note ? `（${s.rent.note}）` : ''}`
+    : `Four books for ${s.mes || 'this month'} — not added together:\n- POS till ${yen(books.pos?.amount)}\n- JBM bill ${yen(books.jbm?.amount)}\n- Staff wages ${yen(books.staff?.amount)} (${s.hoursTotal || 0}h)\n- Rent ${yen(books.rent?.amount)}${s.rent?.note ? ` (${s.rent.note})` : ''}`
+
+  if (/rent|aluguel|家賃|lease/.test(q)) {
+    return ja
+      ? `家賃帳簿のみ：${yen(books.rent?.amount)}（${s.rent?.note || 'メモなし'}）。POSでもJBMでも給与でもありません。`
+      : `Rent book only: ${yen(books.rent?.amount)} (${s.rent?.note || 'no note'}). Not POS, not JBM, not wages.`
+  }
+  if (/hour|wage|pay|salár|給与|時間|ponto/.test(q)) {
+    const rows = (s.payroll || []).map(r => `${r.nome}: ${Number(r.hours || 0).toFixed(2)}h → ${yen(r.pay)}`).join('\n')
+    return ja
+      ? `勤務時間帳簿のみ：合計 ${s.hoursTotal || 0}h → ${yen(books.staff?.amount)}。\n${rows || '打刻なし'}`
+      : `Hours book only: ${s.hoursTotal || 0}h → ${yen(books.staff?.amount)}.\n${rows || 'No punches this month.'}`
+  }
+  if (/jbm|invoice|fatura|請求|supplier|fornecedor/.test(q)) {
+    return ja
+      ? `JBM請求帳簿：今月 ${yen(books.jbm?.amount)}。未払 ${yen(s.jbm?.totalPendente)}（延滞 ${s.jbm?.faturasAtraso || 0}）。POSレジではありません。`
+      : `JBM bill book: ${yen(books.jbm?.amount)} this month. Open invoices ${yen(s.jbm?.totalPendente)} (${s.jbm?.faturasAtraso || 0} overdue). Not the till.`
+  }
+  if (/pos|till|caixa|レジ|counter/.test(q)) {
+    return ja
+      ? `POSレジ：今月 ${yen(books.pos?.amount)}（${s.pos?.salesCount || 0}件）。JBM請求ではありません。`
+      : `POS till: ${yen(books.pos?.amount)} this month (${s.pos?.salesCount || 0} tickets). Not the JBM bill.`
+  }
+  if (/stock|estoque|在庫|restock/.test(q)) {
+    const low = (s.jbm?.estoqueBaixo || []).map(e => `${e.nome} ${e.qtd}/${e.minimo}`).join(', ')
+    return ja
+      ? `在庫（JBM仕入側）：${low || '下限割れなし'}。`
+      : `Inventory (JBM supply side): ${low || 'nothing under minimum'}.`
+  }
+  return four
+}

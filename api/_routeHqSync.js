@@ -32,7 +32,10 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: 'Method not allowed' })
     }
 
-    const snap = await buildHqSnapshot(admin, auth.perfil.bar_id, auth.perfil.nome)
+    const month = req.method === 'GET'
+      ? req.query?.month
+      : (bodyOf(req).month || bodyOf(req).rent?.month_key)
+    const snap = await buildHqSnapshot(admin, auth.perfil.bar_id, auth.perfil.nome, month)
     return res.status(200).json(snap)
   } catch (e) {
     return res.status(500).json({ error: e.message })

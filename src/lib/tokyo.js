@@ -39,6 +39,22 @@ export function tokyoMonthKey(date = new Date()) {
   return tokyoDateKey(date).slice(0, 7)
 }
 
+export function shiftMonthKey(monthKey, deltaMonths = 0) {
+  const [y, m] = String(monthKey || tokyoMonthKey()).split('-').map(Number)
+  const idx = y * 12 + (m - 1) + (+deltaMonths || 0)
+  const ny = Math.floor(idx / 12)
+  const nm = ((idx % 12) + 12) % 12 + 1
+  return `${ny}-${pad2(nm)}`
+}
+
+export function recentMonthKeys(count = 4, from = tokyoMonthKey()) {
+  return Array.from({ length: Math.max(1, count) }, (_, i) => shiftMonthKey(from, -i))
+}
+
+export function isMonthKey(value) {
+  return /^\d{4}-\d{2}$/.test(String(value || ''))
+}
+
 export function tokyoHour(date = new Date()) {
   return tokyoParts(date).hour
 }
