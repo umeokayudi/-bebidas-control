@@ -160,6 +160,7 @@ export default function BarCostsTab({ bar, onTab }) {
   const [rentMsg, setRentMsg] = useState('')
   const [showLogins, setShowLogins] = useState(false)
   const [floorGlance, setFloorGlance] = useState(null)
+  const [localOps, setLocalOps] = useState({ invoices: [], openOrders: 0 })
 
   async function load(force = false, mes = month) {
     setErr('')
@@ -202,14 +203,22 @@ export default function BarCostsTab({ bar, onTab }) {
       supabase.from('bar_spaces').select('id,ativo,ordem,tipo,zona').eq('bar_id', bar.id).eq('ativo', true),
       supabase.from('bar_visits').select('id,space_id,status,guest_id').eq('bar_id', bar.id).in('status', ['seated', 'reserved']),
       supabase.from('bar_guests').select('id,nome,aniversario,ativo').eq('bar_id', bar.id).eq('ativo', true),
-    ]).then(([spR, viR, guR]) => {
-      if (cancelled || spR.error) return
-      const floor = decorateSpaces(spR.data || [], viR.data || [])
-      setFloorGlance({
-        seated: floor.filter(s => s.occupied).length,
-        reserved: floor.filter(s => s.reserved).length,
-        free: floor.filter(s => !s.occupied && !s.reserved).length,
-        birthdays: birthdayThisMonth(guR.data || []).length,
+      supabase.from('faturas').select('*').eq('bar_id', bar.id),
+      supabase.from('pedidos').select('id,status').eq('bar_id', bar.id),
+    ]).then(([spR, viR, guR, fR, pR]) => {
+      if (cancelled) return
+      if (!spR.error) {
+        const floor = decorateSpaces(spR.data || [], viR.data || [])
+        setFloorGlance({
+          seated: floor.filter(s => s.occupied).length,
+          reserved: floor.filter(s => s.reserved).length,
+          free: floor.filter(s => !s.occupied && !s.reserved).length,
+          birthdays: birthdayThisMonth(guR.data || []).length,
+        })
+      }
+      setLocalOps({
+        invoices: filterJbmDrinksFaturas(fR.error ? [] : (fR.data || [])),
+        openOrders: (pR.error ? [] : (pR.data || [])).filter(p => p.status === 'pendente' || p.status === 'confirmado').length,
       })
     }).catch(() => { if (!cancelled) setFloorGlance(null) })
     return () => { cancelled = true }
@@ -286,6 +295,19 @@ export default function BarCostsTab({ bar, onTab }) {
         </button>
       </div>
       {err && <div style={{ color: 'var(--red)', marginBottom: 12 }}>{err}</div>}
+
+      <BarOpsGlance
+        glance={buildBarOpsGlance({
+          hq,
+          books,
+          floor: floorGlance,
+          openOrders: hq?.jbm
+            ? (hq.jbm.pedidosRecentes || []).filter(p => p.status === 'pendente' || p.status === 'confirmado').length
+            : localOps.openOrders,
+          invoices: localOps.invoices,
+        })}
+        onTab={onTab}
+      />
 
       <div className="hq-filters">
         <div className="hq-filter-group">
@@ -364,14 +386,6 @@ export default function BarCostsTab({ bar, onTab }) {
 
       {loading && <Spinner text={t('portal.costs.loading')} />}
       {books && <CostBooksHero books={books} access={access} selected={book} onSelect={setBook} />}
-      <BarOpsGlance
-        glance={buildBarOpsGlance({
-          hq,
-          floor: floorGlance,
-          openOrders: (hq?.jbm?.pedidosRecentes || []).filter(p => p.status === 'pendente' || p.status === 'confirmado').length,
-        })}
-        onTab={onTab}
-      />
 
       {books && emptyBook && (
         <div className="hq-empty" style={{ marginBottom: 12 }}>{t('portal.hq.emptyMonth')}</div>

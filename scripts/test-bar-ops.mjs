@@ -102,6 +102,19 @@ assert('EN labels exist', !!(en.portal.home.opsTitle && en.portal.home.kpiPosTod
 assert('JA labels exist', !!(ja.portal.home.opsTitle && ja.portal.home.kpiOverdue && ja.notifications.delete))
 assert('birthday copy is explicit', /birthday/i.test(en.portal.home.birthdaysMonth))
 
+const fallback = buildBarOpsGlance({
+  books: splitCostBooks({ posMonthTotal: 3900, jbmMonthBill: 0, staffMonthPay: 0, rentMonth: 450000 }),
+  invoices: [
+    { status: 'pendente', valor: 465000, pago: 0, data_vencimento: '2026-07-31' },
+    { status: 'pendente', valor: 1268694, pago: 0, data_vencimento: '2026-08-31' },
+  ],
+  today: '2026-09-18',
+})
+assert('without HQ, AR comes from invoices not month notes', fallback.openAr === 1733694)
+assert('without HQ, overdue is 2', fallback.overdue === 2)
+assert('without HQ, rent still from books', fallback.rent === 450000)
+assert('without HQ, POS month from books', fallback.posMonth === 3900)
+
 if (failed) {
   console.log(`\n${failed} failed`)
   process.exit(1)

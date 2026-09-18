@@ -1,6 +1,7 @@
 /** Bar-ops KPIs for HQ and Home. Never add the four books into one number. */
 
 import { tokyoDateKey } from './tokyo.js'
+import { faturaRemaining } from './barPortal.js'
 
 export function posTodayFromTickets(tickets = [], today = tokyoDateKey()) {
   return (tickets || [])
@@ -12,16 +13,31 @@ export function posTodayCount(tickets = [], today = tokyoDateKey()) {
   return (tickets || []).filter(s => String(s.data || '').slice(0, 10) === today).length
 }
 
+function invoiceGlance(invoices = [], today) {
+  const pending = (invoices || []).filter(f => f.status !== 'pago' && faturaRemaining(f) > 0)
+  const overdue = pending.filter(f => {
+    const venc = String(f.data_vencimento || f.periodo_fim || '').slice(0, 10)
+    return venc && venc < today
+  })
+  return {
+    openAr: pending.reduce((a, f) => a + faturaRemaining(f), 0),
+    overdue: overdue.length,
+    pendingInvoices: pending.length,
+  }
+}
+
 export function buildBarOpsGlance({
   hq = null,
+  books = null,
   floor = null,
   openOrders = 0,
   posTickets = null,
   posMonthFallback = null,
   account = null,
+  invoices = null,
   today = tokyoDateKey(),
 } = {}) {
-  const books = hq?.books || {}
+  const ledgers = hq?.books || books || {}
   const jbm = hq?.jbm || {}
   const tickets = posTickets || hq?.pos?.tickets || []
   const posToday = posTodayFromTickets(tickets, today)
@@ -30,25 +46,27 @@ export function buildBarOpsGlance({
   const monthTicketCount = hq?.pos?.salesCount
     || tickets.filter(s => String(s.data || '').startsWith(monthKey)).length
     || 0
+  const fromInvoices = invoiceGlance(invoices, today)
+  const hasJbm = jbm && (jbm.totalPendente != null || jbm.faturasPendentes != null || jbm.faturasAtraso != null)
   return {
     mixed: false,
     posToday,
     tonightCount,
-    posMonth: Math.round(+books.pos?.amount || posMonthFallback || 0),
+    posMonth: Math.round(+ledgers.pos?.amount || posMonthFallback || 0),
     posTickets: monthTicketCount,
-    jbmBill: Math.round(+books.jbm?.amount || account?.contaMes || 0),
+    jbmBill: Math.round(+ledgers.jbm?.amount || account?.contaMes || 0),
     jbmNotes: jbm.entregasMes || account?.deliveries || 0,
-    openAr: Math.round(+jbm.totalPendente || account?.faturaPendente || 0),
-    overdue: jbm.faturasAtraso || 0,
-    pendingInvoices: jbm.faturasPendentes || 0,
+    openAr: Math.round(hasJbm ? +jbm.totalPendente || 0 : fromInvoices.openAr),
+    overdue: hasJbm ? (jbm.faturasAtraso || 0) : fromInvoices.overdue,
+    pendingInvoices: hasJbm ? (jbm.faturasPendentes || 0) : fromInvoices.pendingInvoices,
     openOrders: +openOrders || 0,
     seated: floor?.seated || 0,
     reserved: floor?.reserved || 0,
     free: floor?.free || 0,
     birthdays: floor?.birthdays || 0,
     hours: hq?.hoursTotal || 0,
-    wages: Math.round(+books.staff?.amount || 0),
-    rent: Math.round(+books.rent?.amount || 0),
+    wages: Math.round(+ledgers.staff?.amount || 0),
+    rent: Math.round(+ledgers.rent?.amount || 0),
     lowStock: (jbm.estoqueBaixo || []).length || hq?.sources?.inventory?.low || 0,
   }
 }

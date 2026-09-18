@@ -252,6 +252,7 @@ function HomeTab({ bar, onTab }) {
           posTickets,
           posMonthFallback: posMonthTotal,
           account,
+          invoices: faturas,
         })}
         onTab={onTab}
       />
