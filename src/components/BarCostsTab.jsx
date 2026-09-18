@@ -209,8 +209,6 @@ export default function BarCostsTab({ bar, onTab }) {
     setBusy(false)
   }
 
-  if (!books && !err) return <Spinner text={t('portal.costs.loading')} />
-
   const payroll = (hq?.payroll || []).filter(r => staffFilter === 'all' || r.staff_id === staffFilter)
   const monthLabel = d => {
     const [y, m] = String(d).split('-')
@@ -218,6 +216,7 @@ export default function BarCostsTab({ bar, onTab }) {
     return `${names[+m - 1] || m} ${y}`
   }
   const show = id => book === 'all' || book === id
+  const loading = !books && !err
 
   return (
     <div className="fade-in portal-page hq-dash">
@@ -263,6 +262,7 @@ export default function BarCostsTab({ bar, onTab }) {
         </div>
       )}
 
+      {loading && <Spinner text={t('portal.costs.loading')} />}
       {books && <CostBooksHero books={books} access={access} selected={book} onSelect={setBook} />}
 
       {books && book !== 'all' && !(books[book]?.amount) && (

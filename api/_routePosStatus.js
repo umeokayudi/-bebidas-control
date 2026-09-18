@@ -9,20 +9,12 @@ export default async function handler(req, res) {
 
   try {
     const sb = drinksAdminClient()
-    const tables = ['pos_vendas', 'pos_vendas_itens', 'drink_menu', 'bar_pricing', 'vip_members', 'discount_codes', 'drink_back_agents', 'bar_spaces', 'bar_guests']
-    const status = {}
-
-    for (const t of tables) {
-      const { error } = await sb.from(t).select('id').limit(1)
-      status[t] = error ? (error.code === 'PGRST205' || /does not exist/i.test(error.message || '') ? 'missing' : 'error') : 'ok'
+    const { error } = await sb.from('pos_vendas').select('id').limit(1)
+    if (!error) {
+      return res.status(200).json({ ready: true, source: 'postgres' })
     }
-
-    if (status.pos_vendas === 'ok' && status.pos_vendas_itens === 'ok') {
-      return res.status(200).json({ ready: true, source: 'postgres', tables: status })
-    }
-
     const live = await ensureBarLiveReady(sb)
-    return res.status(200).json({ ready: true, source: 'live-store', tables: status, live })
+    return res.status(200).json({ ready: true, source: 'live-store', live })
   } catch (e) {
     return res.status(500).json({ ready: false, error: e.message })
   }

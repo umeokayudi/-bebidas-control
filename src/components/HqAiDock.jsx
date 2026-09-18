@@ -43,7 +43,7 @@ export default function HqAiDock({ snapshot, compact = false }) {
         setVia('api')
         setMessages(m => {
           const next = [...m]
-          next[next.length - 1] = { role: 'assistant', content: api }
+          next[next.length - 1] = { role: 'assistant', content: String(api).replace(/\*\*/g, '') }
           return next
         })
       }
