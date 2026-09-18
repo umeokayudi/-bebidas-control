@@ -218,7 +218,7 @@ export default function BarOrdersTab({ bar }) {
           <div className="ord-composer-hint">{t('portal.orders.supplierListHint')}</div>
 
           <div className="ord-cast-panel">
-            <div className="ord-meta-label">{t('portal.orders.cast')}</div>
+            <div className="ord-meta-label">💃 {t('portal.orders.cast')}</div>
             <div className="ord-chips">
               {casts.map(c => (
                 <button
@@ -270,7 +270,7 @@ export default function BarOrdersTab({ bar }) {
             onChange={e => setSearch(e.target.value)}
             placeholder={t('portal.orders.searchProducts')}
           />
-          <div className="ord-chips">
+          <div className="ord-row-scroll">
             <button type="button" className={`ord-chip${cat === 'all' ? ' is-on' : ''}`} onClick={() => setCat('all')}>{t('portal.orders.filterAll')}</button>
             {cats.map(c => (
               <button key={c} type="button" className={`ord-chip${cat === c ? ' is-on' : ''}`} onClick={() => setCat(c)}>{c}</button>
@@ -330,7 +330,7 @@ export default function BarOrdersTab({ bar }) {
         </div>
       )}
 
-      <div className="ord-chips" style={{ marginBottom: 12 }}>
+      <div className="ord-row-scroll" style={{ marginBottom: 12 }}>
         {[['open', t('portal.orders.filterOpen')], ['all', t('portal.orders.filterAll')], ['pendente', t('orderStatus.pendente')], ['confirmado', t('orderStatus.confirmado')], ['entregue', t('orderStatus.entregue')]].map(([id, label]) => (
           <button key={id} type="button" className={`ord-chip${statusFilter === id ? ' is-on' : ''}`} onClick={() => setStatusFilter(id)}>{label}</button>
         ))}
