@@ -47,3 +47,20 @@ export function rentForMonth(rows = [], monthKey) {
   const match = (rows || []).find(r => r.kind === 'rent' && r.month_key === monthKey)
   return Math.round(+match?.amount || 0)
 }
+
+export function lastRentOnOrBefore(rows = [], monthKey) {
+  const list = (rows || [])
+    .filter(r => r.kind === 'rent' && r.month_key && String(r.month_key) <= String(monthKey) && +r.amount > 0)
+    .sort((a, b) => String(b.month_key).localeCompare(String(a.month_key)))
+  return list[0] || null
+}
+
+/** Template for a month with no rent row — prefer earlier months, else any known rent. */
+export function lastKnownRent(rows = [], monthKey) {
+  const prior = lastRentOnOrBefore(rows, monthKey)
+  if (prior && prior.month_key !== monthKey) return prior
+  const list = (rows || [])
+    .filter(r => r.kind === 'rent' && r.month_key && r.month_key !== monthKey && +r.amount > 0)
+    .sort((a, b) => String(b.month_key).localeCompare(String(a.month_key)))
+  return list[0] || null
+}

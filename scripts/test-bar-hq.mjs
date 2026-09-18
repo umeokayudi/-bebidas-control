@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs'
-import { splitCostBooks, booksAreSeparate, booksGrandTotal, rentForMonth } from '../src/lib/costBooks.js'
+import { splitCostBooks, booksAreSeparate, booksGrandTotal, rentForMonth, lastRentOnOrBefore, lastKnownRent } from '../src/lib/costBooks.js'
+import {
+  monthKeyOf, compactYen, explainJbmGap, buildMonthSeries, invoiceOverlapsMonth,
+  matchHqSearch, monthChipHint, matchInvoiceStatus, lowStockFromLedger,
+} from '../src/lib/hqFilters.js'
 import { localHoursPay, calcPayWithLateNight } from '../src/lib/timeClock.js'
 import { buildHqChatSystem, localHqAnswer } from '../src/lib/hqChat.js'
 import { costAccessForRole } from '../src/lib/access.js'
@@ -87,6 +91,7 @@ assert('fallback lists four books not a sum', /not added together/.test(localHqA
 
 const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 assert('HQ command CSS is present', css.includes('.hq-actions') && css.includes('.hq-ai-dock') && css.includes('.hq-filters'))
+assert('HQ filter groups and month chips', css.includes('.hq-filter-group') && css.includes('.hq-chip-stack') && css.includes('.hq-search') && css.includes('.hq-gap'))
 const posSrc = readFileSync(new URL('../src/lib/atomicPos.js', import.meta.url), 'utf8')
 assert('POS schema checks pos-status first', posSrc.indexOf("fetch('/api/pos-status'") < posSrc.indexOf("from('pos_vendas')"))
 const posStatus = readFileSync(new URL('../api/_routePosStatus.js', import.meta.url), 'utf8')
@@ -97,8 +102,72 @@ const dash = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.me
 const hqUi = dash.slice(dash.indexOf('export default function BarCostsTab'))
 assert('HQ puts actions and filters in front', hqUi.indexOf('hq-filters') < hqUi.indexOf('<HqAiDock') && hqUi.includes('BarCommandActions'))
 assert('HQ always mounts AI slot', hqUi.includes('<HqAiDock'))
+assert('HQ month chips show amounts', hqUi.includes('hq-chip-stack') && hqUi.includes('compactYen'))
+assert('HQ JBM views notes/invoices/orders', hqUi.includes("setJbmView") && hqUi.includes('ordersOtherDate'))
+assert('HQ copy last rent', hqUi.includes('copyLastRent') && hqUi.includes('rentCopy'))
+assert('HQ never queries public.estoque', !hqApi.includes("from('estoque')"))
+assert('HQ stock from regras + movimentos', hqApi.includes("from('estoque_regras')") && hqApi.includes("from('estoque_movimentos')"))
 const home = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
 assert('home has command actions and AI slot', home.includes('BarCommandActions') && home.includes('HqAiDock'))
+assert('home window is not HQ month', home.includes('portal.home.filterWindow') && home.includes('portal.home.windowHint'))
+
+console.log('\n== Live-shaped HQ filters (Atomic Jul/Aug/Sep 2026) ==')
+assert('monthKeyOf note date', monthKeyOf('2026-07-14') === '2026-07' && monthKeyOf('2026-08-22T12:00:00+09:00') === '2026-08')
+assert('compact millions', compactYen(1757044) === '¥1.8M' && compactYen(3900) === '¥3,900')
+const vendasLive = [
+  { data: '2026-07-14', data_venda: '2026-07-14', total: 1757044, obs: 'Auto: order' },
+  { data: '2026-06-20', data_venda: '2026-06-20', total: 2565926, obs: 'Costco' },
+]
+const pedidosLive = Array.from({ length: 9 }, (_, i) => ({
+  criado_em: '2026-08-22T03:00:00.000Z',
+  total_estimado: i === 0 ? 1757044 : 0,
+  obs: 'Rebuild jul/2026',
+}))
+const posLive = [
+  { data: '2026-09-10', total: 2400, obs: 'Demo POS' },
+  { data: '2026-09-12', total: 1500, obs: 'Guest' },
+]
+const series = buildMonthSeries({
+  keys: ['2026-09', '2026-08', '2026-07', '2026-06'],
+  vendas: vendasLive,
+  posRows: posLive,
+  pedidos: pedidosLive,
+  rentRows: [{ kind: 'rent', month_key: '2026-09', amount: 450000 }],
+})
+const byKey = Object.fromEntries(series.map(m => [m.key, m]))
+assert('Sep chip POS ¥3900 rent 450k JBM 0', byKey['2026-09'].pos === 3900 && byKey['2026-09'].jbm === 0 && byKey['2026-09'].rent === 450000)
+assert('Aug chip JBM 0 with 9 orders', byKey['2026-08'].jbm === 0 && byKey['2026-08'].pedidos === 9 && byKey['2026-08'].pedidosTotal === 1757044)
+assert('Jul chip JBM ¥1,757,044', byKey['2026-07'].jbm === 1757044 && byKey['2026-07'].jbmCount === 1)
+assert('Jun chip JBM ¥2,565,926', byKey['2026-06'].jbm === 2565926)
+assert('Aug chip hint is orders not bill', monthChipHint(byKey['2026-08']).kind === 'orders')
+assert('Jul chip hint is JBM bill', monthChipHint(byKey['2026-07']).kind === 'jbm' && monthChipHint(byKey['2026-07']).amount === 1757044)
+assert('Sep chip hint is POS till', monthChipHint(byKey['2026-09']).kind === 'pos')
+const augGap = explainJbmGap({ noteCount: 0, noteAmount: 0, orderCount: 9, orderAmount: 1757044, monthKey: '2026-08' })
+assert('August gap is orders-other-date', augGap.kind === 'orders-other-date' && augGap.orderCount === 9)
+assert('July gap is notes', explainJbmGap({ noteCount: 9, noteAmount: 1757044, orderCount: 0, monthKey: '2026-07' }).kind === 'notes')
+const julInv = { status: 'parcial', periodo_inicio: '2026-07-01', periodo_fim: '2026-07-31', data_vencimento: '2026-08-31' }
+const junInv = { status: 'pendente', periodo_inicio: '2026-06-01', periodo_fim: '2026-06-30', data_vencimento: '2026-07-31' }
+assert('Jul invoice overlaps Jul and Aug due date', invoiceOverlapsMonth(julInv, '2026-07') && invoiceOverlapsMonth(julInv, '2026-08') && !invoiceOverlapsMonth(julInv, '2026-09'))
+assert('Jun invoice does not overlap Aug', invoiceOverlapsMonth(junInv, '2026-06') && !invoiceOverlapsMonth(junInv, '2026-08'))
+assert('pending filter keeps both open invoices', matchInvoiceStatus(julInv, 'pending') && matchInvoiceStatus(junInv, 'pending'))
+assert('month filter Sep drops both', !matchInvoiceStatus(julInv, 'month', '2026-09') && !matchInvoiceStatus(junInv, 'month', '2026-09'))
+assert('search hits rebuild obs', matchHqSearch({ obs: 'Rebuild jul/2026', status: 'entregue' }, 'rebuild'))
+assert('search misses unrelated', !matchHqSearch({ obs: 'Costco jun' }, 'pos'))
+const rentRows = [{ kind: 'rent', month_key: '2026-09', amount: 450000, note: 'Roppongi' }]
+assert('Aug can copy Sep rent as template', lastKnownRent(rentRows, '2026-08')?.month_key === '2026-09' && lastRentOnOrBefore(rentRows, '2026-08') == null)
+assert('Oct copies Sep as prior month', lastKnownRent(rentRows, '2026-10')?.amount === 450000)
+const low = lowStockFromLedger({
+  regras: [{ produto_id: 'gin', minimo: 2 }],
+  movimentos: [{ produto_id: 'gin', tipo: 'entrada', qtd: 4 }, { produto_id: 'gin', tipo: 'saida', qtd: 3 }],
+  produtos: [{ id: 'gin', nome: 'Gin' }],
+})
+assert('stock from movimentos not public.estoque', low.length === 1 && low[0].qtd === 1 && low[0].nome === 'Gin')
+const jbmGapA = localHqAnswer('JBM bill and open invoices', {
+  mes: '2026-08',
+  books: splitCostBooks({ posMonthTotal: 0, jbmMonthBill: 0, staffMonthPay: 0, rentMonth: 0 }),
+  jbm: { totalPendente: 1733694, faturasAtraso: 2, gap: augGap, estoqueBaixo: [] },
+})
+assert('AI explains Aug orders vs July notes', /dated another month/.test(jbmGapA) && /¥0/.test(jbmGapA) && /1,733,694/.test(jbmGapA))
 
 if (failed) {
   console.log(`\n${failed} falha(s)`)

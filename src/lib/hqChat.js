@@ -17,6 +17,7 @@ Source health:
 - POS live-store: ${s.sources?.pos?.ok ? 'ok' : 'fail'} · ${s.sources?.pos?.sales || 0} till tickets (${s.sources?.pos?.via || '?'})
 - Time clock: ${s.sources?.clock?.ok ? 'ok' : 'fail'} · ${s.sources?.clock?.punches || 0} punches
 - Rent book: ${s.sources?.rent?.ok ? 'ok' : 'fail'}
+- Inventory (estoque_regras + movimentos, not public.estoque): ${s.sources?.inventory?.ok ? 'ok' : 'fail'} · ${s.jbm?.estoqueBaixo?.length || 0} under minimum
 
 Staff payroll this month: ${JSON.stringify(s.payroll || [])}
 JBM open invoices: ${s.jbm?.faturasPendentes || 0} (${yen(s.jbm?.totalPendente)}) — ${s.jbm?.faturasAtraso || 0} overdue
@@ -63,10 +64,16 @@ export function localHqAnswer(question, snapshot, lang = 'en') {
       ? `勤務時間帳簿のみ：合計 ${s.hoursTotal || 0}h → ${yen(books.staff?.amount)}。\n${rows || '打刻なし'}`
       : `Hours book only: ${s.hoursTotal || 0}h → ${yen(books.staff?.amount)}.\n${rows || 'No punches this month.'}`
   }
-  if (/jbm|invoice|fatura|請求|supplier|fornecedor/.test(q)) {
+  if (/jbm|invoice|fatura|請求|supplier|fornecedor|order|pedido/.test(q)) {
+    const gap = s.jbm?.gap
+    const extra = gap?.kind === 'orders-other-date'
+      ? (ja
+        ? `\n注文 ${gap.orderCount} 件は今月保存（${yen(gap.orderAmount)}）だが伝票日付は別月。`
+        : `\n${gap.orderCount} orders were saved this month (${yen(gap.orderAmount)}) but supplier notes are dated another month.`)
+      : ''
     return ja
-      ? `JBM請求帳簿：今月 ${yen(books.jbm?.amount)}。未払 ${yen(s.jbm?.totalPendente)}（延滞 ${s.jbm?.faturasAtraso || 0}）。POSレジではありません。`
-      : `JBM bill book: ${yen(books.jbm?.amount)} this month. Open invoices ${yen(s.jbm?.totalPendente)} (${s.jbm?.faturasAtraso || 0} overdue). Not the till.`
+      ? `JBM請求帳簿：今月の伝票 ${yen(books.jbm?.amount)}。未払 ${yen(s.jbm?.totalPendente)}（延滞 ${s.jbm?.faturasAtraso || 0}）。POSレジではない。${extra}`
+      : `JBM bill book: ${yen(books.jbm?.amount)} in notes dated ${s.mes || 'this month'}. Open invoices ${yen(s.jbm?.totalPendente)} (${s.jbm?.faturasAtraso || 0} overdue). Not the till.${extra}`
   }
   if (/pos|till|caixa|レジ|counter/.test(q)) {
     return ja

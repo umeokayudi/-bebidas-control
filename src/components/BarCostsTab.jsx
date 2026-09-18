@@ -7,6 +7,7 @@ import { filterSupplierVendas } from './utils'
 import { filterJbmDrinksFaturas } from '../lib/barPortal'
 import { monthlyAccountSummary } from '../lib/clientAnalytics'
 import { tokyoMonthKey, recentMonthKeys, isMonthKey } from '../lib/tokyo'
+import { compactYen, monthChipHint, matchHqSearch, matchInvoiceStatus } from '../lib/hqFilters'
 import { payrollFromPunches, monthRange, localHoursPay } from '../lib/timeClock'
 import { splitCostBooks } from '../lib/costBooks'
 import { costAccessForRole } from '../lib/access'
@@ -141,9 +142,11 @@ export default function BarCostsTab({ bar, onTab }) {
   const { perfil } = useAuth()
   const { t, lang } = useI18n()
   const access = costAccessForRole(perfil?.role)
-  const months = recentMonthKeys(4)
   const [month, setMonth] = useState(tokyoMonthKey())
   const [book, setBook] = useState('all')
+  const [jbmView, setJbmView] = useState('notes')
+  const [invoiceStatus, setInvoiceStatus] = useState('pending')
+  const [query, setQuery] = useState('')
   const [staffFilter, setStaffFilter] = useState('all')
   const [hq, setHq] = useState(null)
   const [books, setBooks] = useState(null)
@@ -195,6 +198,24 @@ export default function BarCostsTab({ bar, onTab }) {
     setBusy(false)
   }
 
+  async function copyLastRent() {
+    const last = hq?.rent?.last
+    if (!last) return
+    setRentAmount(String(last.amount))
+    setRentNote(last.note || '')
+    setRentMsg('')
+    setBusy(true)
+    try {
+      const snap = await saveHqRent({ amount: last.amount, note: last.note, month_key: month })
+      setHq(snap)
+      setBooks(snap.books)
+      setRentMsg(t('common.success'))
+    } catch (e) {
+      setRentMsg(e.message)
+    }
+    setBusy(false)
+  }
+
   async function saveRent() {
     setRentMsg('')
     setBusy(true)
@@ -210,6 +231,8 @@ export default function BarCostsTab({ bar, onTab }) {
   }
 
   const payroll = (hq?.payroll || []).filter(r => staffFilter === 'all' || r.staff_id === staffFilter)
+  const months = (hq?.months?.length ? hq.months.map(m => m.key) : recentMonthKeys(6))
+  const monthMeta = key => (hq?.months || []).find(m => m.key === key) || { key, pos: 0, jbm: 0, pedidos: 0 }
   const monthLabel = d => {
     const [y, m] = String(d).split('-')
     const names = t('months.short') || []
@@ -217,6 +240,11 @@ export default function BarCostsTab({ bar, onTab }) {
   }
   const show = id => book === 'all' || book === id
   const loading = !books && !err
+  const q = query.trim()
+  const notes = (hq?.jbm?.notesMes || []).filter(r => matchHqSearch(r, q))
+  const orders = (hq?.jbm?.pedidosRecentes || []).filter(r => matchHqSearch(r, q))
+  const invoices = (hq?.jbm?.faturasResumo || []).filter(f => matchInvoiceStatus(f, invoiceStatus, month) && matchHqSearch(f, q))
+  const tickets = (hq?.pos?.tickets || []).filter(r => matchHqSearch(r, q))
 
   return (
     <div className="fade-in portal-page hq-dash">
@@ -232,21 +260,62 @@ export default function BarCostsTab({ bar, onTab }) {
       {err && <div style={{ color: 'var(--red)', marginBottom: 12 }}>{err}</div>}
 
       <div className="hq-filters">
-        <span className="hq-filter-label">{t('portal.hq.filterSpecify')}</span>
-        <span className="hq-filter-label">{t('portal.hq.filterMonth')}</span>
-        {months.map(m => (
-          <button key={m} type="button" className={`hq-chip${month === m ? ' is-on' : ''}`} onClick={() => setMonth(m)}>{monthLabel(m)}</button>
-        ))}
-        <span className="hq-filter-label">{t('portal.hq.filterBook')}</span>
-        {[
-          ['all', t('portal.hq.bookAll'), true],
-          ['pos', t('portal.costs.posTill'), access.posTill],
-          ['jbm', t('portal.costs.jbmBill'), access.jbmBill],
-          ['staff', t('portal.costs.staffWages'), access.staffWages],
-          ['rent', t('portal.costs.rent'), access.rent],
-        ].filter(row => row[2]).map(([id, label]) => (
-          <button key={id} type="button" className={`hq-chip${book === id ? ' is-on' : ''}`} onClick={() => setBook(id)}>{label}</button>
-        ))}
+        <div className="hq-filter-group">
+          <span className="hq-filter-label">{t('portal.hq.filterMonth')}</span>
+          {months.map(m => {
+            const meta = monthMeta(m)
+            const hint = monthChipHint(meta)
+            return (
+              <button key={m} type="button" className={`hq-chip hq-chip-stack${month === m ? ' is-on' : ''}`} onClick={() => setMonth(m)}>
+                <span>{monthLabel(m)}</span>
+                <span className="hq-chip-amt">
+                  {hint.kind === 'jbm' ? compactYen(hint.amount)
+                    : hint.kind === 'pos' ? compactYen(hint.amount)
+                    : hint.kind === 'orders' ? t('portal.hq.ordersCount', { count: hint.pedidos })
+                    : '—'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="hq-filter-group">
+          <span className="hq-filter-label">{t('portal.hq.filterBook')}</span>
+          {[
+            ['all', t('portal.hq.bookAll'), true],
+            ['pos', t('portal.costs.posTill'), access.posTill],
+            ['jbm', t('portal.costs.jbmBill'), access.jbmBill],
+            ['staff', t('portal.costs.staffWages'), access.staffWages],
+            ['rent', t('portal.costs.rent'), access.rent],
+          ].filter(row => row[2]).map(([id, label]) => (
+            <button key={id} type="button" className={`hq-chip${book === id ? ' is-on' : ''}`} onClick={() => setBook(id)}>{label}</button>
+          ))}
+        </div>
+        {(book === 'all' || book === 'jbm') && (
+          <div className="hq-filter-group">
+            <span className="hq-filter-label">{t('portal.hq.filterJbmView')}</span>
+            {[
+              ['notes', t('portal.hq.viewNotes')],
+              ['invoices', t('portal.hq.viewInvoices')],
+              ['orders', t('portal.hq.viewOrders')],
+            ].map(([id, label]) => (
+              <button key={id} type="button" className={`hq-chip${jbmView === id ? ' is-on' : ''}`} onClick={() => { setBook('jbm'); setJbmView(id) }}>{label}</button>
+            ))}
+            {jbmView === 'invoices' && ['pending', 'month', 'overdue', 'all'].map(id => (
+              <button key={id} type="button" className={`hq-chip${invoiceStatus === id ? ' is-on' : ''}`} onClick={() => setInvoiceStatus(id)}>
+                {id === 'all' ? t('portal.hq.statusAll') : id === 'pending' ? t('portal.hq.statusPending') : id === 'month' ? t('portal.hq.statusMonth') : t('portal.hq.statusOverdue')}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="hq-filter-group">
+          <input
+            className="hq-search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={t('portal.hq.search')}
+          />
+        </div>
+        <div className="hq-panel-hint" style={{ margin: '4px 0 0' }}>{t('portal.hq.monthHint')}</div>
       </div>
 
       <div className="hq-actions-label">{t('portal.hq.actionsTitle')}</div>
@@ -254,10 +323,13 @@ export default function BarCostsTab({ bar, onTab }) {
 
       {hq?.sources && (
         <div className="hq-sources">
-          <span className={`hq-src${hq.sources.pos?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourcePos')} · {hq.sources.pos?.sales || 0}</span>
-          <span className={`hq-src${hq.sources.jbm?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceJbm')} · {hq.sources.jbm?.vendas || 0}/{hq.sources.jbm?.pedidos || 0}</span>
+          <span className={`hq-src${hq.sources.pos?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourcePos')} · {t('portal.hq.ticketsCount', { count: hq.sources.pos?.sales || 0 })}</span>
+          <span className={`hq-src${hq.sources.jbm?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceJbm')} · {t('portal.hq.notesCount', { count: hq.sources.jbm?.vendasMes || 0 })} / {t('portal.hq.ordersCount', { count: hq.sources.jbm?.pedidosMes || 0 })}</span>
           <span className={`hq-src${hq.sources.clock?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceClock')} · {hq.hoursTotal || 0}h</span>
           <span className={`hq-src${hq.sources.rent?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceRent')}</span>
+          {hq.sources.inventory && (
+            <span className={`hq-src${hq.sources.inventory?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceStock')} · {t('portal.hq.lowCount', { count: hq.sources.inventory?.low || 0 })}</span>
+          )}
           {hq.syncedAt && <span className="hq-src muted">{t('portal.hq.synced', { time: new Date(hq.syncedAt).toLocaleString(lang === 'ja' ? 'ja-JP' : 'en-US') })}</span>}
         </div>
       )}
@@ -284,7 +356,7 @@ export default function BarCostsTab({ bar, onTab }) {
                 </select>
               </div>
               {!payroll.length ? (
-                <div className="hq-empty">{t('clock.noHours')}</div>
+                <div className="hq-empty">{t('portal.hq.noPunches')}</div>
               ) : (
                 <div className="table-scroll">
                   <table style={{ width: '100%', fontSize: 13 }}>
@@ -311,33 +383,118 @@ export default function BarCostsTab({ bar, onTab }) {
             <div className="hq-panel">
               <div className="hq-panel-title">{t('portal.hq.rentTitle')}</div>
               <div className="hq-panel-hint">{t('portal.costs.rentHint')}</div>
+              {!hq?.rent?.amount && hq?.rent?.last && (
+                <div className="hq-empty">
+                  {t('portal.hq.rentMissing', { month: monthLabel(month) })} {t('portal.hq.rentLast', { month: monthLabel(hq.rent.last.month_key), amount: fmtYen(hq.rent.last.amount) })}
+                </div>
+              )}
               <div className="hq-rent-row">
                 <label>{t('portal.hq.rentAmount')}<input type="number" min="0" step="1000" value={rentAmount} onChange={e => setRentAmount(e.target.value)} /></label>
                 <label>{t('common.notes')}<input value={rentNote} onChange={e => setRentNote(e.target.value)} /></label>
                 <button type="button" className="btn-primary" disabled={busy} onClick={saveRent}>{t('portal.hq.rentSave')}</button>
               </div>
+              {hq?.rent?.last && !hq?.rent?.amount && (
+                <button type="button" className="hq-chip" style={{ marginTop: 10 }} disabled={busy} onClick={copyLastRent}>{t('portal.hq.rentCopy')}</button>
+              )}
               {rentMsg && <div style={{ marginTop: 10, fontSize: 12, color: rentMsg === t('common.success') ? 'var(--green)' : 'var(--red)' }}>{rentMsg}</div>}
             </div>
           )}
           {show('jbm') && hq?.jbm && (
             <div className="hq-panel">
-              <div className="hq-panel-title">{t('portal.hq.sourceJbm')}</div>
+              <div className="hq-panel-title">{t('portal.hq.sourceJbm')} · {monthLabel(month)}</div>
               <div className="hq-kpis">
-                <div><b>{fmtYen(hq.jbm.totalPendente)}</b><span>{t('portal.pending')}</span></div>
-                <div><b>{hq.jbm.faturasAtraso || 0}</b><span>{t('portal.overdue')}</span></div>
-                <div><b>{(hq.jbm.pedidosRecentes || []).length}</b><span>{t('nav.portalOrders')}</span></div>
+                <div><b>{fmtYen(hq.jbm.comprasMes)}</b><span>{t('portal.hq.viewNotes')}</span></div>
+                <div><b>{fmtYen(hq.jbm.totalPendente)}</b><span>{t('portal.hq.openAr')}</span></div>
+                <div><b>{hq.jbm.pedidosMes || 0}</b><span>{t('portal.hq.viewOrders')}</span></div>
               </div>
-              <button type="button" className="hq-chip" onClick={() => onTab?.('faturas')}>{t('portal.hq.linkJbm')}</button>
+              {hq.jbm.gap?.kind === 'orders-other-date' && (
+                <div className="hq-gap">{t('portal.hq.ordersOtherDate', { count: hq.jbm.gap.orderCount, month: monthLabel(month), amount: fmtYen(hq.jbm.gap.orderAmount), bill: fmtYen(hq.jbm.comprasMes) })}</div>
+              )}
+              <div className="hq-panel-hint">{t('portal.hq.openInvoicesHint')}</div>
+              {!!hq.jbm.estoqueBaixo?.length && (
+                <div className="hq-empty">{t('portal.hq.lowStock')}: {hq.jbm.estoqueBaixo.map(e => `${e.nome || e.id} ${e.qtd}/${e.minimo}`).join(' · ')}</div>
+              )}
+              {jbmView === 'notes' && (
+                notes.length ? (
+                  <div className="table-scroll">
+                    <table style={{ width: '100%', fontSize: 13 }}>
+                      <thead><tr><th>{t('portal.hq.colDate')}</th><th>{t('portal.hq.colNote')}</th><th></th></tr></thead>
+                      <tbody>
+                        {notes.map(n => (
+                          <tr key={n.id} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: 8 }}>{n.data}</td>
+                            <td>{n.obs || '—'}</td>
+                            <td style={{ fontWeight: 800 }}>{fmtYen(n.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <div className="hq-empty">{t('portal.hq.emptyNotes')}</div>
+              )}
+              {jbmView === 'orders' && (
+                orders.length ? (
+                  <div className="table-scroll">
+                    <table style={{ width: '100%', fontSize: 13 }}>
+                      <thead><tr><th>{t('portal.hq.colDate')}</th><th>{t('portal.hq.colNote')}</th><th></th></tr></thead>
+                      <tbody>
+                        {orders.map(n => (
+                          <tr key={n.id || n.criado + n.total} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: 8 }}>{n.criado}</td>
+                            <td>{n.status} · {n.obs || '—'}</td>
+                            <td style={{ fontWeight: 800 }}>{fmtYen(n.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <div className="hq-empty">{t('portal.hq.emptyOrders')}</div>
+              )}
+              {jbmView === 'invoices' && (
+                invoices.length ? (
+                  <div className="table-scroll">
+                    <table style={{ width: '100%', fontSize: 13 }}>
+                      <thead><tr><th>{t('portal.hq.colDate')}</th><th>{t('portal.hq.colNote')}</th><th></th></tr></thead>
+                      <tbody>
+                        {invoices.map((n, i) => (
+                          <tr key={n.vencimento + i} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: 8 }}>{n.vencimento}<div style={{ fontSize: 11, color: 'var(--text2)' }}>{n.periodo}</div></td>
+                            <td>{n.status}{n.inMonth ? ` · ${t('portal.hq.inThisMonth')}` : ` · ${t('portal.hq.otherMonth')}`}</td>
+                            <td style={{ fontWeight: 800 }}>{fmtYen(n.remain ?? n.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <div className="hq-empty">{invoiceStatus === 'month' ? t('portal.hq.emptyInvoicesMonth') : t('portal.hq.openInvoicesHint')}</div>
+              )}
+              <button type="button" className="hq-chip" style={{ marginTop: 10 }} onClick={() => onTab?.(jbmView === 'orders' ? 'pedidos' : 'faturas')}>{jbmView === 'orders' ? t('portal.hq.linkOrders') : t('portal.hq.linkJbm')}</button>
             </div>
           )}
           {show('pos') && hq?.pos && (
             <div className="hq-panel">
-              <div className="hq-panel-title">{t('portal.costs.posTill')}</div>
+              <div className="hq-panel-title">{t('portal.costs.posTill')} · {monthLabel(month)}</div>
               <div className="hq-kpis">
                 <div><b>{fmtYen(hq.pos.till)}</b><span>{t('portal.hq.filterMonth')}</span></div>
                 <div><b>{hq.pos.salesCount || 0}</b><span>{t('atomicPos.tabCheckout')}</span></div>
               </div>
-              <button type="button" className="hq-chip" onClick={() => onTab?.('pos')}>{t('portal.hq.linkPos')}</button>
+              {tickets.length ? (
+                <div className="table-scroll">
+                  <table style={{ width: '100%', fontSize: 13 }}>
+                    <thead><tr><th>{t('portal.hq.colDate')}</th><th>{t('portal.hq.colNote')}</th><th></th></tr></thead>
+                    <tbody>
+                      {tickets.map((n, i) => (
+                        <tr key={(n.data || '') + i} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: 8 }}>{n.data}</td>
+                          <td>{n.obs || '—'}</td>
+                          <td style={{ fontWeight: 800 }}>{fmtYen(n.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <div className="hq-empty">{t('portal.hq.emptyTickets')}</div>}
+              <button type="button" className="hq-chip" style={{ marginTop: 10 }} onClick={() => onTab?.('pos')}>{t('portal.hq.linkPos')}</button>
             </div>
           )}
         </div>

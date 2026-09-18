@@ -3,8 +3,9 @@
 import { filterSupplierVendas } from './_supplierVenda.js'
 import { filterJbmDrinksFaturas, faturaRemaining, faturaValor, faturaPago } from '../src/lib/barPortal.js'
 import { payrollFromPunches } from '../src/lib/timeClock.js'
-import { tokyoMonthKey, monthRange } from '../src/lib/tokyo.js'
-import { splitCostBooks, rentForMonth } from '../src/lib/costBooks.js'
+import { tokyoMonthKey, monthRange, recentMonthKeys } from '../src/lib/tokyo.js'
+import { splitCostBooks, rentForMonth, lastKnownRent } from '../src/lib/costBooks.js'
+import { monthKeyOf, explainJbmGap, buildMonthSeries, invoiceOverlapsMonth, lowStockFromLedger } from '../src/lib/hqFilters.js'
 import {
   isMissingSchemaError,
   runLiveOp,
@@ -68,12 +69,12 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   await ensureBarLiveReady(admin)
   const mes = /^\d{4}-\d{2}$/.test(String(monthKey || '')) ? String(monthKey) : tokyoMonthKey()
   const range = monthRange(`${mes}-01`)
+  const monthKeys = recentMonthKeys(6)
 
-  const [vendasR, pedR, fatR, estR, posR, clockR, rentR, staff] = await Promise.all([
-    admin.from('vendas').select('id,data,total,obs,bar_id,cast_id').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
-    admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(80),
+  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR] = await Promise.all([
+    admin.from('vendas').select('id,data,data_venda,total,obs,bar_id,cast_id,criado_em').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
+    admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(200),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
-    admin.from('estoque').select('qtd,minimo,produtos(nome)').eq('bar_id', barId),
     pgOrLive(admin, 'pos_vendas', [{ op: 'eq', k: 'bar_id', v: barId }], 'id,total,data,obs'),
     pgOrLive(admin, 'time_clock', [
       { op: 'eq', k: 'bar_id', v: barId },
@@ -82,20 +83,19 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     ]),
     pgOrLive(admin, 'bar_overhead', [{ op: 'eq', k: 'bar_id', v: barId }]),
     listStaffWithExtras(admin, barId).catch(() => []),
+    admin.from('estoque_regras').select('produto_id,minimo').eq('bar_id', barId).limit(400),
+    admin.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', barId).limit(4000),
+    admin.from('produtos').select('id,nome').limit(400),
   ])
 
   const jbmOk = !vendasR.error && !fatR.error
+  const supplier = filterSupplierVendas(vendasR.data || [])
   const jbm = monthBill(vendasR.data || [], fatR.data || [], mes)
   const pedidos = pedR.data || []
-  const lowStock = (estR.data || [])
-    .filter(e => (+e.qtd || 0) <= (+e.minimo || 3))
-    .slice(0, 10)
-    .map(e => ({ nome: e.produtos?.nome || '?', qtd: e.qtd, minimo: e.minimo }))
-
+  const pedMes = pedidos.filter(p => monthKeyOf(p.criado_em) === mes)
   const posRows = posR.rows || []
-  const posMonthTotal = posRows
-    .filter(s => String(s.data || '').startsWith(mes))
-    .reduce((a, s) => a + (+s.total || 0), 0)
+  const posMonthRows = posRows.filter(s => monthKeyOf(s.data) === mes)
+  const posMonthTotal = posMonthRows.reduce((a, s) => a + (+s.total || 0), 0)
 
   const payroll = payrollFromPunches(clockR.rows || [], staff || [], range)
   const staffMonthPay = payroll.reduce((a, r) => a + (+r.pay || 0), 0)
@@ -103,6 +103,14 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
 
   const rentAmount = rentForMonth(rentR.rows || [], mes)
   const rentRow = (rentR.rows || []).find(r => r.kind === 'rent' && r.month_key === mes) || null
+  const rentPrev = lastKnownRent(rentR.rows || [], mes)
+  const estoqueBaixo = (!regrasR.error && !movR.error)
+    ? lowStockFromLedger({
+      regras: regrasR.data || [],
+      movimentos: movR.data || [],
+      produtos: prodR.error ? [] : (prodR.data || []),
+    }).slice(0, 8)
+    : []
 
   const books = splitCostBooks({
     posMonthTotal,
@@ -111,17 +119,51 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     rentMonth: rentAmount,
   })
 
+  const months = buildMonthSeries({
+    keys: monthKeys,
+    vendas: supplier,
+    posRows,
+    pedidos,
+    rentRows: rentR.rows || [],
+  })
+  const gap = explainJbmGap({
+    noteCount: jbm.deliveries,
+    noteAmount: jbm.contaMes,
+    orderCount: pedMes.length,
+    orderAmount: pedMes.reduce((a, p) => a + (+p.total_estimado || 0), 0),
+    monthKey: mes,
+  })
+
+  const drinksFaturas = filterJbmDrinksFaturas(fatR.data || [])
+  const invoicesThisPeriod = drinksFaturas.filter(f => invoiceOverlapsMonth(f, mes))
+
+  const mapPedido = p => ({
+    id: p.id,
+    status: p.status,
+    total: p.total_estimado ?? p.total,
+    criado: p.criado_em?.slice(0, 10),
+    obs: String(p.obs || '').slice(0, 80),
+  })
+  const mapNote = v => ({
+    id: v.id,
+    data: v.data || v.data_venda,
+    total: +v.total || 0,
+    obs: String(v.obs || '').slice(0, 80),
+  })
+
   const sources = {
     jbm: source(jbmOk, {
       via: 'postgres',
-      vendas: filterSupplierVendas(vendasR.data || []).length,
+      vendas: supplier.length,
+      vendasMes: jbm.deliveries,
       pedidos: pedR.error ? 0 : pedidos.length,
-      faturas: filterJbmDrinksFaturas(fatR.data || []).length,
+      pedidosMes: pedMes.length,
+      faturas: drinksFaturas.length,
       error: [vendasR.error?.message, pedR.error?.message, fatR.error?.message].filter(Boolean).join(' | ') || null,
     }),
     pos: source(!posR.error, {
       via: posR.via,
-      sales: posRows.filter(s => String(s.data || '').startsWith(mes)).length,
+      sales: posMonthRows.length,
       error: posR.error,
     }),
     clock: source(!clockR.error, {
@@ -132,6 +174,13 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     rent: source(!rentR.error, {
       via: rentR.via,
       error: rentR.error,
+    }),
+    inventory: source(!regrasR.error && !movR.error, {
+      via: 'postgres',
+      regras: regrasR.error ? 0 : (regrasR.data || []).length,
+      movimentos: movR.error ? 0 : (movR.data || []).length,
+      low: estoqueBaixo.length,
+      error: [regrasR.error?.message, movR.error?.message].filter(Boolean).join(' | ') || null,
     }),
   }
 
@@ -160,13 +209,25 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
       open: r.open,
     })),
     hoursTotal: Math.round(hoursTotal * 100) / 100,
+    months,
     rent: {
       amount: rentAmount,
       note: rentRow?.note || '',
       month_key: mes,
       id: rentRow?.id || null,
+      last: rentPrev && rentPrev.month_key !== mes
+        ? { month_key: rentPrev.month_key, amount: Math.round(+rentPrev.amount || 0), note: rentPrev.note || '' }
+        : null,
     },
-    pos: { salesCount: sources.pos.sales, till: books.pos.amount },
+    pos: {
+      salesCount: posMonthRows.length,
+      till: books.pos.amount,
+      tickets: posMonthRows.slice(0, 12).map(s => ({
+        data: s.data,
+        total: +s.total || 0,
+        obs: String(s.obs || '').slice(0, 60),
+      })),
+    },
     jbm: {
       comprasMes: jbm.contaMes,
       entregasMes: jbm.deliveries,
@@ -174,13 +235,23 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
       faturasAtraso: jbm.faturasAtraso,
       totalPendente: jbm.totalPendente,
       faturaPagaMes: jbm.faturaPagaMes,
-      faturasResumo: jbm.faturasResumo,
-      pedidosRecentes: pedidos.slice(0, 5).map(p => ({
-        status: p.status,
-        total: p.total_estimado ?? p.total,
-        criado: p.criado_em?.slice(0, 10),
+      faturasResumo: drinksFaturas.slice(0, 8).map(f => ({
+        status: f.status,
+        total: faturaValor(f),
+        pago: faturaPago(f),
+        remain: faturaRemaining(f),
+        vencimento: f.data_vencimento || f.periodo_fim,
+        periodo: `${f.periodo_inicio || ''}..${f.periodo_fim || ''}`,
+        obs: String(f.obs || f.notas || '').slice(0, 80),
+        inMonth: invoiceOverlapsMonth(f, mes),
       })),
-      estoqueBaixo: lowStock,
+      invoicesThisPeriod: invoicesThisPeriod.length,
+      pedidosRecentes: pedMes.slice(0, 8).map(mapPedido),
+      pedidosMes: pedMes.length,
+      pedidosMesTotal: pedMes.reduce((a, p) => a + (+p.total_estimado || 0), 0),
+      notesMes: supplier.filter(v => monthKeyOf(v.data || v.data_venda) === mes).slice(0, 12).map(mapNote),
+      gap,
+      estoqueBaixo,
     },
   }
 }

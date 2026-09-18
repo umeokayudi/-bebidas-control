@@ -239,10 +239,13 @@ function HomeTab({ bar, onTab }) {
       <BarCommandActions onTab={onTab} />
 
       <div className="hq-filters">
-        <span className="hq-filter-label">{t('portal.hq.filterSpecify')}</span>
-        {[['7', '7d'], ['30', '30d'], ['90', '90d'], ['365', '1y']].map(([v, l]) => (
-          <button key={v} type="button" className={`hq-chip${periodo === v ? ' is-on' : ''}`} onClick={() => setPeriodo(v)}>{l}</button>
-        ))}
+        <div className="hq-filter-group">
+          <span className="hq-filter-label">{t('portal.home.filterWindow')}</span>
+          {[['7', '7d'], ['30', '30d'], ['90', '90d'], ['365', '1y']].map(([v, l]) => (
+            <button key={v} type="button" className={`hq-chip${periodo === v ? ' is-on' : ''}`} onClick={() => setPeriodo(v)}>{l}</button>
+          ))}
+        </div>
+        <div className="hq-panel-hint" style={{ margin: 0 }}>{t('portal.home.windowHint')}</div>
       </div>
 
       <div className="hq-layout" style={{ marginBottom: 16 }}>

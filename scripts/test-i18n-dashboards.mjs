@@ -25,6 +25,8 @@ assert('home glance is English', en.portal.home.payJbm === 'Pay JBM' && en.porta
 assert('three cost books are separate labels', en.portal.costs.posTill === 'POS till' && en.portal.costs.jbmBill === 'JBM bill' && en.portal.costs.staffWages === 'Staff wages')
 assert('rent is a fourth book', en.portal.costs.rent === 'Rent' && en.nav.portalCosts === 'Bar HQ')
 assert('HQ command copy', en.portal.hq.actionsTitle === 'Run the bar' && en.portal.hq.aiSlot === 'AI slot' && en.portal.hq.filterSpecify === 'Specify')
+assert('HQ filter copy names three JBM clocks', en.portal.hq.viewNotes.includes('dated') && en.portal.hq.viewOrders.includes('saved') && en.portal.hq.openAr.includes('all months'))
+assert('home window is not HQ month', en.portal.home.filterWindow.includes('window') && en.portal.home.windowHint.includes('calendar month'))
 assert('written login doors exist as copy keys', !!(en.auth.doorPosTitle && en.auth.doorGerenteTitle && en.auth.doorStaffTitle))
 const authSrc = readFileSync(new URL('../src/components/Auth.jsx', import.meta.url), 'utf8')
 assert('login page does not print door passwords', !authSrc.includes('PosOnly#2026') && !authSrc.includes('DoorCard'))
