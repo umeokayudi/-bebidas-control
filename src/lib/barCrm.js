@@ -164,6 +164,11 @@ export function keepExpiringSoon(keep, date = new Date(), days = 14) {
 export async function checkCrmSchema(supabase) {
   const { error } = await supabase.from('bar_spaces').select('id').limit(1)
   if (!error) return { ready: true }
+  try {
+    const r = await fetch('/api/pos-status')
+    const j = await r.json()
+    if (j?.ready) return { ready: true, source: j.source }
+  } catch {}
   if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
     return { ready: false, error: 'Run BAR_CRM_SPACES_SCHEMA.sql' }
   }

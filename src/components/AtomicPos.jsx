@@ -37,7 +37,7 @@ function SetupBanner({ onRefresh }) {
   const { t } = useI18n()
   const [setup, setSetup] = useState(null)
   useEffect(() => { checkPosSchema(supabase).then(setSetup) }, [])
-  if (setup?.ready) return null
+  if (!setup || setup.ready) return null
   return (
     <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 16, marginBottom: 20, fontSize: 13 }}>
       <strong>{t('atomicPos.setupRequired')}</strong>

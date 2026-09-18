@@ -92,6 +92,11 @@ export function validateDiscountCode(code, { drinkMenuId, produtoId } = {}) {
 export async function checkPosSchema(supabase) {
   const { error } = await supabase.from('pos_vendas').select('id').limit(1)
   if (!error) return { ready: true }
+  try {
+    const r = await fetch('/api/pos-status')
+    const j = await r.json()
+    if (j?.ready) return { ready: true, source: j.source }
+  } catch {}
   if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
     return { ready: false, error: 'POS tables not created. Run ATOMIC_POS_SCHEMA.sql' }
   }
