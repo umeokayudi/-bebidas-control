@@ -225,38 +225,40 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
         )}
 
         <div className="pos-ticket">
-          <div className="pos-ticket-label">{t('atomicPos.castLabel')}</div>
-          <div className="pos-ticket-chips">
-            {agents.filter(a => a.ativo !== false).map(a => (
-              <button
-                key={a.id}
-                type="button"
-                className={`pos-chip${agentId === a.id ? ' is-on' : ''}`}
-                onClick={() => setAgentId(agentId === a.id ? '' : a.id)}
-              >💃 {a.nome}</button>
-            ))}
-            <button type="button" className="pos-chip" onClick={() => setAddCastOpen(v => !v)}>{t('atomicPos.addCast')}</button>
-          </div>
-          {addCastOpen && (
-            <div className="pos-code-row">
-              <input value={newCastName} onChange={e => setNewCastName(e.target.value)} placeholder={t('atomicPos.castPlaceholder')} />
-              <button type="button" className="btn-primary" onClick={async () => {
-                const nome = newCastName.trim()
-                if (!nome) return
-                const { data, error } = await supabase.from('drink_back_agents').insert({
-                  bar_id: bar.id, nome, comissao_pct: 10, ativo: true,
-                }).select('*').single()
-                if (!error && data) {
-                  setAgents(prev => [...prev, data])
-                  setAgentId(data.id)
-                  setNewCastName('')
-                  setAddCastOpen(false)
-                } else {
-                  alert(error?.message || t('atomicPos.drinkBackSetup'))
-                }
-              }}>{t('common.confirm')}</button>
+          <div className="pos-ticket-cast">
+            <div className="pos-ticket-label">{t('atomicPos.castLabel')}</div>
+            <div className="pos-ticket-chips">
+              {agents.filter(a => a.ativo !== false).map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`pos-chip pos-chip-cast${agentId === a.id ? ' is-on' : ''}`}
+                  onClick={() => setAgentId(agentId === a.id ? '' : a.id)}
+                >💃 {a.nome}</button>
+              ))}
+              <button type="button" className="pos-chip" onClick={() => setAddCastOpen(v => !v)}>{t('atomicPos.addCast')}</button>
             </div>
-          )}
+            {addCastOpen && (
+              <div className="pos-code-row">
+                <input value={newCastName} onChange={e => setNewCastName(e.target.value)} placeholder={t('atomicPos.castPlaceholder')} />
+                <button type="button" className="btn-primary" onClick={async () => {
+                  const nome = newCastName.trim()
+                  if (!nome) return
+                  const { data, error } = await supabase.from('drink_back_agents').insert({
+                    bar_id: bar.id, nome, comissao_pct: 10, ativo: true,
+                  }).select('*').single()
+                  if (!error && data) {
+                    setAgents(prev => [...prev, data])
+                    setAgentId(data.id)
+                    setNewCastName('')
+                    setAddCastOpen(false)
+                  } else {
+                    alert(error?.message || t('atomicPos.drinkBackSetup'))
+                  }
+                }}>{t('common.confirm')}</button>
+              </div>
+            )}
+          </div>
 
           <div className="pos-ticket-label">{t('atomicPos.spaceLabel')}</div>
           <div className="pos-ticket-chips">

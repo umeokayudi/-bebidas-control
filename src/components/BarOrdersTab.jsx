@@ -34,6 +34,8 @@ export default function BarOrdersTab({ bar }) {
   const [items, setItems] = useState([])
   const [obs, setObs] = useState('')
   const [castName, setCastName] = useState('')
+  const [addCastOpen, setAddCastOpen] = useState(false)
+  const [newCastName, setNewCastName] = useState('')
   const [entrega, setEntrega] = useState('')
   const [search, setSearch] = useState('')
   const [cat, setCat] = useState('all')
@@ -88,18 +90,22 @@ export default function BarOrdersTab({ bar }) {
     return p.status === statusFilter
   })
 
-  async function addCastQuick() {
-    const nome = window.prompt(t('portal.orders.castPlaceholder'))
-    if (!nome?.trim()) return
+  async function addCastQuick(nomeRaw) {
+    const nome = String(nomeRaw || '').trim()
+    if (!nome) return
     const { data, error } = await supabase.from('drink_back_agents').insert({
-      bar_id: bar.id, nome: nome.trim(), comissao_pct: 10, ativo: true,
+      bar_id: bar.id, nome, comissao_pct: 10, ativo: true,
     }).select('id,nome,ativo').single()
     if (error) {
-      setCastName(nome.trim())
+      setCastName(nome)
+      setAddCastOpen(false)
+      setNewCastName('')
       return
     }
     setCasts(prev => [...prev, data])
     setCastName(data.nome)
+    setAddCastOpen(false)
+    setNewCastName('')
   }
 
   async function enviarOrder() {
@@ -211,36 +217,52 @@ export default function BarOrdersTab({ bar }) {
           <div className="ord-composer-title">{t('portal.orders.newOrderJbm')}</div>
           <div className="ord-composer-hint">{t('portal.orders.supplierListHint')}</div>
 
-          <div className="ord-meta">
-            <div className="ord-meta-block">
-              <div className="ord-meta-label">{t('portal.orders.cast')}</div>
-              <div className="ord-chips">
-                {casts.map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`ord-chip${castName === c.nome ? ' is-on' : ''}`}
-                    onClick={() => setCastName(castName === c.nome ? '' : c.nome)}
-                  >💃 {c.nome}</button>
-                ))}
-                <button type="button" className="ord-chip" onClick={addCastQuick}>{t('portal.orders.addCast')}</button>
+          <div className="ord-cast-panel">
+            <div className="ord-meta-label">{t('portal.orders.cast')}</div>
+            <div className="ord-chips">
+              {casts.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`ord-chip ord-chip-cast${castName === c.nome ? ' is-on' : ''}`}
+                  onClick={() => setCastName(castName === c.nome ? '' : c.nome)}
+                >💃 {c.nome}</button>
+              ))}
+              <button type="button" className="ord-chip" onClick={() => setAddCastOpen(v => !v)}>{t('portal.orders.addCast')}</button>
+            </div>
+            {addCastOpen && (
+              <div className="ord-add-cast">
+                <input
+                  value={newCastName}
+                  onChange={e => setNewCastName(e.target.value)}
+                  placeholder={t('portal.orders.castPlaceholder')}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCastQuick(newCastName) } }}
+                />
+                <button type="button" className="btn-primary" onClick={() => addCastQuick(newCastName)}>{t('common.confirm')}</button>
               </div>
-              <input
-                className="ord-cast-input"
-                value={castName}
-                onChange={e => setCastName(e.target.value)}
-                placeholder={t('portal.orders.castPlaceholder')}
-              />
-            </div>
-            <div className="ord-meta-grid">
-              <label>{t('portal.orders.deliveryDate')}
-                <input type="date" value={entrega} onChange={e => setEntrega(e.target.value)} />
-              </label>
-              <label>{t('portal.orders.details')}
-                <input type="text" value={obs} onChange={e => setObs(e.target.value)} placeholder={t('portal.orders.notesPlaceholder')} />
-              </label>
-            </div>
+            )}
+            <input
+              className="ord-cast-input"
+              value={castName}
+              onChange={e => setCastName(e.target.value)}
+              placeholder={t('portal.orders.castPlaceholder')}
+            />
           </div>
+
+          <div className="ord-meta-grid">
+            <label>{t('portal.orders.deliveryDate')}
+              <input type="date" value={entrega} onChange={e => setEntrega(e.target.value)} />
+            </label>
+          </div>
+          <label className="ord-details-label">{t('portal.orders.details')}
+            <textarea
+              className="ord-details-input"
+              rows={3}
+              value={obs}
+              onChange={e => setObs(e.target.value)}
+              placeholder={t('portal.orders.notesPlaceholder')}
+            />
+          </label>
 
           <input
             className="ord-search"
@@ -295,10 +317,13 @@ export default function BarOrdersTab({ bar }) {
 
           <div className="ord-sendbar">
             <div>
-              <div className="ord-send-kicker">{items.length} · {castName || t('portal.orders.cast')}</div>
+              {castName
+                ? <div className="ord-cast-tag">💃 {castName}</div>
+                : <div className="ord-send-kicker">{t('portal.orders.cast')}</div>}
+              <div className="ord-send-kicker">{items.length} {t('portal.orders.items')}</div>
               <div className="ord-send-total">{t('portal.orders.estimatedTotal', { amount: fmtYen(totalOrder) })}</div>
             </div>
-            <button type="button" className="btn-primary" onClick={enviarOrder} disabled={saving || items.length === 0}>
+            <button type="button" className="btn-primary ord-send-btn" onClick={enviarOrder} disabled={saving || items.length === 0}>
               {saving ? t('portal.orders.sending') : t('portal.orders.sendOrder')}
             </button>
           </div>
@@ -323,7 +348,7 @@ export default function BarOrdersTab({ bar }) {
                   {meta.cast && <div className="ord-cast-tag">💃 {meta.cast}</div>}
                   {isRestockPedido(p) && <div className="ord-restock">{t('portal.orders.restockFromCounter')}</div>}
                   {p.data_entrega_prevista && <div className="ord-card-sub">{t('portal.orders.expected', { date: p.data_entrega_prevista })}</div>}
-                  {meta.details && !isRestockPedido(p) && <div className="ord-card-sub">{meta.details}</div>}
+                  {meta.details && !isRestockPedido(p) && <div className="ord-details-box compact">{meta.details}</div>}
                 </div>
                 <div className="ord-card-right">
                   <strong>{fmtYen(p.total_estimado)}</strong>
