@@ -23,7 +23,7 @@ export default function PortalClienteAI({ bar, initialSnapshot = null }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
-  const bottomRef = useRef(null)
+  const listRef = useRef(null)
 
   useEffect(() => {
     setMessages([{ role: 'assistant', content: t(snapshot?.books ? 'portal.aiHqIntro' : 'portal.aiIntro', { bar: bar.nome }) }])
@@ -39,7 +39,7 @@ export default function PortalClienteAI({ bar, initialSnapshot = null }) {
   }, [bar, initialSnapshot])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
   }, [messages])
 
   async function refreshSnapshot() {
@@ -133,7 +133,7 @@ export default function PortalClienteAI({ bar, initialSnapshot = null }) {
       </div>
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', height: 420 }}>
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+        <div ref={listRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
           {messages.map((m, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
               <div
@@ -154,7 +154,6 @@ export default function PortalClienteAI({ bar, initialSnapshot = null }) {
             </div>
           ))}
           {chatLoading && <Spinner text={t('portal.aiThinking')} />}
-          <div ref={bottomRef} />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
