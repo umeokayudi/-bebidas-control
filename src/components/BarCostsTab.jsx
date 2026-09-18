@@ -15,6 +15,9 @@ import { fetchHqSnapshot, saveHqRent } from '../lib/hqSnapshot'
 import { WRITTEN_LOGINS } from '../lib/barLanes'
 import { useI18n } from '../lib/i18n'
 import HqAiDock from './HqAiDock'
+import BarOpsGlance from './BarOpsGlance'
+import { buildBarOpsGlance } from '../lib/barOpsGlance'
+import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
 
 const ACTIONS = [
   { id: 'pos', icon: '🧾', labelKey: 'portal.hq.linkPos' },
@@ -156,6 +159,7 @@ export default function BarCostsTab({ bar, onTab }) {
   const [rentNote, setRentNote] = useState('')
   const [rentMsg, setRentMsg] = useState('')
   const [showLogins, setShowLogins] = useState(false)
+  const [floorGlance, setFloorGlance] = useState(null)
 
   async function load(force = false, mes = month) {
     setErr('')
@@ -191,6 +195,25 @@ export default function BarCostsTab({ bar, onTab }) {
     load(false, month).catch(e => { if (!cancelled) setErr(e.message) })
     return () => { cancelled = true }
   }, [bar.id, month])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      supabase.from('bar_spaces').select('id,ativo,ordem,tipo,zona').eq('bar_id', bar.id).eq('ativo', true),
+      supabase.from('bar_visits').select('id,space_id,status,guest_id').eq('bar_id', bar.id).in('status', ['seated', 'reserved']),
+      supabase.from('bar_guests').select('id,nome,aniversario,ativo').eq('bar_id', bar.id).eq('ativo', true),
+    ]).then(([spR, viR, guR]) => {
+      if (cancelled || spR.error) return
+      const floor = decorateSpaces(spR.data || [], viR.data || [])
+      setFloorGlance({
+        seated: floor.filter(s => s.occupied).length,
+        reserved: floor.filter(s => s.reserved).length,
+        free: floor.filter(s => !s.occupied && !s.reserved).length,
+        birthdays: birthdayThisMonth(guR.data || []).length,
+      })
+    }).catch(() => { if (!cancelled) setFloorGlance(null) })
+    return () => { cancelled = true }
+  }, [bar.id])
 
   async function syncNow() {
     setBusy(true)
@@ -341,6 +364,14 @@ export default function BarCostsTab({ bar, onTab }) {
 
       {loading && <Spinner text={t('portal.costs.loading')} />}
       {books && <CostBooksHero books={books} access={access} selected={book} onSelect={setBook} />}
+      <BarOpsGlance
+        glance={buildBarOpsGlance({
+          hq,
+          floor: floorGlance,
+          openOrders: (hq?.jbm?.pedidosRecentes || []).filter(p => p.status === 'pendente' || p.status === 'confirmado').length,
+        })}
+        onTab={onTab}
+      />
 
       {books && emptyBook && (
         <div className="hq-empty" style={{ marginBottom: 12 }}>{t('portal.hq.emptyMonth')}</div>

@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 import { fmtYen, fmtDate } from './utils'
 import { splitPendingCompras, splitPendingFaturas } from '../lib/compraPagamentos'
+import { filterJbmDrinksFaturas, faturaRemaining } from '../lib/barPortal'
 import { useI18n } from '../lib/i18n'
+import { placeNotifPanel, panelBoxStyle } from '../lib/notifPanel'
 
 export function useNotifications() {
   const { user } = useAuth()
@@ -38,11 +40,23 @@ export function useNotifications() {
     setNotifs(prev => prev.map(n => ({ ...n, lida: true })))
   }
 
+  async function deleteNotif(id) {
+    await supabase.from('notificacoes').delete().eq('id', id)
+    setNotifs(prev => prev.filter(n => n.id !== id))
+  }
+
+  async function deleteAll() {
+    const ids = notifs.filter(n => n.lida).map(n => n.id)
+    if (!ids.length) return
+    await supabase.from('notificacoes').delete().in('id', ids)
+    setNotifs(prev => prev.filter(n => !n.lida))
+  }
+
   const unread = notifs.filter(n => !n.lida).length
-  return { notifs, unread, markRead, markAllRead, reload: load }
+  return { notifs, unread, markRead, markAllRead, deleteNotif, deleteAll, reload: load }
 }
 
-/** Alertas de vencimento (faturas/compras atrasadas) para o sino e dashboard */
+/** JBM admin: overdue invoices/purchases across bars. */
 export function useOverdueAlerts() {
   const { user } = useAuth()
   const [alerts, setAlerts] = useState(null)
@@ -63,17 +77,64 @@ export function useOverdueAlerts() {
         label: f.bars?.nome || 'Bar',
         amount: f.amount,
         date: f.dueDate,
+        tab: 'faturas',
       })),
       compras: compraSplit.overdue.map(c => ({
         id: c.id,
         label: c.fornecedor || 'Fornecedor',
         amount: c.amount,
         date: c.dueDate,
+        tab: 'cashflow',
       })),
       faturasTotal: faturaSplit.overdueTotal,
       comprasTotal: compraSplit.overdueTotal,
     })
   }, [user])
+
+  useEffect(() => {
+    load()
+    const interval = setInterval(load, 60000)
+    return () => clearInterval(interval)
+  }, [load])
+
+  return alerts
+}
+
+/** Bar portal: this bar’s JBM drinks invoices only — never compras of the supplier. */
+export function useBarOverdueAlerts(barId) {
+  const { user } = useAuth()
+  const [alerts, setAlerts] = useState(null)
+
+  const load = useCallback(async () => {
+    if (!user || !barId) return
+    const today = new Date().toISOString().slice(0, 10)
+    const { data, error } = await supabase
+      .from('faturas')
+      .select('*')
+      .eq('bar_id', barId)
+      .order('data_vencimento')
+    if (error) {
+      setAlerts({ faturas: [], compras: [], faturasTotal: 0, comprasTotal: 0 })
+      return
+    }
+    const overdue = filterJbmDrinksFaturas(data || []).filter(f => {
+      if (f.status === 'pago') return false
+      const venc = f.data_vencimento || f.periodo_fim
+      return venc && venc < today && faturaRemaining(f) > 0
+    })
+    setAlerts({
+      faturas: overdue.map(f => ({
+        id: f.id,
+        label: f.obs || f.notas || 'JBM',
+        amount: faturaRemaining(f),
+        date: f.data_vencimento || f.periodo_fim,
+        tab: 'faturas',
+      })),
+      compras: [],
+      faturasTotal: overdue.reduce((a, f) => a + faturaRemaining(f), 0),
+      comprasTotal: 0,
+    })
+  }, [user, barId])
 
   useEffect(() => {
     load()
@@ -102,6 +163,13 @@ function timeAgo(iso, t) {
   return t('common.justNow')
 }
 
+function notifTab(link) {
+  const s = String(link || '')
+  if (!s) return 'pedidos'
+  if (s.startsWith('http')) return null
+  return s.replace(/^\//, '').split(/[?#]/)[0] || 'pedidos'
+}
+
 export function NotificationBell({
   notifs,
   unread,
@@ -121,42 +189,56 @@ export function NotificationBell({
   const overdueCount = (overdueAlerts?.faturas?.length || 0) + (overdueAlerts?.compras?.length || 0)
   const badgeCount = unread + overdueCount
 
-  useLayoutEffect(() => {
+  const place = useCallback(() => {
     if (!open || !btnRef.current) {
       setPanelStyle(null)
       return
     }
     const rect = btnRef.current.getBoundingClientRect()
-    const panelW = Math.min(360, window.innerWidth - 16)
-    const maxH = Math.min(480, window.innerHeight - 24)
-    let left
-    let top
-
-    if (placement === 'header') {
-      left = Math.min(Math.max(8, rect.right - panelW), window.innerWidth - panelW - 8)
-      top = rect.bottom + 8
-      if (top + maxH > window.innerHeight - 8) top = Math.max(8, rect.top - maxH - 8)
-    } else {
-      left = Math.max(8, rect.left)
-      if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8
-      top = rect.top - maxH - 8
-      if (top < 8) top = rect.bottom + 8
-    }
-
-    setPanelStyle({ left, top, width: panelW, maxHeight: maxH })
+    const vv = window.visualViewport
+    setPanelStyle(panelBoxStyle(placeNotifPanel({
+      rect,
+      placement,
+      vw: vv?.width || window.innerWidth,
+      vh: vv?.height || window.innerHeight,
+    })))
   }, [open, placement])
+
+  useLayoutEffect(() => {
+    place()
+  }, [place, notifs.length, overdueCount])
 
   useEffect(() => {
     if (!open) return
     const onKey = e => { if (e.key === 'Escape') setOpen(false) }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    window.visualViewport?.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+      window.visualViewport?.removeEventListener('resize', place)
+    }
+  }, [open, place])
+
+  function go(tab) {
+    setOpen(false)
+    if (tab) onNavigate?.(tab)
+  }
 
   const panel = open && panelStyle && createPortal(
     <>
       <button type="button" className="notif-backdrop" onClick={() => setOpen(false)} aria-label={t('notifications.close')} />
-      <div className="notif-panel" style={panelStyle} role="dialog" aria-label={t('notifications.title')}>
+      <div
+        className="notif-panel"
+        style={panelStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('notifications.title')}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="notif-panel-header">
           <span className="notif-panel-title">{t('notifications.title')}</span>
           <div className="notif-panel-actions">
@@ -168,6 +250,7 @@ export function NotificationBell({
                 {t('notifications.markRead')}
               </button>
             )}
+            <button type="button" className="notif-panel-link" onClick={() => setOpen(false)}>{t('notifications.close')}</button>
           </div>
         </div>
 
@@ -180,7 +263,7 @@ export function NotificationBell({
                   key={`f-${f.id}`}
                   type="button"
                   className="notif-overdue-row"
-                  onClick={() => { setOpen(false); onNavigate?.('faturas') }}
+                  onClick={() => go(f.tab || 'faturas')}
                 >
                   <span className="notif-overdue-kind">{t('notifications.invoiceKind')}</span>
                   <span className="notif-overdue-label">{f.label}</span>
@@ -193,7 +276,7 @@ export function NotificationBell({
                   key={`c-${c.id}`}
                   type="button"
                   className="notif-overdue-row"
-                  onClick={() => { setOpen(false); onNavigate?.('cashflow') }}
+                  onClick={() => go(c.tab || 'cashflow')}
                 >
                   <span className="notif-overdue-kind">{t('notifications.purchaseKind')}</span>
                   <span className="notif-overdue-label">{c.label}</span>
@@ -208,6 +291,7 @@ export function NotificationBell({
             <div className="notif-empty">{t('notifications.none')}</div>
           ) : notifs.map(n => {
             const tipo = TIPO_ICON[n.tipo] || { icon: '🔔', color: 'var(--text2)', bg: 'var(--bg3)' }
+            const tab = notifTab(n.link)
             return (
               <div
                 key={n.id}
@@ -215,22 +299,27 @@ export function NotificationBell({
               >
                 <button
                   type="button"
-                  className="notif-row-icon"
-                  style={{ background: tipo.bg }}
-                  onClick={() => { markRead(n.id); if (onNavigate && n.link) { setOpen(false); onNavigate(n.link) } }}
+                  className="notif-row-hit"
+                  onClick={() => { markRead(n.id); go(tab) }}
                 >
-                  {tipo.icon}
+                  <span className="notif-row-icon" style={{ background: tipo.bg }}>{tipo.icon}</span>
+                  <span className="notif-row-content">
+                    <span className="notif-row-title">{n.titulo}</span>
+                    {n.mensagem && <span className="notif-row-msg">{n.mensagem}</span>}
+                    <span className="notif-row-time">{timeAgo(n.criado_em, t)}</span>
+                  </span>
+                  {!n.lida && <span className="notif-unread-dot" aria-hidden />}
                 </button>
-                <button
-                  type="button"
-                  className="notif-row-content"
-                  onClick={() => { markRead(n.id); if (onNavigate && n.link) { setOpen(false); onNavigate(n.link) } }}
-                >
-                  <div className="notif-row-title">{n.titulo}</div>
-                  {n.mensagem && <div className="notif-row-msg">{n.mensagem}</div>}
-                  <div className="notif-row-time">{timeAgo(n.criado_em, t)}</div>
-                </button>
-                {!n.lida && <span className="notif-unread-dot" aria-hidden />}
+                {deleteNotif && (
+                  <button
+                    type="button"
+                    className="notif-row-x"
+                    aria-label={t('notifications.delete')}
+                    onClick={e => { e.stopPropagation(); deleteNotif(n.id) }}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             )
           })}
@@ -245,9 +334,25 @@ export function NotificationBell({
       <button
         ref={btnRef}
         type="button"
-        className="notif-bell-btn"
-        onClick={() => setOpen(x => !x)}
+        className={`notif-bell-btn${open ? ' is-on' : ''}`}
+        onClick={() => {
+          setOpen(x => {
+            const next = !x
+            if (next && btnRef.current) {
+              const rect = btnRef.current.getBoundingClientRect()
+              const vv = window.visualViewport
+              setPanelStyle(panelBoxStyle(placeNotifPanel({
+                rect,
+                placement,
+                vw: vv?.width || window.innerWidth,
+                vh: vv?.height || window.innerHeight,
+              })))
+            }
+            return next
+          })
+        }}
         aria-expanded={open}
+        aria-haspopup="dialog"
         aria-label={badgeCount > 0 ? t('notifications.badgeCount', { count: badgeCount }) : t('notifications.title')}
       >
         🔔

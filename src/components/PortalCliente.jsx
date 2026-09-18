@@ -35,8 +35,11 @@ import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
 import BarCostsTab, { CostBooksHero, loadCostBooks, BarCommandActions } from './BarCostsTab'
+import BarOpsGlance from './BarOpsGlance'
+import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import HqAiDock from './HqAiDock'
 import { fetchHqSnapshot } from '../lib/hqSnapshot'
+import { NotificationBell, useBarOverdueAlerts } from './Notifications'
 
 const STATUS_PEDIDO = {
   pendente:   { labelKey:'orderStatus.pendente',   color:'#8A5A00', bg:'#FDF3E0' },
@@ -82,6 +85,7 @@ function HomeTab({ bar, onTab }) {
   const [barPricing,  setBarPricing]  = useState([])
   const [faturas,     setFaturas]     = useState([])
   const [posMonthTotal, setPosMonthTotal] = useState(null)
+  const [posTickets,  setPosTickets]  = useState([])
   const [costBooks,   setCostBooks]   = useState(null)
   const [hq,          setHq]          = useState(null)
   const [floorGlance, setFloorGlance] = useState(null)
@@ -109,8 +113,10 @@ function HomeTab({ bar, onTab }) {
     const mesKey = tokyoMonthKey()
     if (!posR.error && (posR.data || []).length) {
       const posSales = posR.data || []
+      setPosTickets(posSales)
       setPosMonthTotal(posSales.filter(s => (s.data || '').startsWith(mesKey)).reduce((a, s) => a + (+s.total || 0), 0))
     } else {
+      setPosTickets([])
       setPosMonthTotal(null)
     }
     try {
@@ -237,6 +243,18 @@ function HomeTab({ bar, onTab }) {
 
       <div className="hq-actions-label">{t('portal.hq.actionsTitle')}</div>
       <BarCommandActions onTab={onTab} />
+
+      <BarOpsGlance
+        glance={buildBarOpsGlance({
+          hq,
+          floor: floorGlance,
+          openOrders: ativos.length,
+          posTickets,
+          posMonthFallback: posMonthTotal,
+          account,
+        })}
+        onTab={onTab}
+      />
 
       <div className="hq-filters">
         <div className="hq-filter-group">
@@ -2317,14 +2335,13 @@ function PrecosCardapioTab({ bar }) {
 }
 
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
-import { NotificationBell } from './Notifications'
-
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
   const { perfil } = useAuth()
   const NAV = navForBarRole(perfil?.role)
   const [tab, setTab] = useState(() => defaultBarTab(perfil?.role))
   const [menuOpen, setMenuOpen] = useState(false)
   const { t } = useI18n()
+  const overdueAlerts = useBarOverdueAlerts(bar?.id)
 
   useMobileMenuLock(menuOpen)
 
@@ -2344,7 +2361,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         onToggle={() => setMenuOpen(o => !o)}
         title={<div className="logo-mobile-header"><span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>{bar.nome}</span></div>}
       >
-        <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
+        <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="header"/>
       </MobileTopBar>
 
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
@@ -2366,7 +2383,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
             {t(footerKey)}
           </div>
           <div className="sidebar-footer-notifs">
-            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab}/>
+            <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="sidebar"/>
           </div>
           <UiPrefsPanel />
           <button onClick={signOut} className="sidebar-signout">{t('common.signOut')}</button>
