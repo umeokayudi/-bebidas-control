@@ -301,9 +301,7 @@ export default function BarCostsTab({ bar, onTab }) {
           hq,
           books,
           floor: floorGlance,
-          openOrders: hq?.jbm
-            ? (hq.jbm.pedidosRecentes || []).filter(p => p.status === 'pendente' || p.status === 'confirmado').length
-            : localOps.openOrders,
+          openOrders: localOps.openOrders,
           invoices: localOps.invoices,
         })}
         onTab={onTab}
