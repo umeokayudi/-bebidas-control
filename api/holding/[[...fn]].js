@@ -1,5 +1,8 @@
-import { requireStaff } from './_requireStaff.js'
-import { drinksAdminClient } from './_supabaseAdmin.js'
+import { requireStaff } from '../_requireStaff.js'
+import { drinksAdminClient } from '../_supabaseAdmin.js'
+import holdingModules from '../_routeHoldingModules.js'
+import holdingAudit from '../_routeHoldingAudit.js'
+import cashflowExport from '../_routeCashflowExport.js'
 
 const BUCKET = 'system-private'
 const FILE = 'jbm_holding.json'
@@ -12,7 +15,21 @@ const DEFAULT_HOLDING = {
   negocios: [],
 }
 
+function routeFn(req) {
+  const parts = req.query?.fn
+  if (Array.isArray(parts) && parts.length) return parts.join('/')
+  if (typeof parts === 'string' && parts) return parts
+  const q = req.query?.route
+  if (q) return String(q)
+  return 'holding'
+}
+
 export default async function handler(req, res) {
+  const fn = routeFn(req)
+  if (fn === 'holding-modules') return holdingModules(req, res)
+  if (fn === 'holding-audit') return holdingAudit(req, res)
+  if (fn === 'cashflow-export') return cashflowExport(req, res)
+
   try {
     const sb = drinksAdminClient()
     const auth = await requireStaff(req, sb)

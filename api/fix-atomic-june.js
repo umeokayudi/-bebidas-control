@@ -13,13 +13,19 @@ export default async function handler(req, res) {
 
   const secret = process.env.FIX_ATOMIC_SECRET || 'jbm-atomic-june-2026'
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
-  if (body.confirm !== secret && body.confirm !== 'atomic-june-465000') {
+  if (body.confirm !== secret && body.confirm !== 'atomic-june-465000' && body.confirm !== 'atomic-pos-2026') {
     return res.status(403).json({ error: 'confirm inválido' })
   }
 
   try {
     const sb = drinksAdminClient()
     const action = body.action || 'fix'
+
+    if (action === 'setupPos') {
+      const { applyBarPosSql } = await import('./_applyBarSql.js')
+      const result = await applyBarPosSql()
+      return res.status(result.ok ? 200 : 400).json(result)
+    }
 
     if (action === 'revertPedidos') {
       const revert = await revertAtomicPedidosToJune(sb)
@@ -101,7 +107,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({
       error: 'action inválida',
-      actions: ['fix', 'revertPedidos', 'markEntregue', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas', 'syncMissingVendas', 'backfillVendaItens', 'fixSeikyushoCompraDates'],
+      actions: ['fix', 'setupPos', 'revertPedidos', 'markEntregue', 'dedupeVendas', 'fixVendaDates', 'reconcileSales', 'resyncJuneVendas', 'syncMissingVendas', 'backfillVendaItens', 'fixSeikyushoCompraDates'],
     })
   } catch (e) {
     return res.status(500).json({ error: e.message })

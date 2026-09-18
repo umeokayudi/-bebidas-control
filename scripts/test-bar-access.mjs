@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply, defaultBarTab } from '../src/lib/access.js'
 import { haversineMeters, isInsideGeofence, hoursBetween, calcPay, pairPunches, payrollFromPunches } from '../src/lib/timeClock.js'
 
@@ -21,6 +24,22 @@ assert('caixa POS cashier', posAccessForRole('caixa') === 'cashier')
 assert('staff sem POS', posAccessForRole('bar_staff') === 'none')
 assert('staff não vê supply JBM', !canSeeJbmSupply('bar_staff') && canSeeJbmSupply('cliente'))
 assert('tab inicial caixa = pos', defaultBarTab('caixa') === 'pos')
+
+function listFns(dir, prefix = '') {
+  const out = []
+  for (const name of readdirSync(dir, { withFileTypes: true })) {
+    if (name.name.startsWith('_')) continue
+    const rel = prefix ? `${prefix}/${name.name}` : name.name
+    if (name.isDirectory()) out.push(...listFns(join(dir, name.name), rel))
+    else if (name.name.endsWith('.js')) out.push(rel)
+  }
+  return out
+}
+const fns = listFns(fileURLToPath(new URL('../api', import.meta.url)))
+assert('Vercel Hobby: no máximo 12 funções', fns.length <= 12, String(fns.length) + ' ' + fns.join(','))
+const vjson = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
+assert('time-clock rewrite keeps path (query preserved)', vjson.rewrites.some(r => r.source === '/api/time-clock' && !String(r.destination).includes('?')))
+
 
 console.log('\n== Geofence do local ==')
 const here = { lat: 35.68, lng: 139.76, barLat: 35.68, barLng: 139.76, radiusM: 150 }
