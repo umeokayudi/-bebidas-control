@@ -1,6 +1,11 @@
-/** Three money books. Never add POS till into JBM vendas/faturas. */
+/** Four money books. Never add POS till, JBM bill, wages or rent together. */
 
-export function splitCostBooks({ posMonthTotal = 0, jbmMonthBill = 0, staffMonthPay = 0 } = {}) {
+export function splitCostBooks({
+  posMonthTotal = 0,
+  jbmMonthBill = 0,
+  staffMonthPay = 0,
+  rentMonth = 0,
+} = {}) {
   return {
     pos: {
       id: 'pos',
@@ -17,9 +22,28 @@ export function splitCostBooks({ posMonthTotal = 0, jbmMonthBill = 0, staffMonth
       kind: 'wages',
       amount: Math.round(+staffMonthPay || 0),
     },
+    rent: {
+      id: 'rent',
+      kind: 'overhead',
+      amount: Math.round(+rentMonth || 0),
+    },
   }
 }
 
 export function booksAreSeparate(books) {
-  return books?.pos?.kind === 'till' && books?.jbm?.kind === 'bill' && books?.staff?.kind === 'wages'
+  return (
+    books?.pos?.kind === 'till'
+    && books?.jbm?.kind === 'bill'
+    && books?.staff?.kind === 'wages'
+    && books?.rent?.kind === 'overhead'
+  )
+}
+
+export function booksGrandTotal(books) {
+  return null
+}
+
+export function rentForMonth(rows = [], monthKey) {
+  const match = (rows || []).find(r => r.kind === 'rent' && r.month_key === monthKey)
+  return Math.round(+match?.amount || 0)
 }

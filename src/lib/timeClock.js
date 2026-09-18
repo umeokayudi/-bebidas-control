@@ -70,6 +70,20 @@ export function calcPayWithLateNight(hours, lateNightHours, salarioHora) {
   return Math.round(regular * rate + late * rate * (1 + LATE_NIGHT_PREMIUM))
 }
 
+/** Desk calculator for HQ. Always wages — never mixed into POS or JBM. */
+export function localHoursPay({ hours = 0, lateHours = 0, rate = 0 } = {}) {
+  const h = Math.max(0, +hours || 0)
+  const late = Math.min(h, Math.max(0, +lateHours || 0))
+  const salario = Math.max(0, +rate || 0)
+  return {
+    hours: h,
+    lateHours: late,
+    rate: salario,
+    pay: calcPayWithLateNight(h, late, salario),
+    book: 'wages',
+  }
+}
+
 /** Emparelha IN/OUT em ordem. Ponto aberto fica sem saída. */
 export function pairPunches(punches = []) {
   const sorted = [...punches].sort((a, b) => new Date(a.punched_at) - new Date(b.punched_at))

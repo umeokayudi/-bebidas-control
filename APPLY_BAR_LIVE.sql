@@ -399,6 +399,36 @@ exception when duplicate_object then null; end $$;
 
 select 'Bar CRM + spaces + bottle keep ready (JBM supply untouched)' as status;
 
+-- Bar HQ overhead (rent) — never mixed with POS till or JBM vendas/faturas
+create table if not exists bar_overhead (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  kind text not null default 'rent',
+  month_key text not null,
+  amount numeric not null default 0,
+  note text,
+  criado_em timestamptz default now(),
+  unique(bar_id, kind, month_key)
+);
+alter table bar_overhead enable row level security;
+do $$ begin
+  create policy "bar_or_jbm bar_overhead" on bar_overhead for all using (public.pos_can_access_bar(bar_id));
+exception when duplicate_object then null; end $$;
+
+create table if not exists bar_hq_meta (
+  id uuid primary key,
+  bar_id uuid references bars(id) not null,
+  last_sync timestamptz,
+  sources jsonb,
+  atualizado_em timestamptz default now()
+);
+alter table bar_hq_meta enable row level security;
+do $$ begin
+  create policy "bar_or_jbm bar_hq_meta" on bar_hq_meta for all using (public.pos_can_access_bar(bar_id));
+exception when duplicate_object then null; end $$;
+
+select 'Bar HQ rent + sync meta ready (JBM supply untouched)' as status;
+
 -- Allow caixa / bar_staff and keep Auth signup from 500ing
 alter table public.perfis drop constraint if exists perfis_role_check;
 create or replace function public.handle_new_user()

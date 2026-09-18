@@ -17,6 +17,8 @@ export const LIVE_TABLES = new Set([
   'staff_extras',
   'drink_menu',
   'bar_pricing',
+  'bar_overhead',
+  'bar_hq_meta',
 ])
 
 let sourcePromise = null

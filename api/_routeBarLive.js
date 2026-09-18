@@ -7,6 +7,7 @@ import { resolveBarActor } from './_barLaneAuth.js'
 
 const SECRET_TABLES = new Set(['bar_logins', 'bar_sessions'])
 const PG_MENU_TABLES = new Set(['drink_menu', 'bar_pricing', 'bars'])
+const GERENTE_WRITE = new Set(['bar_overhead', 'bar_hq_meta'])
 
 function bodyOf(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
@@ -66,6 +67,12 @@ export default async function handler(req, res) {
     if (SECRET_TABLES.has(table)) return res.status(403).json({ error: 'Forbidden table' })
     if (!LIVE_TABLES.includes(table) && !PG_MENU_TABLES.has(table)) {
       return res.status(400).json({ error: 'Unknown table' })
+    }
+    if (GERENTE_WRITE.has(table) && (body.mode || 'select') !== 'select') {
+      const role = auth.perfil?.role
+      if (role !== 'cliente' && role !== 'gerente') {
+        return res.status(403).json({ error: 'Only the manager can write HQ books' })
+      }
     }
 
     const spec = {

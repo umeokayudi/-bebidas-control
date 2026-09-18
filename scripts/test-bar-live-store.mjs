@@ -13,6 +13,7 @@ assert('no vendas writes', !/from\('vendas'\)/.test(storeSrc))
 assert('no pedidos writes', !/from\('pedidos'\)/.test(storeSrc))
 assert('no faturas writes', !/from\('faturas'\)/.test(storeSrc))
 assert('seeds POS and staff lane logins', storeSrc.includes('pos@atomic.bar') && storeSrc.includes('funcionario@atomic.bar'))
+assert('HQ overhead tables exist', storeSrc.includes("'bar_overhead'") && storeSrc.includes("'bar_hq_meta'"))
 
 console.log('\n== Query filters ==')
 const rows = [

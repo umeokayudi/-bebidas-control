@@ -2354,7 +2354,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         </div>
       </aside>
       <main className="app-main app-main-wide">
-        {tab==='custos'    && isGerente(perfil?.role) && <BarCostsTab bar={bar} />}
+        {tab==='custos'    && isGerente(perfil?.role) && <BarCostsTab bar={bar} onTab={selectTab} />}
         {tab==='inicio' && posAccess !== 'cashier' && (
           <HomeTab bar={bar} onTab={selectTab} />
         )}

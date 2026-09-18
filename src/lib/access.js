@@ -36,7 +36,7 @@ export function defaultBarTab(role) {
 }
 
 const GERENTE_NAV = [
-  { id: 'custos', labelKey: 'nav.portalCosts', icon: '📒' },
+  { id: 'custos', labelKey: 'nav.portalCosts', icon: '🏛️' },
   { id: 'inicio', labelKey: 'nav.portalHome', icon: '🏠' },
   { id: 'pos', labelKey: 'nav.portalPos', icon: '🧾' },
   { id: 'ponto', labelKey: 'nav.portalClock', icon: '🕒' },
@@ -90,13 +90,13 @@ export function canSeePayrollAll(role) {
 
 export function costAccessForRole(role) {
   if (role === ROLES.caixa) {
-    return { posTill: true, jbmBill: false, staffWages: false, drinkCost: false, ownWage: false }
+    return { posTill: true, jbmBill: false, staffWages: false, drinkCost: false, ownWage: false, rent: false }
   }
   if (role === ROLES.bar_staff) {
-    return { posTill: false, jbmBill: false, staffWages: false, drinkCost: false, ownWage: true }
+    return { posTill: false, jbmBill: false, staffWages: false, drinkCost: false, ownWage: true, rent: false }
   }
   if (isGerente(role)) {
-    return { posTill: true, jbmBill: true, staffWages: true, drinkCost: true, ownWage: true }
+    return { posTill: true, jbmBill: true, staffWages: true, drinkCost: true, ownWage: true, rent: true }
   }
-  return { posTill: false, jbmBill: isJbmRole(role), staffWages: false, drinkCost: isJbmRole(role), ownWage: false }
+  return { posTill: false, jbmBill: isJbmRole(role), staffWages: false, drinkCost: isJbmRole(role), ownWage: false, rent: false }
 }

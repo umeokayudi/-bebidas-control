@@ -4,25 +4,39 @@ import { callGeminiChat } from '../lib/ai'
 import { Spinner, SectionTitle } from './utils'
 import { useI18n } from '../lib/i18n'
 import { fetchClientPortalSnapshot, buildClientChatSystem } from '../lib/clientPortalSnapshot'
+import { fetchHqSnapshot, buildHqChatSystem } from '../lib/hqSnapshot'
 
-const QUICK_PROMPT_KEYS = ['portal.aiQ1', 'portal.aiQ2', 'portal.aiQ3', 'portal.aiQ4', 'portal.aiQ5']
+const QUICK_PROMPT_KEYS = ['portal.aiQ1', 'portal.aiQ2', 'portal.aiQ3', 'portal.aiQ4', 'portal.aiQ5', 'portal.aiQ6']
 
-export default function PortalClienteAI({ bar }) {
+async function loadPortalSnapshot(bar) {
+  try {
+    return await fetchHqSnapshot()
+  } catch {
+    return fetchClientPortalSnapshot(supabase, bar)
+  }
+}
+
+export default function PortalClienteAI({ bar, initialSnapshot = null }) {
   const { t } = useI18n()
-  const [snapshot, setSnapshot] = useState(null)
-  const [loadingSnap, setLoadingSnap] = useState(true)
+  const [snapshot, setSnapshot] = useState(initialSnapshot)
+  const [loadingSnap, setLoadingSnap] = useState(!initialSnapshot)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    setMessages([{ role: 'assistant', content: t('portal.aiIntro', { bar: bar.nome }) }])
-  }, [bar.nome, t])
+    setMessages([{ role: 'assistant', content: t(snapshot?.books ? 'portal.aiHqIntro' : 'portal.aiIntro', { bar: bar.nome }) }])
+  }, [bar.nome, t, snapshot?.books])
 
   useEffect(() => {
+    if (initialSnapshot) {
+      setSnapshot(initialSnapshot)
+      setLoadingSnap(false)
+      return
+    }
     refreshSnapshot()
-  }, [bar])
+  }, [bar, initialSnapshot])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -31,7 +45,7 @@ export default function PortalClienteAI({ bar }) {
   async function refreshSnapshot() {
     setLoadingSnap(true)
     try {
-      const snap = await fetchClientPortalSnapshot(supabase, bar)
+      const snap = await loadPortalSnapshot(bar)
       setSnapshot(snap)
     } catch (e) {
       setSnapshot({ erro: e.message, bar: { nome: bar.nome } })
@@ -47,13 +61,14 @@ export default function PortalClienteAI({ bar }) {
     setMessages(m => [...m, userMsg])
     setChatLoading(true)
 
-    const snap = snapshot?.erro ? await fetchClientPortalSnapshot(supabase, bar) : (snapshot || await fetchClientPortalSnapshot(supabase, bar))
+    const snap = snapshot?.erro ? await loadPortalSnapshot(bar) : (snapshot || await loadPortalSnapshot(bar))
     if (!snapshot || snapshot.erro) setSnapshot(snap)
 
     const history = messages.filter((_, i) => i > 0).map(m => ({ role: m.role, content: m.content }))
+    const system = snap?.books ? buildHqChatSystem(snap) : buildClientChatSystem(snap)
     const reply = await callGeminiChat({
       messages: [...history, userMsg],
-      system: buildClientChatSystem(snap),
+      system,
       temperature: 0.45,
       maxOutputTokens: 1200,
     })
@@ -61,15 +76,17 @@ export default function PortalClienteAI({ bar }) {
     setChatLoading(false)
   }
 
+  const isHq = !!snapshot?.books
+
   return (
     <div className="fade-in portal-page" style={{ maxWidth: 860 }}>
-      <SectionTitle sub={t('portal.aiSub')}>
+      <SectionTitle sub={isHq ? t('portal.aiHqSub') : t('portal.aiSub')}>
         {t('portal.aiTitle')}
       </SectionTitle>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontSize: 12, color: 'var(--text2)' }}>
-          {t('portal.aiConnected', { bar: bar.nome })}
+          {t(isHq ? 'portal.aiHqConnected' : 'portal.aiConnected', { bar: bar.nome })}
         </div>
         <button
           type="button"
@@ -83,12 +100,17 @@ export default function PortalClienteAI({ bar }) {
 
       {snapshot && !snapshot.erro && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, marginBottom: 16 }}>
-          {[
+          {(isHq ? [
+            { label: t('portal.costs.posTill'), value: `¥${Math.round(snapshot.books.pos?.amount || 0).toLocaleString('ja-JP')}`, color: 'var(--navy)' },
+            { label: t('portal.costs.jbmBill'), value: `¥${Math.round(snapshot.books.jbm?.amount || 0).toLocaleString('ja-JP')}`, color: 'var(--navy)' },
+            { label: t('portal.costs.staffWages'), value: `¥${Math.round(snapshot.books.staff?.amount || 0).toLocaleString('ja-JP')}`, color: 'var(--green)' },
+            { label: t('portal.costs.rent'), value: `¥${Math.round(snapshot.books.rent?.amount || 0).toLocaleString('ja-JP')}`, color: 'var(--amber)' },
+          ] : [
             { label: t('portal.purchasesMonth'), value: `¥${Math.round(snapshot.comprasMes || 0).toLocaleString('ja-JP')}`, color: 'var(--navy)' },
             { label: t('portal.posMargin'), value: `${snapshot.margemPct || 0}%`, color: 'var(--green)' },
             { label: t('portal.pending'), value: `¥${Math.round(snapshot.totalPendente || 0).toLocaleString('ja-JP')}`, color: snapshot.totalPendente > 0 ? 'var(--amber)' : 'var(--green)' },
             { label: t('portal.overdue'), value: snapshot.faturasAtraso || 0, color: snapshot.faturasAtraso > 0 ? 'var(--red)' : 'var(--green)' },
-          ].map(k => (
+          ]).map(k => (
             <div key={k.label} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
               <div style={{ fontSize: 10, color: 'var(--text2)', textTransform: 'uppercase' }}>{k.label}</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: k.color }}>{k.value}</div>

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply, defaultBarTab, costAccessForRole } from '../src/lib/access.js'
 import { haversineMeters, isInsideGeofence, hoursBetween, calcPay, pairPunches, payrollFromPunches } from '../src/lib/timeClock.js'
 import { WRITTEN_LOGINS } from '../src/lib/barLanes.js'
-import { splitCostBooks, booksAreSeparate } from '../src/lib/costBooks.js'
+import { splitCostBooks, booksAreSeparate, booksGrandTotal } from '../src/lib/costBooks.js'
 import { signLanePayload, verifyLaneToken } from '../api/_hash.js'
 
 let failed = 0
@@ -34,9 +34,11 @@ assert('tab inicial staff = ponto', defaultBarTab('bar_staff') === 'ponto')
 const caixaCost = costAccessForRole('caixa')
 assert('caixa só vê caixa POS', caixaCost.posTill && !caixaCost.jbmBill && !caixaCost.staffWages && !caixaCost.ownWage)
 const gerCost = costAccessForRole('cliente')
-assert('gerente vê 3 livros', gerCost.posTill && gerCost.jbmBill && gerCost.staffWages)
+assert('gerente vê 4 livros', gerCost.posTill && gerCost.jbmBill && gerCost.staffWages && gerCost.rent)
 const staffCost = costAccessForRole('bar_staff')
 assert('funcionário só salário próprio', staffCost.ownWage && !staffCost.posTill && !staffCost.jbmBill && !staffCost.staffWages)
+assert('caixa não vê aluguel', !caixaCost.rent)
+assert('funcionário não vê aluguel', !staffCost.rent)
 
 assert('POS login escrito', WRITTEN_LOGINS.pos.email === 'pos@atomic.bar' && WRITTEN_LOGINS.pos.password === 'PosOnly#2026')
 assert('gerente login escrito', WRITTEN_LOGINS.gerente.email === 'umeokayudi@gmail.com')
@@ -44,10 +46,11 @@ assert('funcionário login escrito', WRITTEN_LOGINS.funcionario.email === 'funci
 assert('emails dos 3 acessos são distintos', new Set([WRITTEN_LOGINS.pos.email, WRITTEN_LOGINS.gerente.email, WRITTEN_LOGINS.funcionario.email]).size === 3)
 assert('senhas POS e funcionário diferentes', WRITTEN_LOGINS.pos.password !== WRITTEN_LOGINS.funcionario.password)
 
-const books = splitCostBooks({ posMonthTotal: 3900, jbmMonthBill: 120000, staffMonthPay: 3000 })
+const books = splitCostBooks({ posMonthTotal: 3900, jbmMonthBill: 120000, staffMonthPay: 3000, rentMonth: 450000 })
 assert('livros separados por tipo', booksAreSeparate(books))
-assert('não soma os 3 livros', books.pos.amount === 3900 && books.jbm.amount === 120000 && books.staff.amount === 3000)
-assert('POS não é JBM', books.pos.kind === 'till' && books.jbm.kind === 'bill' && books.staff.kind === 'wages')
+assert('não soma os 4 livros', books.pos.amount === 3900 && books.jbm.amount === 120000 && books.staff.amount === 3000 && books.rent.amount === 450000)
+assert('POS não é JBM nem aluguel', books.pos.kind === 'till' && books.jbm.kind === 'bill' && books.staff.kind === 'wages' && books.rent.kind === 'overhead')
+assert('HQ não devolve total misturado', booksGrandTotal(books) == null)
 const signed = signLanePayload({ id: 'x', email: 'pos@atomic.bar', role: 'caixa', bar_id: 'b', exp: Date.now() + 60_000 })
 assert('token de pista assinado verifica', verifyLaneToken(signed)?.email === 'pos@atomic.bar')
 assert('token de pista adulterado cai', !verifyLaneToken(signed.replace(/\.[^.]+$/, '.aaa')))
@@ -64,6 +67,7 @@ function listFns(dir, prefix = '') {
 }
 const fns = listFns(fileURLToPath(new URL('../api', import.meta.url)))
 assert('Vercel Hobby: no máximo 12 funções', fns.length <= 12, String(fns.length) + ' ' + fns.join(','))
+assert('hq-sync vive no mesmo /api/bar/[fn]', fns.includes('bar/[fn].js') && !fns.includes('hq-sync.js'))
 const vjson = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
 assert('time-clock rewrite keeps path (query preserved)', vjson.rewrites.some(r => r.source === '/api/time-clock' && !String(r.destination).includes('?')))
 assert('lane-login rewrite keeps path', vjson.rewrites.some(r => r.source === '/api/lane-login' && r.destination === '/api/bar/lane-login'))

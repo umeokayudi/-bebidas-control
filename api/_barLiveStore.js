@@ -21,6 +21,8 @@ export const LIVE_TABLES = [
   'staff_extras',
   'bar_logins',
   'bar_sessions',
+  'bar_overhead',
+  'bar_hq_meta',
 ]
 
 const locks = new Map()
@@ -309,6 +311,8 @@ async function seedAtomic(admin) {
   await saveTable(admin, 'staff_extras', [])
   await saveTable(admin, 'bar_logins', [])
   await saveTable(admin, 'bar_sessions', [])
+  await saveTable(admin, 'bar_overhead', [])
+  await saveTable(admin, 'bar_hq_meta', [])
 }
 
 const POS_LOGIN_ID = '11111111-1111-4111-8111-111111111111'
