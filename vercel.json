@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:holding",
+  "buildCommand": "npm run build",
   "crons": [
     {
       "path": "/api/sync-cashflow-cron",

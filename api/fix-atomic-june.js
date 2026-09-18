@@ -23,8 +23,11 @@ export default async function handler(req, res) {
 
     if (action === 'setupPos') {
       const { applyBarPosSql } = await import('./_applyBarSql.js')
-      const result = await applyBarPosSql()
-      return res.status(result.ok ? 200 : 400).json(result)
+      const result = await applyBarPosSql(body.dbPassword || body.password)
+      if (result.ok) return res.status(200).json(result)
+      const { ensureBarLiveReady } = await import('./_barLiveStore.js')
+      const live = await ensureBarLiveReady(sb)
+      return res.status(200).json({ ok: true, via: 'live-store', sql: result, live })
     }
 
     if (action === 'revertPedidos') {

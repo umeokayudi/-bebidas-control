@@ -1,6 +1,5 @@
 import { readFileSync } from 'fs'
-import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { join } from 'path'
 
 const FILES = [
   'ATOMIC_POS_SCHEMA.sql',
@@ -32,8 +31,14 @@ $$;
 alter table public.perfis drop constraint if exists perfis_role_check;
 `
 
+const POOLER_HOSTS = [
+  'aws-1-ap-northeast-2.pooler.supabase.com',
+  'aws-0-ap-northeast-1.pooler.supabase.com',
+  'aws-1-ap-northeast-1.pooler.supabase.com',
+]
+
 function sqlRoot() {
-  return join(dirname(fileURLToPath(import.meta.url)), '..')
+  return process.cwd()
 }
 
 export function bundledBarSql() {
@@ -45,28 +50,47 @@ export function bundledBarSql() {
   return chunks.join('\n\n') + '\n\n' + TRIGGER_SQL
 }
 
-export async function applyBarPosSql() {
+async function tryPg(connectionString, sql) {
+  const pg = (await import('pg')).default
+  const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 8000 })
+  await client.connect()
+  try {
+    await client.query(sql)
+    return { ok: true, via: 'postgres' }
+  } finally {
+    await client.end()
+  }
+}
+
+export async function applyBarPosSql(extraPass) {
   const sql = bundledBarSql()
   const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL
-  const pass = process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD
+  const pass = extraPass || process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD
   const ref = (process.env.VITE_SUPABASE_URL || 'https://ojirgkqtqvugqktyuhem.supabase.co').match(/https:\/\/([^.]+)/)?.[1]
 
-  if (dbUrl || (pass && ref)) {
-    const pg = (await import('pg')).default
-    const connectionString = dbUrl || `postgresql://postgres.${ref}:${encodeURIComponent(pass)}@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`
-    const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } })
-    await client.connect()
+  const attempts = []
+  if (dbUrl) attempts.push(dbUrl)
+  if (pass && ref) {
+    const encoded = encodeURIComponent(pass)
+    for (const host of POOLER_HOSTS) {
+      attempts.push(`postgresql://postgres.${ref}:${encoded}@${host}:6543/postgres`)
+      attempts.push(`postgresql://postgres.${ref}:${encoded}@${host}:5432/postgres`)
+    }
+  }
+
+  const errors = []
+  for (const connectionString of attempts) {
     try {
-      await client.query(sql)
-      return { ok: true, via: 'postgres' }
-    } finally {
-      await client.end()
+      return await tryPg(connectionString, sql)
+    } catch (e) {
+      errors.push((e.message || String(e)).split('\n')[0])
     }
   }
 
   return {
     ok: false,
-    error: 'No DATABASE_URL / SUPABASE_DB_PASSWORD. Run the four SQL files in Supabase SQL Editor.',
+    error: 'No DATABASE_URL / SUPABASE_DB_PASSWORD. Run APPLY_BAR_LIVE.sql in Supabase SQL Editor.',
     files: FILES,
+    attempts: errors.slice(0, 6),
   }
 }

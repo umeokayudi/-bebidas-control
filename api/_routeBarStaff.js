@@ -3,6 +3,7 @@
 import { drinksAdminClient } from './_supabaseAdmin.js'
 import { requireBarAccount } from './_requireStaff.js'
 import { hashSecret, randomTabletCode } from './_hash.js'
+import { loadBarWithGeo, listStaffWithExtras, saveBarGeo, saveStaffExtras } from './_barLiveStore.js'
 
 function bodyOf(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
@@ -22,11 +23,10 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const [{ data: staff, error: sErr }, { data: bar }] = await Promise.all([
-        admin.from('perfis').select('id,nome,email,role,cargo,salario_hora,ativo,bar_id').eq('bar_id', barId).in('role', ['cliente', 'caixa', 'bar_staff']).order('nome'),
-        admin.from('bars').select('id,nome,lat,lng,geofence_m,tablet_token_hash').eq('id', barId).single(),
+      const [staff, bar] = await Promise.all([
+        listStaffWithExtras(admin, barId),
+        loadBarWithGeo(admin, barId),
       ])
-      if (sErr) return res.status(400).json({ error: sErr.message })
       return res.status(200).json({
         staff: staff || [],
         bar: {
@@ -44,18 +44,18 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST' && body.action === 'pairTablet') {
       const code = randomTabletCode()
-      const { error } = await admin.from('bars').update({ tablet_token_hash: hashSecret(code) }).eq('id', barId)
-      if (error) return res.status(400).json({ error: error.message })
+      const saved = await saveBarGeo(admin, barId, { tablet_token_hash: hashSecret(code) })
+      if (!saved.ok) return res.status(400).json({ error: saved.error })
       return res.status(200).json({ ok: true, tabletToken: code })
     }
 
     if (req.method === 'POST' && body.action === 'saveLocation') {
-      const { error } = await admin.from('bars').update({
+      const saved = await saveBarGeo(admin, barId, {
         lat: +body.lat,
         lng: +body.lng,
         geofence_m: Math.max(50, Math.min(500, +body.geofence_m || 150)),
-      }).eq('id', barId)
-      if (error) return res.status(400).json({ error: error.message })
+      })
+      if (!saved.ok) return res.status(400).json({ error: saved.error })
       return res.status(200).json({ ok: true })
     }
 
@@ -77,14 +77,19 @@ export default async function handler(req, res) {
         email: String(email).trim().toLowerCase(),
         role: staffRole,
         bar_id: barId,
-        cargo: cargo || staffRole,
-        salario_hora: +salario_hora || 0,
-        clock_pin_hash: pin ? hashSecret(String(pin)) : null,
-        ativo: true,
       }, { onConflict: 'id' })
       if (pErr) {
         await admin.auth.admin.deleteUser(uid).catch(() => {})
         return res.status(400).json({ error: pErr.message })
+      }
+      const extraPatch = {}
+      if (cargo || staffRole) extraPatch.cargo = cargo || staffRole
+      if (salario_hora != null) extraPatch.salario_hora = +salario_hora || 0
+      if (pin) extraPatch.clock_pin_hash = hashSecret(String(pin))
+      extraPatch.ativo = true
+      const extras = await saveStaffExtras(admin, uid, extraPatch)
+      if (!extras.ok && extras.error) {
+        return res.status(400).json({ error: extras.error })
       }
       return res.status(200).json({ ok: true, id: uid })
     }
@@ -98,14 +103,21 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Cannot edit another owner' })
       }
       const patch = {}
+      const extraPatch = {}
       if (body.nome != null) patch.nome = body.nome
-      if (body.cargo != null) patch.cargo = body.cargo
-      if (body.salario_hora != null) patch.salario_hora = +body.salario_hora
-      if (body.ativo != null) patch.ativo = !!body.ativo
-      if (body.pin) patch.clock_pin_hash = hashSecret(String(body.pin))
+      if (body.cargo != null) extraPatch.cargo = body.cargo
+      if (body.salario_hora != null) extraPatch.salario_hora = +body.salario_hora
+      if (body.ativo != null) extraPatch.ativo = !!body.ativo
+      if (body.pin) extraPatch.clock_pin_hash = hashSecret(String(body.pin))
       if (body.role === 'caixa' || body.role === 'bar_staff') patch.role = body.role
-      const { error } = await admin.from('perfis').update(patch).eq('id', id)
-      if (error) return res.status(400).json({ error: error.message })
+      if (Object.keys(patch).length) {
+        const { error } = await admin.from('perfis').update(patch).eq('id', id)
+        if (error) return res.status(400).json({ error: error.message })
+      }
+      if (Object.keys(extraPatch).length) {
+        const extras = await saveStaffExtras(admin, id, extraPatch)
+        if (!extras.ok) return res.status(400).json({ error: extras.error })
+      }
       return res.status(200).json({ ok: true })
     }
 

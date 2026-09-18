@@ -4,15 +4,36 @@ import { drinksAdminClient } from './_supabaseAdmin.js'
 import { requireBarAccount, bearerToken } from './_requireStaff.js'
 import { secretsMatch, hashSecret } from './_hash.js'
 import { isInsideGeofence } from './_geo.js'
+import { isMissingSchemaError, loadBarWithGeo, loadStaffWithExtras, runLiveOp } from './_barLiveStore.js'
 
 function bodyOf(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
 }
 
 async function loadBar(admin, barId) {
-  const { data, error } = await admin.from('bars').select('id,nome,lat,lng,geofence_m,tablet_token_hash').eq('id', barId).single()
-  if (error || !data) return null
-  return data
+  return loadBarWithGeo(admin, barId)
+}
+
+async function listPunches(admin, spec) {
+  let query = admin.from('time_clock').select('*').eq('bar_id', spec.barId).order('punched_at', { ascending: false }).limit(500)
+  if (spec.staffId) query = query.eq('staff_id', spec.staffId)
+  if (spec.from) query = query.gte('punched_at', spec.from)
+  if (spec.to) query = query.lte('punched_at', spec.to)
+  const { data, error } = await query
+  if (!error) return { data: data || [], error: null }
+  if (!isMissingSchemaError(error)) return { data: null, error }
+  const filters = [{ op: 'eq', k: 'bar_id', v: spec.barId }]
+  if (spec.staffId) filters.push({ op: 'eq', k: 'staff_id', v: spec.staffId })
+  if (spec.from) filters.push({ op: 'gte', k: 'punched_at', v: spec.from })
+  if (spec.to) filters.push({ op: 'lte', k: 'punched_at', v: spec.to })
+  return runLiveOp(admin, {
+    table: 'time_clock',
+    mode: 'select',
+    columns: '*',
+    filters,
+    orderBy: { k: 'punched_at', ascending: false },
+    limitN: 500,
+  })
 }
 
 function tabletOk(bar, token) {
@@ -50,11 +71,12 @@ export default async function handler(req, res) {
       if (auth.error) return res.status(auth.status).json({ error: auth.error })
       const from = q.from
       const to = q.to
-      let query = admin.from('time_clock').select('*').eq('bar_id', auth.perfil.bar_id).order('punched_at', { ascending: false }).limit(500)
-      if (auth.perfil.role !== 'cliente') query = query.eq('staff_id', auth.user.id)
-      if (from) query = query.gte('punched_at', from)
-      if (to) query = query.lte('punched_at', to)
-      const { data, error } = await query
+      const { data, error } = await listPunches(admin, {
+        barId: auth.perfil.bar_id,
+        staffId: auth.perfil.role !== 'cliente' ? auth.user.id : null,
+        from,
+        to,
+      })
       if (error) return res.status(400).json({ error: error.message })
       return res.status(200).json({ punches: data || [] })
     }
@@ -103,11 +125,8 @@ export default async function handler(req, res) {
       })
     }
 
-    const { data: staff, error: sErr } = await admin.from('perfis')
-      .select('id,bar_id,role,clock_pin_hash,ativo,nome')
-      .eq('id', staffId)
-      .single()
-    if (sErr || !staff || staff.bar_id !== bar.id) return res.status(404).json({ error: 'Staff not found' })
+    const staff = await loadStaffWithExtras(admin, staffId)
+    if (!staff || staff.bar_id !== bar.id) return res.status(404).json({ error: 'Staff not found' })
     if (staff.ativo === false) return res.status(403).json({ error: 'Staff inactive' })
 
     const pinOk = secretsMatch(String(body.pin || ''), staff.clock_pin_hash)
@@ -115,13 +134,30 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Invalid PIN', code: 'pin' })
     }
 
-    const { data: last } = await admin.from('time_clock')
+    let lastTipo = null
+    const lastPg = await admin.from('time_clock')
       .select('tipo')
       .eq('bar_id', bar.id)
       .eq('staff_id', staffId)
       .order('punched_at', { ascending: false })
       .limit(1)
-    const lastTipo = last?.[0]?.tipo
+    if (!lastPg.error) lastTipo = lastPg.data?.[0]?.tipo
+    else if (isMissingSchemaError(lastPg.error)) {
+      const lastLive = await runLiveOp(admin, {
+        table: 'time_clock',
+        mode: 'select',
+        columns: 'tipo',
+        filters: [
+          { op: 'eq', k: 'bar_id', v: bar.id },
+          { op: 'eq', k: 'staff_id', v: staffId },
+        ],
+        orderBy: { k: 'punched_at', ascending: false },
+        limitN: 1,
+      })
+      lastTipo = lastLive.data?.[0]?.tipo
+    } else {
+      return res.status(400).json({ error: lastPg.error.message })
+    }
     if (tipo === 'in' && lastTipo === 'in') {
       return res.status(400).json({ error: 'Already clocked in' })
     }
@@ -129,17 +165,30 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Not clocked in' })
     }
 
-    const { data: punch, error: pErr } = await admin.from('time_clock').insert({
+    const punchRow = {
       bar_id: bar.id,
       staff_id: staffId,
       tipo,
+      punched_at: new Date().toISOString(),
       lat: body.lat,
       lng: body.lng,
       accuracy_m: body.accuracy || null,
       distance_m: Math.round(geo.distance),
       tablet_ok: true,
       origem: 'tablet',
-    }).select().single()
+    }
+    let punch, pErr
+    ;({ data: punch, error: pErr } = await admin.from('time_clock').insert(punchRow).select().single())
+    if (pErr && isMissingSchemaError(pErr)) {
+      const live = await runLiveOp(admin, {
+        table: 'time_clock',
+        mode: 'insert',
+        insertRows: [punchRow],
+        wantSingle: true,
+      })
+      punch = live.data
+      pErr = live.error
+    }
     if (pErr) return res.status(400).json({ error: pErr.message })
 
     return res.status(200).json({ ok: true, punch, staff: { id: staff.id, nome: staff.nome } })
