@@ -70,7 +70,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '') {
   const range = monthRange()
 
   const [vendasR, pedR, fatR, estR, posR, clockR, rentR, staff] = await Promise.all([
-    admin.from('vendas').select('id,data,total,obs,origem,bar_id,cast_id').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
+    admin.from('vendas').select('id,data,total,obs,bar_id,cast_id').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
     admin.from('pedidos').select('id,status,total,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(80),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
     admin.from('estoque').select('qtd,minimo,produtos(nome)').eq('bar_id', barId),
