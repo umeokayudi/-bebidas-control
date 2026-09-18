@@ -27,7 +27,6 @@ export default function BarOrdersTab({ bar }) {
   const [casts, setCasts] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [showForm, setShowForm] = useState(true)
   const [qtyPopup, setQtyPopup] = useState(null)
   const [orderPreview, setOrderPreview] = useState(null)
   const [qtyInput, setQtyInput] = useState('')
@@ -147,11 +146,23 @@ export default function BarOrdersTab({ bar }) {
     load()
   }
 
+  function bumpQty(prodId, delta) {
+    setItems(prev => {
+      const cur = prev.find(i => i.produto_id === prodId)?.qtd || 0
+      const n = Math.max(0, cur + delta)
+      if (n <= 0) return prev.filter(i => i.produto_id !== prodId)
+      if (prev.some(i => i.produto_id === prodId)) return prev.map(i => i.produto_id === prodId ? { ...i, qtd: n } : i)
+      return [...prev, { produto_id: prodId, qtd: n }]
+    })
+  }
+
   function setQty(prodId, qtd) {
     const n = Math.max(0, +qtd || 0)
-    if (n <= 0) setItems(items.filter(i => i.produto_id !== prodId))
-    else if (items.some(i => i.produto_id === prodId)) setItems(items.map(i => i.produto_id === prodId ? { ...i, qtd: n } : i))
-    else setItems([...items, { produto_id: prodId, qtd: n }])
+    setItems(prev => {
+      if (n <= 0) return prev.filter(i => i.produto_id !== prodId)
+      if (prev.some(i => i.produto_id === prodId)) return prev.map(i => i.produto_id === prodId ? { ...i, qtd: n } : i)
+      return [...prev, { produto_id: prodId, qtd: n }]
+    })
   }
 
   if (loading) return <Spinner text={t('portal.orders.loading')} />
@@ -163,9 +174,6 @@ export default function BarOrdersTab({ bar }) {
         <div className="ord-head-actions">
           <button type="button" className="ord-ghost" onClick={() => setViewMode(v => v === 'list' ? 'summary' : 'list')}>
             {viewMode === 'list' ? t('portal.orders.monthlySummary') : t('portal.orders.orderList')}
-          </button>
-          <button type="button" className="btn-primary" onClick={() => setShowForm(x => !x)}>
-            {showForm ? t('common.cancel') : t('portal.orders.newOrder')}
           </button>
         </div>
       </div>
@@ -212,7 +220,7 @@ export default function BarOrdersTab({ bar }) {
         </div>
       )}
 
-      {showForm && (
+      {viewMode === 'list' && (
         <div className="ord-composer card">
           <div className="ord-composer-title">{t('portal.orders.newOrderJbm')}</div>
           <div className="ord-composer-hint">{t('portal.orders.supplierListHint')}</div>
@@ -282,15 +290,15 @@ export default function BarOrdersTab({ bar }) {
               const item = items.find(i => i.produto_id === p.id)
               return (
                 <div key={p.id} className={`ord-tile${item ? ' is-on' : ''}`}>
-                  <button type="button" className="ord-tile-hit" onClick={() => setQty(p.id, (item?.qtd || 0) + 1)}>
+                  <button type="button" className="ord-tile-hit" onClick={() => bumpQty(p.id, 1)}>
                     <span className="ord-tile-name">{p.nome}</span>
                     <span className="ord-tile-cat">{p.categoria}{p.volume_ml ? ` · ${p.volume_ml}ml` : ''}</span>
                     <span className="ord-tile-price">{fmtYen(p.preco_venda)}</span>
                   </button>
                   <div className="ord-tile-qty">
-                    <button type="button" onClick={() => setQty(p.id, (item?.qtd || 0) - 1)}>−</button>
+                    <button type="button" onClick={() => bumpQty(p.id, -1)}>−</button>
                     <button type="button" className="ord-tile-count" onClick={() => { setQtyPopup(p.id); setQtyInput(String(item?.qtd || 1)) }}>{item?.qtd || 0}</button>
-                    <button type="button" onClick={() => setQty(p.id, (item?.qtd || 0) + 1)}>+</button>
+                    <button type="button" onClick={() => bumpQty(p.id, 1)}>+</button>
                   </div>
                 </div>
               )
