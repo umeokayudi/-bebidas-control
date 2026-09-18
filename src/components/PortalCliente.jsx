@@ -2224,6 +2224,7 @@ function PrecosCardapioTab({ bar }) {
 
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 import { NotificationBell } from './Notifications'
+import AtomicPosPanel from './AtomicPos'
 
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
   const [tab, setTab] = useState('inicio')
@@ -2239,6 +2240,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
 
   const NAV = [
     { id:'inicio',    labelKey:'nav.portalHome', icon:'🏠' },
+    { id:'pos',       labelKey:'nav.portalPos', icon:'🧾' },
     { id:'pedidos',   labelKey:'nav.portalOrders', icon:'🛒' },
     { id:'entregas',  labelKey:'nav.portalDeliveries', icon:'📦' },
     { id:'estoque',   labelKey:'nav.portalInventory', icon:'📊' },
@@ -2293,6 +2295,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
             </div>
           </>
         )}
+        {tab==='pos'       && <AtomicPosPanel bar={bar} />}
         {tab==='pedidos'   && <OrdersTab bar={bar} />}
         {tab==='entregas'  && <DeliveriesTab bar={bar} />}
         {tab==='estoque'   && <InventoryTab bar={bar} onOrder={()=>selectTab('pedidos')} />}

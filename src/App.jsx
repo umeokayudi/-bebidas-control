@@ -25,6 +25,7 @@ import Fornecedores from './components/Fornecedores'
 import Faturas from './components/Faturas'
 import Cashflow from './components/Cashflow'
 import ReportsBilling from './components/ReportsBilling'
+import AdminPosTab from './components/AdminPosTab'
 import { PedidosAdminTab } from './components/Configs'
 import { fmtYen, fmtDate, roleLabel } from './components/utils'
 import { I18nProvider, useI18n } from './lib/i18n'
@@ -37,6 +38,7 @@ import DashboardMetricModal from './components/DashboardMetricModal'
 // ── TABS por role ─────────────────────────────────────────────────────────────
 const ADMIN_TABS = [
   { id:'dashboard', labelKey:'nav.dashboard', icon:'📊' },
+  { id:'pos',       labelKey:'nav.adminPos', icon:'⚡' },
   { id:'billingHub', labelKey:'nav.billingHub', icon:'📱' },
   { id:'purchases', labelKey:'nav.purchases', icon:'🛒' },
   { id:'sales',    labelKey:'nav.sales', icon:'💴' },
@@ -453,6 +455,7 @@ function Shell() {
       <main className="app-main app-main-wide">
         <div className="fade-in" key={tab}>
           {tab==='dashboard' && <Dashboard onNav={selectTab}/>}
+          {tab==='pos'        && <AdminPosTab/>}
           {tab==='billingHub' && <ReportsBilling onNav={selectTab}/>}
           {tab==='purchases'   && <ComprasTab/>}
           {tab==='sales'    && <VendasTab/>}

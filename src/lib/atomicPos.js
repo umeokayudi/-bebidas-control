@@ -1,9 +1,9 @@
-/** Helpers do POS Atomic — preços, descontos, códigos */
+/** Helpers do POS e Gestão do Bar — preços, descontos, códigos, horários e métricas */
 
-export function generateDiscountCode(prefix = 'ATOMIC') {
+export function generateDiscountCode(prefix = 'HAPPY') {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let suffix = ''
-  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < 4; i++) suffix += chars[Math.floor(Math.random() * chars.length)]
   return `${prefix}-${suffix}`
 }
 
@@ -57,7 +57,7 @@ export async function checkPosSchema(supabase) {
   const { error } = await supabase.from('pos_vendas').select('id').limit(1)
   if (!error) return { ready: true }
   if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
-    return { ready: false, error: 'Tabelas POS não criadas. Execute ATOMIC_POS_SCHEMA.sql ou /api/setup-atomic-pos' }
+    return { ready: false, error: 'Tabelas POS não criadas. Execute BAR_PLATFORM_POS_SCHEMA.sql' }
   }
   return { ready: false, error: error.message }
 }
@@ -77,4 +77,72 @@ export function cartTotal(cart) {
 
 export function todayKey() {
   return new Date().toISOString().slice(0, 10)
+}
+
+export function extractHourFromSale(sale) {
+  if (sale.hora) {
+    const parts = String(sale.hora).split(':')
+    const h = parseInt(parts[0], 10)
+    if (!isNaN(h)) return h
+  }
+  if (sale.criado_em) {
+    const d = new Date(sale.criado_em)
+    return d.getHours()
+  }
+  return 20
+}
+
+export function buildHourlyBuckets(sales = []) {
+  // Horários típicos de operação noturna: das 17h às 05h da manhã seguinte
+  const hoursOrder = [17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5]
+  const buckets = hoursOrder.map(h => ({
+    hour: h,
+    label: `${String(h).padStart(2, '0')}:00`,
+    total: 0,
+    count: 0,
+    ticketMedio: 0,
+  }))
+
+  const bucketMap = {}
+  buckets.forEach(b => { bucketMap[b.hour] = b })
+
+  sales.forEach(s => {
+    const h = extractHourFromSale(s)
+    if (bucketMap[h]) {
+      bucketMap[h].total += (+s.total || 0)
+      bucketMap[h].count += 1
+    }
+  })
+
+  buckets.forEach(b => {
+    b.ticketMedio = b.count > 0 ? Math.round(b.total / b.count) : 0
+  })
+
+  return buckets
+}
+
+export function analyzePeakAndIdleHours(buckets) {
+  const activeBuckets = buckets.filter(b => b.total > 0)
+  if (activeBuckets.length === 0) {
+    return {
+      peakHour: null,
+      idleHours: buckets.slice(0, 3),
+      avgRevenuePerHour: 0,
+    }
+  }
+
+  const sortedByRevenue = [...buckets].sort((a, b) => b.total - a.total)
+  const peakHour = sortedByRevenue[0]?.total > 0 ? sortedByRevenue[0] : null
+  const totalRev = buckets.reduce((acc, b) => acc + b.total, 0)
+  const activeHoursCount = buckets.filter(b => b.count > 0).length || 1
+  const avgRevenuePerHour = Math.round(totalRev / activeHoursCount)
+
+  // Horários ociosos: menos de 35% da média de receita por hora ativa
+  const idleHours = buckets.filter(b => b.total < avgRevenuePerHour * 0.35)
+
+  return {
+    peakHour,
+    idleHours,
+    avgRevenuePerHour,
+  }
 }

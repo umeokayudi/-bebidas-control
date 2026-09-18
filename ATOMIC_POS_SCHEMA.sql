@@ -119,6 +119,85 @@ create table if not exists discount_usages (
   criado_em timestamptz default now()
 );
 
+-- Staff, turnos e salários
+create table if not exists bar_staff (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  nome text not null,
+  cargo text default 'Bartender',
+  telefone text,
+  email text,
+  salario_base numeric default 0,
+  comissao_pct numeric default 0,
+  ativo boolean default true,
+  criado_em timestamptz default now()
+);
+
+create table if not exists staff_turnos (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  staff_id uuid references bar_staff(id) on delete cascade,
+  data date not null default current_date,
+  hora_inicio text not null default '18:00',
+  hora_fim text not null default '02:00',
+  status text default 'agendado',
+  valor_turno numeric default 0,
+  notas text,
+  criado_em timestamptz default now()
+);
+
+-- Drink Back (Promoters / Hostesses)
+create table if not exists drink_back_agents (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  nome text not null,
+  apelido text,
+  regiao text default 'Tokyo',
+  telefone text,
+  chave_pix_ou_conta text,
+  comissao_drink_fixa numeric default 500,
+  comissao_pct numeric default 10,
+  metas_mensal_drinks integer default 50,
+  ativo boolean default true,
+  notas text,
+  criado_em timestamptz default now()
+);
+
+-- Serviços Integrados (Limpeza & Manutenção)
+create table if not exists service_orders (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null,
+  tipo text not null default 'limpeza',
+  titulo text not null,
+  descricao text,
+  prioridade text default 'media',
+  status text default 'solicitado',
+  data_agendada date,
+  hora_agendada text,
+  prestador_nome text,
+  valor_estimado numeric default 0,
+  valor_final numeric default 0,
+  notas text,
+  criado_por uuid,
+  criado_em timestamptz default now()
+);
+
+-- Reposição Automática
+create table if not exists pos_reorder_settings (
+  id uuid default gen_random_uuid() primary key,
+  bar_id uuid references bars(id) not null unique,
+  webhook_url text,
+  auto_order_jbm boolean default true,
+  email_notificacao text,
+  ativo boolean default true,
+  atualizado_em timestamptz default now()
+);
+
+alter table pos_vendas add column if not exists hora time default current_time;
+alter table pos_vendas add column if not exists staff_id uuid references bar_staff(id) on delete set null;
+alter table pos_vendas add column if not exists drink_back_agent_id uuid references drink_back_agents(id) on delete set null;
+alter table pos_vendas add column if not exists comissao_drink_back numeric default 0;
+
 -- RLS
 alter table bar_pricing enable row level security;
 alter table drink_menu enable row level security;

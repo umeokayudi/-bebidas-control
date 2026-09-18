@@ -4,6 +4,17 @@ import { drinksAdminClient } from './_supabaseAdmin.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  if (req.method === 'GET' && req.query?.action === 'checkPos') {
+    try {
+      const sb = drinksAdminClient()
+      const { error } = await sb.from('pos_vendas').select('id').limit(1)
+      return res.status(200).json({ ready: !error, error: error?.message || null })
+    } catch {
+      return res.status(200).json({ ready: false })
+    }
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({
       error: 'Use POST',
