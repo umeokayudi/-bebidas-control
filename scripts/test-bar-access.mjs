@@ -6,6 +6,7 @@ import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply,
 import { haversineMeters, isInsideGeofence, hoursBetween, calcPay, pairPunches, payrollFromPunches } from '../src/lib/timeClock.js'
 import { WRITTEN_LOGINS } from '../src/lib/barLanes.js'
 import { splitCostBooks, booksAreSeparate } from '../src/lib/costBooks.js'
+import { signLanePayload, verifyLaneToken } from '../api/_hash.js'
 
 let failed = 0
 function assert(name, cond, extra) {
@@ -47,6 +48,9 @@ const books = splitCostBooks({ posMonthTotal: 3900, jbmMonthBill: 120000, staffM
 assert('livros separados por tipo', booksAreSeparate(books))
 assert('não soma os 3 livros', books.pos.amount === 3900 && books.jbm.amount === 120000 && books.staff.amount === 3000)
 assert('POS não é JBM', books.pos.kind === 'till' && books.jbm.kind === 'bill' && books.staff.kind === 'wages')
+const signed = signLanePayload({ id: 'x', email: 'pos@atomic.bar', role: 'caixa', bar_id: 'b', exp: Date.now() + 60_000 })
+assert('token de pista assinado verifica', verifyLaneToken(signed)?.email === 'pos@atomic.bar')
+assert('token de pista adulterado cai', !verifyLaneToken(signed.replace(/\.[^.]+$/, '.aaa')))
 
 function listFns(dir, prefix = '') {
   const out = []

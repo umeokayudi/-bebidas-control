@@ -342,8 +342,6 @@ export async function seedLaneLogins(admin) {
   const byId = new Map(existing.map(r => [r.id, r]))
   for (const lane of lanes) byId.set(lane.id, { ...(byId.get(lane.id) || {}), ...lane })
   await saveTable(admin, 'bar_logins', [...byId.values()])
-  const sessions = await loadTable(admin, 'bar_sessions')
-  if (!sessions.length) await saveTable(admin, 'bar_sessions', [])
   return { seeded: true }
 }
 

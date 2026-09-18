@@ -1,6 +1,6 @@
 import { drinksAdminClient, drinksAuthClient, createStaffUserClient } from './_supabaseAdmin.js'
 import { ensureBarLiveReady, runLiveOp } from './_barLiveStore.js'
-import { secretsMatch } from './_hash.js'
+import { secretsMatch, signLanePayload, verifyLaneToken } from './_hash.js'
 
 function bearerToken(req) {
   return (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim()
@@ -12,7 +12,25 @@ function newId() {
 
 export async function resolveLaneSession(token, admin) {
   if (!token || !String(token).startsWith('lane:')) return null
+  const signed = verifyLaneToken(token)
+  if (signed?.id) {
+    return {
+      user: { id: signed.id, email: signed.email },
+      perfil: {
+        id: signed.id,
+        email: signed.email,
+        nome: signed.nome,
+        role: signed.role,
+        bar_id: signed.bar_id,
+        cargo: signed.cargo || signed.role,
+        salario_hora: signed.salario_hora || 0,
+      },
+      token,
+      lane: true,
+    }
+  }
   const sessionId = String(token).slice(5)
+  if (sessionId.includes('.')) return null
   const { data } = await runLiveOp(admin, {
     table: 'bar_sessions',
     mode: 'select',
@@ -61,29 +79,36 @@ export async function loginLane(email, password) {
   if (!login || !secretsMatch(password, login.password_hash)) {
     return { error: 'Incorrect email or password', status: 401 }
   }
-  const session = {
-    id: newId(),
-    login_id: login.id,
-    bar_id: login.bar_id,
-    role: login.role,
-    nome: login.nome,
+  const perfil = {
+    id: login.id,
     email: login.email,
+    nome: login.nome,
+    role: login.role,
+    bar_id: login.bar_id,
     cargo: login.cargo || login.role,
     salario_hora: login.salario_hora || 0,
     exp: Date.now() + 12 * 60 * 60 * 1000,
   }
-  await runLiveOp(admin, { table: 'bar_sessions', mode: 'insert', insertRows: [session], wantSingle: true })
+  const token = signLanePayload(perfil)
+  try {
+    await runLiveOp(admin, {
+      table: 'bar_sessions',
+      mode: 'insert',
+      insertRows: [{ ...perfil, id: newId(), login_id: login.id }],
+      wantSingle: true,
+    })
+  } catch {}
   return {
     ok: true,
-    token: `lane:${session.id}`,
+    token,
     perfil: {
-      id: login.id,
-      email: login.email,
-      nome: login.nome,
-      role: login.role,
-      bar_id: login.bar_id,
-      cargo: login.cargo || login.role,
-      salario_hora: login.salario_hora || 0,
+      id: perfil.id,
+      email: perfil.email,
+      nome: perfil.nome,
+      role: perfil.role,
+      bar_id: perfil.bar_id,
+      cargo: perfil.cargo,
+      salario_hora: perfil.salario_hora,
     },
   }
 }
