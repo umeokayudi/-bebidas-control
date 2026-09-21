@@ -77,6 +77,8 @@ assert('lane-login rewrite keeps path', vjson.rewrites.some(r => r.source === '/
 const authUi = readFileSync(new URL('../src/components/Auth.jsx', import.meta.url), 'utf8')
 assert('login é só email e senha', authUi.includes('type="email"') && authUi.includes('type="password"') && !authUi.includes('DoorCard') && !authUi.includes('WRITTEN_LOGINS'))
 assert('login não imprime senhas na tela', !authUi.includes('PosOnly#2026') && !authUi.includes('Funcionario#2026') && !authUi.includes('JbmVer#2026'))
+const hqUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
+assert('HQ tablet não imprime senhas', !hqUi.includes('PosOnly#2026') && !hqUi.includes('Funcionario#2026') && !hqUi.includes('WRITTEN_LOGINS'))
 
 
 console.log('\n== Geofence do local ==')

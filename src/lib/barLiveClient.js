@@ -19,6 +19,8 @@ export const LIVE_TABLES = new Set([
   'bar_pricing',
   'bar_overhead',
   'bar_hq_meta',
+  'pos_shifts',
+  'pos_settings',
 ])
 
 let sourcePromise = null
@@ -107,11 +109,6 @@ class LiveQuery {
 
   async execute() {
     const token = await this.getToken()
-    const source = await detectSource()
-    const lane = token && String(token).startsWith('lane:')
-    if (source === 'postgres' && !lane) {
-      return this.executeRaw()
-    }
     try {
       const r = await fetch('/api/bar/live-db', {
         method: 'POST',
@@ -125,7 +122,11 @@ class LiveQuery {
       if (!r.ok) return { data: this.spec.wantSingle ? null : [], error: { message: j.error || j.message || r.statusText, code: 'LIVE' } }
       return { data: j.data, error: j.error || null }
     } catch (e) {
-      return { data: this.spec.wantSingle ? null : [], error: { message: e.message } }
+      try {
+        return await this.executeRaw()
+      } catch {
+        return { data: this.spec.wantSingle ? null : [], error: { message: e.message } }
+      }
     }
   }
 

@@ -33,6 +33,7 @@ export default function BarOrdersTab({ bar }) {
   const [items, setItems] = useState([])
   const [obs, setObs] = useState('')
   const [castName, setCastName] = useState('')
+  const [castId, setCastId] = useState('')
   const [addCastOpen, setAddCastOpen] = useState(false)
   const [newCastName, setNewCastName] = useState('')
   const [entrega, setEntrega] = useState('')
@@ -98,12 +99,14 @@ export default function BarOrdersTab({ bar }) {
     }).select('id,nome,ativo').single()
     if (error) {
       setCastName(nome)
+      setCastId('')
       setAddCastOpen(false)
       setNewCastName('')
       return
     }
     setCasts(prev => [...prev, data])
     setCastName(data.nome)
+    setCastId(data.id)
     setAddCastOpen(false)
     setNewCastName('')
   }
@@ -111,7 +114,7 @@ export default function BarOrdersTab({ bar }) {
   async function enviarOrder() {
     if (items.length === 0) return alert(t('portal.orders.addOneItem'))
     setSaving(true)
-    const packed = withOrderCast(obs, castName)
+    const packed = withOrderCast(obs, { name: castName, id: castId })
     const { data: pedido, error } = await supabase.from('pedidos').insert({
       bar_id: bar.id, criado_por: user?.id,
       status: 'pendente',
@@ -143,7 +146,7 @@ export default function BarOrdersTab({ bar }) {
     }
 
     setSaving(false)
-    setItems([]); setObs(''); setCastName(''); setEntrega('')
+    setItems([]); setObs(''); setCastName(''); setCastId(''); setEntrega('')
     load()
   }
 
@@ -233,8 +236,11 @@ export default function BarOrdersTab({ bar }) {
                 <button
                   key={c.id}
                   type="button"
-                  className={`ord-chip ord-chip-cast${castName === c.nome ? ' is-on' : ''}`}
-                  onClick={() => setCastName(castName === c.nome ? '' : c.nome)}
+                  className={`ord-chip ord-chip-cast${castId === c.id || (!castId && castName === c.nome) ? ' is-on' : ''}`}
+                  onClick={() => {
+                    if (castId === c.id) { setCastId(''); setCastName('') }
+                    else { setCastId(c.id); setCastName(c.nome) }
+                  }}
                 >💃 {c.nome}</button>
               ))}
               <button type="button" className="ord-chip" onClick={() => setAddCastOpen(v => !v)}>{t('portal.orders.addCast')}</button>
@@ -253,7 +259,7 @@ export default function BarOrdersTab({ bar }) {
             <input
               className="ord-cast-input"
               value={castName}
-              onChange={e => setCastName(e.target.value)}
+              onChange={e => { setCastName(e.target.value); setCastId('') }}
               placeholder={t('portal.orders.castPlaceholder')}
             />
           </div>

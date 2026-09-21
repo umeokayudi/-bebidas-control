@@ -16,6 +16,7 @@ import {
   birthdayToday,
   activeKeeps,
   keepExpiringSoon,
+  pourKeep,
 } from '../src/lib/barCrm.js'
 import { navForBarRole } from '../src/lib/access.js'
 import { isSupplierVenda } from './lib/supplierVenda.mjs'
@@ -66,6 +67,8 @@ assert('birthday this Tokyo month', bday.length === 1 && bday[0].nome === 'A')
 assert('birthday today Tokyo', birthdayToday([{ aniversario: '1990-09-17' }], new Date('2026-09-17T15:00:00+09:00')).length === 1)
 assert('active keeps filter', activeKeeps([{ guest_id: 'g1', ativo: true }, { guest_id: 'g1', ativo: false }, { guest_id: 'g2', ativo: true }], 'g1').length === 1)
 assert('keep expiring within 14d', keepExpiringSoon({ expires_on: tokyoDateKey(new Date('2026-09-24T00:00:00+09:00')) }, new Date('2026-09-17T00:00:00+09:00')))
+assert('pour deducts remaining_pct', pourKeep({ remaining_pct: 70 }, 10).remaining_pct === 60)
+assert('empty keep deactivates', pourKeep({ remaining_pct: 5 }, 10).ativo === false)
 
 console.log('\n== Source isolation ==')
 const crm = readFileSync(new URL('../src/lib/barCrm.js', import.meta.url), 'utf8')

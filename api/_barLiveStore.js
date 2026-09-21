@@ -23,21 +23,50 @@ export const LIVE_TABLES = [
   'bar_sessions',
   'bar_overhead',
   'bar_hq_meta',
+  'pos_shifts',
+  'pos_settings',
 ]
 
 const locks = new Map()
+
+export function isMissingTableError(error) {
+  if (!error) return false
+  const m = String(error.message || error.details || '')
+  const code = String(error.code || '')
+  return (
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    /Could not find the table|relation .+ does not exist/i.test(m)
+  )
+}
+
+export function isMissingColumnError(error) {
+  if (!error) return false
+  const m = String(error.message || error.details || '')
+  const code = String(error.code || '')
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    /Could not find the '[^']+' column|column .+ does not exist/i.test(m)
+  )
+}
 
 export function isMissingSchemaError(error) {
   if (!error) return false
   const m = String(error.message || error.details || '')
   const code = String(error.code || '')
   return (
-    code === 'PGRST205' ||
-    code === 'PGRST204' ||
-    code === '42703' ||
-    code === '42P01' ||
-    /does not exist|schema cache|Could not find the table|Could not find the/i.test(m)
+    isMissingTableError(error) ||
+    isMissingColumnError(error) ||
+    /does not exist|schema cache|Could not find the/i.test(m)
   )
+}
+
+export function columnFromPgError(error) {
+  const m = String(error?.message || error?.details || '')
+  return m.match(/Could not find the '([^']+)' column/i)?.[1]
+    || m.match(/column "?([a-z0-9_]+)"? does not exist/i)?.[1]
+    || null
 }
 
 function newId() {
@@ -168,6 +197,73 @@ async function saveTable(admin, table, rows) {
   if (error) throw new Error(error.message)
 }
 
+function applyPgFilters(q, spec) {
+  for (const f of spec.filters || []) {
+    if (f.op === 'eq') q = q.eq(f.k, f.v)
+    else if (f.op === 'neq') q = q.neq(f.k, f.v)
+    else if (f.op === 'in') q = q.in(f.k, f.v)
+    else if (f.op === 'gte') q = q.gte(f.k, f.v)
+    else if (f.op === 'lte') q = q.lte(f.k, f.v)
+    else if (f.op === 'gt') q = q.gt(f.k, f.v)
+    else if (f.op === 'lt') q = q.lt(f.k, f.v)
+    else if (f.op === 'is') q = q.is(f.k, f.v)
+    else if (f.op === 'not') q = q.not(f.k, f.sub, f.v)
+  }
+  if (spec.orderBy) q = q.order(spec.orderBy.k, { ascending: spec.orderBy.ascending !== false })
+  if (spec.limitN != null) q = q.limit(spec.limitN)
+  if (spec.wantSingle === true) q = q.single()
+  if (spec.wantSingle === 'maybe') q = q.maybeSingle()
+  return q
+}
+
+function stripColumn(spec, col) {
+  const drop = (row) => {
+    if (!row || !(col in row)) return row
+    const next = { ...row }
+    delete next[col]
+    return next
+  }
+  const columns = String(spec.columns || '*')
+  const nextCols = columns === '*' ? columns : columns.split(',').map(s => s.trim()).filter(c => c && c !== col).join(',') || '*'
+  return {
+    ...spec,
+    columns: nextCols,
+    insertRows: spec.insertRows ? spec.insertRows.map(drop) : spec.insertRows,
+    updatePatch: spec.updatePatch ? drop(spec.updatePatch) : spec.updatePatch,
+  }
+}
+
+async function tryPostgresOp(admin, spec, depth = 0) {
+  const table = spec.table
+  const mode = spec.mode || 'select'
+  let q = admin.from(table)
+  if (mode === 'insert') {
+    const rows = spec.insertRows || []
+    q = q.insert(rows.length === 1 ? rows[0] : rows).select(spec.columns || '*')
+  } else if (mode === 'update') {
+    q = q.update(spec.updatePatch || {}).select(spec.columns || '*')
+  } else if (mode === 'delete') {
+    q = q.delete()
+  } else if (mode === 'upsert') {
+    const rows = spec.insertRows || []
+    q = q.upsert(rows.length === 1 ? rows[0] : rows).select(spec.columns || '*')
+  } else {
+    q = q.select(spec.columns || '*')
+  }
+  q = applyPgFilters(q, spec)
+  const r = await q
+  if (!r.error) {
+    return { missingTable: false, result: { data: r.data, error: null } }
+  }
+  if (isMissingTableError(r.error)) return { missingTable: true }
+  if (isMissingColumnError(r.error) && depth < 8) {
+    const col = columnFromPgError(r.error)
+    if (col) return tryPostgresOp(admin, stripColumn(spec, col), depth + 1)
+    return { missingTable: true }
+  }
+  return { missingTable: false, result: { data: spec.wantSingle ? null : (mode === 'select' ? [] : null), error: r.error } }
+}
+
 function defaultsFor(table, row) {
   const now = new Date().toISOString()
   const out = { id: row.id || newId(), ...row }
@@ -182,6 +278,8 @@ function defaultsFor(table, row) {
 export async function runLiveOp(admin, spec) {
   const table = spec.table
   if (!LIVE_TABLES.includes(table)) return { data: null, error: { message: `Unknown live table ${table}` } }
+  const pg = await tryPostgresOp(admin, spec)
+  if (!pg.missingTable) return pg.result
   return withLock(table, async () => {
     let rows = await loadTable(admin, table)
     if (spec.mode === 'insert') {
@@ -313,6 +411,8 @@ async function seedAtomic(admin) {
   await saveTable(admin, 'bar_sessions', [])
   await saveTable(admin, 'bar_overhead', [])
   await saveTable(admin, 'bar_hq_meta', [])
+  await saveTable(admin, 'pos_shifts', [])
+  await saveTable(admin, 'pos_settings', [])
 }
 
 const POS_LOGIN_ID = '11111111-1111-4111-8111-111111111111'

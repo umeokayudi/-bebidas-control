@@ -8,6 +8,9 @@ import { splitCostBooks, rentForMonth, lastKnownRent } from '../src/lib/costBook
 import { monthKeyOf, explainJbmGap, buildMonthSeries, invoiceOverlapsMonth, lowStockFromLedger } from '../src/lib/hqFilters.js'
 import {
   isMissingSchemaError,
+  isMissingTableError,
+  isMissingColumnError,
+  columnFromPgError,
   runLiveOp,
   listStaffWithExtras,
   ensureBarLiveReady,
@@ -18,15 +21,33 @@ function source(ok, extra = {}) {
 }
 
 async function pgOrLive(admin, table, filters, columns = '*') {
-  let q = admin.from(table).select(columns)
+  const selectCols = columns
+  let q = admin.from(table).select(selectCols)
   for (const f of filters || []) {
     if (f.op === 'eq') q = q.eq(f.k, f.v)
     else if (f.op === 'gte') q = q.gte(f.k, f.v)
     else if (f.op === 'lte') q = q.lte(f.k, f.v)
   }
-  const pg = await q
+  let pg = await q
+  let cols = selectCols
+  let guard = 0
+  while (pg.error && isMissingColumnError(pg.error) && guard < 8) {
+    const col = columnFromPgError(pg.error)
+    if (!col || cols === '*') break
+    cols = cols.split(',').map(s => s.trim()).filter(c => c && c !== col).join(',') || 'id'
+    let retry = admin.from(table).select(cols)
+    for (const f of filters || []) {
+      if (f.op === 'eq') retry = retry.eq(f.k, f.v)
+      else if (f.op === 'gte') retry = retry.gte(f.k, f.v)
+      else if (f.op === 'lte') retry = retry.lte(f.k, f.v)
+    }
+    pg = await retry
+    guard += 1
+  }
   if (!pg.error) return { rows: pg.data || [], via: 'postgres', error: null }
-  if (!isMissingSchemaError(pg.error)) return { rows: [], via: 'postgres', error: pg.error.message }
+  if (!isMissingTableError(pg.error) && !isMissingSchemaError(pg.error)) {
+    return { rows: [], via: 'postgres', error: pg.error.message }
+  }
   const live = await runLiveOp(admin, {
     table,
     mode: 'select',
@@ -75,7 +96,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     admin.from('vendas').select('id,data,data_venda,total,obs,bar_id,cast_id,criado_em').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
     admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(200),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
-    pgOrLive(admin, 'pos_vendas', [{ op: 'eq', k: 'bar_id', v: barId }], 'id,total,data,obs'),
+    pgOrLive(admin, 'pos_vendas', [{ op: 'eq', k: 'bar_id', v: barId }], 'id,total,data,obs,criado_em,metodo_pagamento,drink_back_agent_id'),
     pgOrLive(admin, 'time_clock', [
       { op: 'eq', k: 'bar_id', v: barId },
       { op: 'gte', k: 'punched_at', v: range.from },
@@ -93,7 +114,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   const jbm = monthBill(vendasR.data || [], fatR.data || [], mes)
   const pedidos = pedR.data || []
   const pedMes = pedidos.filter(p => monthKeyOf(p.criado_em) === mes)
-  const posRows = posR.rows || []
+  const posRows = [...(posR.rows || [])].sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
   const posMonthRows = posRows.filter(s => monthKeyOf(s.data) === mes)
   const posMonthTotal = posMonthRows.reduce((a, s) => a + (+s.total || 0), 0)
 
@@ -222,10 +243,14 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     pos: {
       salesCount: posMonthRows.length,
       till: books.pos.amount,
-      tickets: posMonthRows.slice(0, 12).map(s => ({
+      tickets: posMonthRows.map(s => ({
+        id: s.id,
         data: s.data,
+        criado_em: s.criado_em || null,
         total: +s.total || 0,
-        obs: String(s.obs || '').slice(0, 60),
+        obs: String(s.obs || '').slice(0, 80),
+        metodo_pagamento: s.metodo_pagamento || null,
+        drink_back_agent_id: s.drink_back_agent_id || null,
       })),
     },
     jbm: {

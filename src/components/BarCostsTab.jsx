@@ -12,7 +12,6 @@ import { payrollFromPunches, monthRange, localHoursPay } from '../lib/timeClock'
 import { splitCostBooks } from '../lib/costBooks'
 import { costAccessForRole } from '../lib/access'
 import { fetchHqSnapshot, saveHqRent } from '../lib/hqSnapshot'
-import { WRITTEN_LOGINS } from '../lib/barLanes'
 import { useI18n } from '../lib/i18n'
 import HqAiDock from './HqAiDock'
 import BarOpsGlance from './BarOpsGlance'
@@ -127,7 +126,7 @@ function HoursCalculator() {
   const { t } = useI18n()
   const [hours, setHours] = useState('8')
   const [lateHours, setLateHours] = useState('2')
-  const [rate, setRate] = useState(String(WRITTEN_LOGINS.funcionario.salario_hora))
+  const [rate, setRate] = useState('1500')
   const result = localHoursPay({ hours, lateHours, rate })
   return (
     <div className="hq-panel">
@@ -160,7 +159,6 @@ export default function BarCostsTab({ bar, onTab }) {
   const [rentAmount, setRentAmount] = useState('')
   const [rentNote, setRentNote] = useState('')
   const [rentMsg, setRentMsg] = useState('')
-  const [showLogins, setShowLogins] = useState(false)
   const [floorGlance, setFloorGlance] = useState(null)
   const [localOps, setLocalOps] = useState({ invoices: [], openOrders: 0 })
 
@@ -550,25 +548,6 @@ export default function BarCostsTab({ bar, onTab }) {
         </div>
         <HqAiDock snapshot={hq} />
       </div>
-
-      <button type="button" className="easy-dash-more" onClick={() => setShowLogins(v => !v)}>
-        {showLogins ? t('portal.hq.hideLogins') : t('portal.costs.loginsTitle')}
-      </button>
-      {showLogins && (
-        <div className="hq-logins">
-          {[['pos', WRITTEN_LOGINS.pos, t('portal.costs.loginPos'), t('auth.doorPosHint')],
-            ['gerente', WRITTEN_LOGINS.gerente, t('portal.costs.loginGerente'), t('auth.doorGerenteHint')],
-            ['staff', WRITTEN_LOGINS.funcionario, t('portal.costs.loginStaff'), t('auth.doorStaffHint')]].map(([k, login, title, sees]) => (
-            <div key={k} className="hq-panel">
-              <div className="hq-panel-title">{title}</div>
-              <div className="hq-panel-hint">{sees}</div>
-              <div className="hq-mono">{login.email}</div>
-              <div className="hq-mono">{login.password}</div>
-              {login.pin && <div className="hq-mono">PIN {login.pin}</div>}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

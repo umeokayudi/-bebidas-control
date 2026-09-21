@@ -20,9 +20,12 @@ import {
 import { syncPosStockAndReorder } from '../lib/posSupply'
 import { isSupplierProduct } from './utils'
 import { includedTaxBreakdown } from '../lib/consumptionTax'
-import { tokyoMonthKey } from '../lib/tokyo'
+import { tokyoMonthKey, tokyoNightKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
 import { matchCheckoutVisit, spacesByZone, activeKeeps } from '../lib/barCrm'
+import { packTicketObs, ticketChargeLines, settingsFromRow, DEFAULT_POS_SETTINGS } from '../lib/nightTicket'
+import { summarizeNight, closeVariance } from '../lib/nightClose'
+import { printGuestReceipt } from '../lib/guestReceipt'
 
 const SUB_TAB_IDS = [
   { id: 'dashboard', key: 'tabDashboard', icon: '📊' },
@@ -45,6 +48,99 @@ function SetupBanner({ onRefresh }) {
         {t('atomicPos.setupHint')}
       </p>
       <button onClick={onRefresh} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12 }}>{t('atomicPos.checkAgain')}</button>
+    </div>
+  )
+}
+
+function NightCloseBar({ bar, salesHint = [] }) {
+  const { t } = useI18n()
+  const { user } = useAuth()
+  const nightKey = tokyoNightKey()
+  const [shift, setShift] = useState(null)
+  const [counted, setCounted] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [nightSales, setNightSales] = useState(salesHint || [])
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('pos_shifts').select('*').eq('bar_id', bar.id).eq('night_key', nightKey).maybeSingle(),
+      supabase.from('pos_vendas').select('id,total,data,criado_em,metodo_pagamento').eq('bar_id', bar.id).gte('data', nightKey),
+    ]).then(([sh, sl]) => {
+      setShift(sh.data || null)
+      setNightSales(sl.data || salesHint || [])
+    }).catch(() => setShift(null))
+  }, [bar.id, nightKey, salesHint.length])
+
+  const summary = summarizeNight(nightSales, nightKey)
+  const closed = shift?.status === 'closed'
+
+  async function closeNight() {
+    setBusy(true)
+    setMsg('')
+    const { data: rows } = await supabase.from('pos_vendas')
+      .select('id,total,data,criado_em,metodo_pagamento')
+      .eq('bar_id', bar.id)
+      .gte('data', nightKey)
+    const sum = summarizeNight(rows || salesHint, nightKey)
+    const countedCash = counted === '' ? sum.expectedCash : +counted
+    const row = {
+      bar_id: bar.id,
+      night_key: nightKey,
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      closed_by: user?.id || null,
+      ticket_count: sum.ticketCount,
+      drinks_total: sum.drinksTotal,
+      cash_total: sum.cashTotal,
+      card_total: sum.cardTotal,
+      other_total: sum.otherTotal,
+      expected_cash: sum.expectedCash,
+      counted_cash: countedCash,
+      variance: closeVariance(sum.expectedCash, countedCash),
+    }
+    let error
+    if (shift?.id) {
+      ;({ error } = await supabase.from('pos_shifts').update(row).eq('id', shift.id))
+    } else {
+      const ins = await supabase.from('pos_shifts').insert(row).select('*').single()
+      error = ins.error
+      if (ins.data) setShift(ins.data)
+    }
+    setBusy(false)
+    if (error) {
+      setMsg(error.message)
+      return
+    }
+    setShift(s => ({ ...(s || {}), ...row, status: 'closed' }))
+    setMsg(t('atomicPos.closedOk'))
+  }
+
+  return (
+    <div className="pos-close-bar">
+      <div>
+        <div className="pos-ticket-label">{t('atomicPos.nightClose')}</div>
+        <div className="pos-close-meta">
+          {t('atomicPos.nightOpen', { date: nightKey })} · {summary.ticketCount} · {fmtYen(summary.drinksTotal)}
+        </div>
+      </div>
+      {closed ? (
+        <div className="pos-close-done">{t('atomicPos.alreadyClosed')} · {fmtYen(shift.drinks_total || summary.drinksTotal)}</div>
+      ) : (
+        <div className="pos-close-actions">
+          <input
+            type="number"
+            min="0"
+            placeholder={t('atomicPos.cashCounted')}
+            value={counted}
+            onChange={e => setCounted(e.target.value)}
+          />
+          <button type="button" className="btn-primary" disabled={busy} onClick={closeNight}>
+            {busy ? t('common.saving') : t('atomicPos.closeNight')}
+          </button>
+        </div>
+      )}
+      {msg && <div className="pos-close-msg">{msg}</div>}
     </div>
   )
 }
@@ -72,6 +168,14 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [agents, setAgents] = useState(drinkBackAgents || [])
   const [payMethod, setPayMethod] = useState('Cash')
   const [saving, setSaving] = useState(false)
+  const [settings, setSettings] = useState(DEFAULT_POS_SETTINGS)
+  const [servicePct, setServicePct] = useState(String(DEFAULT_POS_SETTINGS.service_pct))
+  const [nominho, setNominho] = useState('')
+  const [setMinutes, setSetMinutes] = useState(String(DEFAULT_POS_SETTINGS.set_minutes))
+  const [setPrice, setSetPrice] = useState('')
+  const [keepId, setKeepId] = useState('')
+  const [keepPourPct, setKeepPourPct] = useState('')
+  const [lastSale, setLastSale] = useState(null)
 
   useEffect(() => { setAgents(drinkBackAgents || []) }, [drinkBackAgents])
 
@@ -81,11 +185,16 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       supabase.from('bar_guests').select('id,nome,line_id,vip_member_id,preferencias,alergias,ativo').eq('bar_id', bar.id).eq('ativo', true).order('nome'),
       supabase.from('bar_visits').select('id,space_id,guest_id,status').eq('bar_id', bar.id).in('status', ['seated', 'reserved']),
       supabase.from('bar_bottle_keeps').select('id,guest_id,nome,remaining_pct,expires_on,ativo').eq('bar_id', bar.id).eq('ativo', true),
-    ]).then(([sR, gR, vR, kR]) => {
+      supabase.from('pos_settings').select('*').eq('bar_id', bar.id).maybeSingle(),
+    ]).then(([sR, gR, vR, kR, setR]) => {
       setSpaces(sR.data || [])
       setGuests(gR.data || [])
       setVisits(vR.data || [])
       setKeeps(kR.error ? [] : (kR.data || []))
+      const next = settingsFromRow(setR.data)
+      setSettings(next)
+      setServicePct(String(next.service_pct))
+      setSetMinutes(String(next.set_minutes || 60))
     }).catch(() => {})
   }, [bar.id])
 
@@ -145,15 +254,43 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     })
   }
 
+  const drinksTotal = cartTotal(cart)
+  const space = spaces.find(s => s.id === spaceId)
+  const charges = ticketChargeLines({
+    drinksTotal,
+    servicePct: +servicePct || 0,
+    nominho: +nominho || 0,
+    setMinutes: +setMinutes || 0,
+    setPrice: +setPrice || 0,
+    roomMin: settings.room_min,
+    spaceType: space?.tipo || '',
+  })
+  const ticketTotal = charges.total
+  const checkoutCart = [...cart, ...charges.lines]
+
   async function completeSale() {
-    if (!cart.length) return
+    if (!cart.length && !charges.lines.length) return
     if (priceType === 'vip' && !vipId) return alert(t('atomicPos.vipMemberRequired'))
     setSaving(true)
     const openVisit = matchCheckoutVisit(visits, { spaceId, guestId })
     const guest = guests.find(g => g.id === guestId)
+    const agent = agents.find(a => a.id === agentId)
+    const obs = packTicketObs({
+      details: ticketNote,
+      castName: agent?.nome || '',
+      castId: agentId,
+      nightKey: tokyoNightKey(),
+      servicePct: +servicePct || 0,
+      nominho: +nominho || 0,
+      setMinutes: +setMinutes || 0,
+      setPrice: +setPrice || 0,
+      roomMin: space?.tipo === 'vip_room' ? settings.room_min : 0,
+      keepId,
+      keepPourPct: +keepPourPct || 0,
+    })
     const result = await commitPosSale(supabase, {
       bar,
-      cart,
+      cart: checkoutCart,
       payMethod,
       priceType,
       vipId: priceType === 'vip' ? (vipId || guest?.vip_member_id || null) : null,
@@ -162,7 +299,8 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       spaceId: spaceId || null,
       guestId: guestId || null,
       visitId: openVisit?.id || null,
-      obs: ticketNote,
+      obs,
+      keepPour: keepId && +keepPourPct > 0 ? { id: keepId, pct: +keepPourPct } : null,
       userId: user?.id,
       shots,
       syncStock: args => syncPosStockAndReorder(supabase, {
@@ -176,6 +314,16 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     if (!result.ok) {
       return alert(result.errorKey ? t(result.errorKey) : (result.error || t('atomicPos.saleStockFailed')))
     }
+    const snapshot = {
+      sale: result.venda,
+      total: result.total,
+      items: checkoutCart,
+      guestNome: guest?.nome || '',
+      castNome: agent?.nome || '',
+      spaceNome: space?.nome || '',
+      payMethod,
+    }
+    setLastSale(snapshot)
     setCart([])
     setActiveCode(null)
     setCodeInput('')
@@ -183,6 +331,10 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     setSpaceId('')
     setGuestId('')
     setTicketNote('')
+    setNominho('')
+    setSetPrice('')
+    setKeepId('')
+    setKeepPourPct('')
     onSale?.()
     const tax = includedTaxBreakdown(result.total)
     const restockNote = result.stock?.pedido
@@ -312,9 +464,47 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                 {guestKeeps.map(k => (
                   <div key={k.id}>{t('atomicPos.keepChip', { name: k.nome, pct: k.remaining_pct })}</div>
                 ))}
+                {guestKeeps.length > 0 && (
+                  <div className="pos-keep-pour">
+                    <select value={keepId} onChange={e => setKeepId(e.target.value)}>
+                      <option value="">{t('atomicPos.keepPour')}</option>
+                      {guestKeeps.map(k => (
+                        <option key={k.id} value={k.id}>{k.nome} · {k.remaining_pct}%</option>
+                      ))}
+                    </select>
+                    {keepId && (
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        placeholder="%"
+                        value={keepPourPct}
+                        onChange={e => setKeepPourPct(e.target.value)}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             )
           })()}
+
+          <div className="pos-extras">
+            <label>{t('atomicPos.servicePct')}
+              <input type="number" min="0" max="30" value={servicePct} onChange={e => setServicePct(e.target.value)} />
+            </label>
+            <label>{t('atomicPos.nominho')}
+              <input type="number" min="0" value={nominho} onChange={e => setNominho(e.target.value)} placeholder="¥" />
+            </label>
+            <label>{t('atomicPos.setMinutes')}
+              <input type="number" min="0" value={setMinutes} onChange={e => setSetMinutes(e.target.value)} />
+            </label>
+            <label>{t('atomicPos.setPrice')}
+              <input type="number" min="0" value={setPrice} onChange={e => setSetPrice(e.target.value)} placeholder="¥" />
+            </label>
+          </div>
+          {space?.tipo === 'vip_room' && settings.room_min > 0 && (
+            <div className="pos-room-min">{t('atomicPos.roomMin')}: {fmtYen(settings.room_min)}</div>
+          )}
 
           <label className="pos-ticket-label" htmlFor="pos-ticket-note">{t('atomicPos.detailsLabel')}</label>
           <textarea
@@ -345,6 +535,22 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       </div>
 
       <div className="pos-cart">
+        <NightCloseBar bar={bar} />
+        {lastSale && (
+          <div className="pos-receipt-bar">
+            <span>{t('atomicPos.saleRegisteredShort', { amount: fmtYen(lastSale.total) })}</span>
+            <button type="button" className="btn-primary" onClick={() => printGuestReceipt({
+              barNome: bar.nome,
+              sale: { ...lastSale.sale, total: lastSale.total },
+              items: lastSale.items,
+              guestNome: lastSale.guestNome,
+              castNome: lastSale.castNome,
+              spaceNome: lastSale.spaceNome,
+              payMethod: lastSale.payMethod,
+            })}>{t('atomicPos.printReceipt')}</button>
+            <div className="pos-receipt-hint">{t('atomicPos.guestReceiptHint')}</div>
+          </div>
+        )}
         <div className="pos-cart-title">{t('atomicPos.cart')}</div>
         {(agentId || spaceId || guestId || ticketNote) && (
           <div className="pos-cart-ticket">
@@ -354,7 +560,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             {ticketNote && <span>{ticketNote}</span>}
           </div>
         )}
-        {cart.length === 0 ? <div className="pos-cart-empty">{t('atomicPos.tapToAdd')}</div> : (
+        {cart.length === 0 && charges.lines.length === 0 ? <div className="pos-cart-empty">{t('atomicPos.tapToAdd')}</div> : (
           <>
             <div className="pos-cart-list">
               {cart.map((it, i) => (
@@ -372,10 +578,19 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                   </div>
                 </div>
               ))}
+              {charges.lines.map(it => (
+                <div key={it.key} className="pos-cart-row pos-cart-extra">
+                  <div>
+                    <div className="pos-cart-name">{it.nome}</div>
+                    <div className="pos-cart-meta">{it.tipo_preco}</div>
+                  </div>
+                  <strong>{fmtYen(it.preco)}</strong>
+                </div>
+              ))}
             </div>
-            <div className="pos-cart-total">{fmtYen(cartTotal(cart))}</div>
+            <div className="pos-cart-total">{fmtYen(ticketTotal)}</div>
             <div style={{ fontSize: 11, color: 'var(--text2)', margin: '-4px 0 10px' }}>
-              {t('atomicPos.taxIncluded')} · {t('atomicPos.consumptionTaxIncluded')} {fmtYen(includedTaxBreakdown(cartTotal(cart)).tax)}
+              {t('atomicPos.taxIncluded')} · {t('atomicPos.consumptionTaxIncluded')} {fmtYen(includedTaxBreakdown(ticketTotal).tax)}
             </div>
             <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="pos-select">
               {['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer'].map(m => <option key={m}>{m}</option>)}
@@ -840,6 +1055,7 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
           {metrics.peakHour?.total > 0 ? ` · ${t('atomicPos.busiestHour')} ${metrics.peakHour.label}` : ''}
         </div>
       </div>
+      <NightCloseBar bar={bar} salesHint={salesList} />
 
       {openRestock.length === 0 && lowStock.length === 0 && (
         <div className="easy-dash-ok" style={{ marginBottom: 16 }}>{t('atomicPos.stockOk')}</div>

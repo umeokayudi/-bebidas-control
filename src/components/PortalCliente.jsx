@@ -12,6 +12,8 @@ import {
   faturaVencimento,
   faturaEmissao,
   faturaRemaining,
+  faturaPeriodoFim,
+  arAging,
 } from '../lib/barPortal'
 import {
   analyzePurchases,
@@ -41,6 +43,12 @@ import HqAiDock from './HqAiDock'
 import { fetchHqSnapshot } from '../lib/hqSnapshot'
 import { NotificationBell, useBarOverdueAlerts } from './Notifications'
 import BarOrdersTab from './BarOrdersTab'
+import {
+  buildPaymentRyoshushoHtml,
+  buildRyoshushoNumero,
+  printRyoshushoHtml,
+  savePaymentRyoshusho,
+} from '../lib/ryoshushoPrint'
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
 function EasyMoneyCard({ kicker, value, hint, tone = 'navy', children }) {
@@ -99,13 +107,34 @@ function HomeTab({ bar, onTab }) {
     setBarPricing(bpR.data || [])
     setFaturas(filterJbmDrinksFaturas(fR.data || []))
     const mesKey = tokyoMonthKey()
-    if (!posR.error && (posR.data || []).length) {
-      const posSales = posR.data || []
-      setPosTickets(posSales)
-      setPosMonthTotal(posSales.filter(s => (s.data || '').startsWith(mesKey)).reduce((a, s) => a + (+s.total || 0), 0))
-    } else {
-      setPosTickets([])
-      setPosMonthTotal(null)
+    let hqPos = false
+    try {
+      const snap = await fetchHqSnapshot()
+      setHq(snap)
+      setCostBooks(snap.books)
+      if (snap?.pos) {
+        setPosTickets(snap.pos.tickets || [])
+        setPosMonthTotal(snap.pos.till != null ? snap.pos.till : null)
+        hqPos = true
+      }
+    } catch {
+      setHq(null)
+      try {
+        const books = await loadCostBooks(bar.id)
+        setCostBooks(books)
+      } catch {
+        setCostBooks(null)
+      }
+    }
+    if (!hqPos) {
+      if (!posR.error && (posR.data || []).length) {
+        const posSales = posR.data || []
+        setPosTickets(posSales)
+        setPosMonthTotal(posSales.filter(s => (s.data || '').startsWith(mesKey)).reduce((a, s) => a + (+s.total || 0), 0))
+      } else {
+        setPosTickets([])
+        setPosMonthTotal(null)
+      }
     }
     try {
       const [spR, viR, guR] = await Promise.all([
@@ -126,19 +155,6 @@ function HomeTab({ bar, onTab }) {
       }
     } catch {
       setFloorGlance(null)
-    }
-    try {
-      const snap = await fetchHqSnapshot()
-      setHq(snap)
-      setCostBooks(snap.books)
-    } catch {
-      setHq(null)
-      try {
-        const books = await loadCostBooks(bar.id)
-        setCostBooks(books)
-      } catch {
-        setCostBooks(null)
-      }
     }
     setLoading(false)
   }
@@ -1645,6 +1661,8 @@ function FaturasTab({ bar }) {
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
   const [scannedData, setScannedData] = useState(null)
+  const [emittingReceipt, setEmittingReceipt] = useState(null)
+  const [ryoSeq, setRyoSeq] = useState(1)
 
   useEffect(() => { load() }, [bar])
 
@@ -1658,7 +1676,41 @@ function FaturasTab({ bar }) {
     setFaturas(jbmFaturas)
     setVendas(filterSupplierVendas(vR.data||[]))
     setPagamentos(pR.data||[])
+    const { count } = await supabase.from('ryoshusho').select('id', { count: 'exact', head: true }).eq('bar_id', bar.id)
+    setRyoSeq((count || 0) + 1)
     setLoading(false)
+  }
+
+  async function emitPaymentReceipt({ key, valor, data, metodo, notas, fatura }) {
+    if (!valor) return
+    setEmittingReceipt(key)
+    try {
+      const numero = buildRyoshushoNumero(ryoSeq)
+      const dataEmissao = (data || new Date().toISOString().slice(0, 10)).slice(0, 10)
+      const html = buildPaymentRyoshushoHtml({
+        numero,
+        dataEmissao,
+        barNome: bar.nome,
+        valor,
+        metodo,
+        notas,
+        periodoInicio: faturaEmissao(fatura),
+        periodoFim: faturaPeriodoFim(fatura),
+      })
+      printRyoshushoHtml(html)
+      await savePaymentRyoshusho(supabase, {
+        barId: bar.id,
+        numero,
+        dataEmissao,
+        valor,
+        metodo,
+        periodoInicio: faturaEmissao(fatura),
+        periodoFim: faturaPeriodoFim(fatura),
+      })
+      setRyoSeq(s => s + 1)
+    } finally {
+      setEmittingReceipt(null)
+    }
   }
 
   async function scanReceipt(imageData) {
@@ -1718,6 +1770,7 @@ function FaturasTab({ bar }) {
   const pending = filtered.filter(f=>f.status!=="pago")
   const totalPending = pending.reduce((a,f)=>a+faturaRemaining(f),0)
   const overdue = pending.filter(f=>faturaVencimento(f) && new Date(faturaVencimento(f))<new Date())
+  const aging = arAging(filtered)
   const upcoming = pending.filter(f=>!faturaVencimento(f) || new Date(faturaVencimento(f))>=new Date()).sort((a,b)=>faturaVencimento(a).localeCompare(faturaVencimento(b)))
   const monthlySpend = []
   const monthLabels = []
@@ -1734,6 +1787,41 @@ function FaturasTab({ bar }) {
   return (
     <div className="fade-in portal-page" style={{ maxWidth:860 }}>
       <SectionTitle sub={t('portal.invoices.subtitle')}>{t('portal.invoices.title')}</SectionTitle>
+      <div className="ar-war">
+        <div className="ar-war-head">
+          <div>
+            <div className="ar-war-kicker">{t('portal.invoices.warTitle')}</div>
+            <div className="ar-war-total">{fmtYen(aging.total)}</div>
+            <div className="ar-war-hint">{t('portal.invoices.warHint')}</div>
+          </div>
+          <div className="ar-aging">
+            {[
+              [t('portal.invoices.aging0'), aging.current],
+              [t('portal.invoices.aging30'), aging.d30],
+              [t('portal.invoices.aging60'), aging.d60],
+              [t('portal.invoices.aging90'), aging.d90],
+            ].map(([label, amt]) => (
+              <div key={label} className={`ar-aging-cell${amt > 0 && label === t('portal.invoices.aging90') ? ' is-hot' : ''}`}>
+                <b>{fmtYen(amt)}</b>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {aging.overdue.length > 0 && (
+          <div className="ar-overdue-list">
+            {aging.overdue.slice(0, 6).map(f => (
+              <div key={f.id} className="ar-overdue-row">
+                <div>
+                  <strong>{t('portal.invoices.callNow')}</strong>
+                  <span> · {t('portal.invoices.dueOn', { date: fmtDate(faturaVencimento(f)) })} · {f.daysOverdue}d</span>
+                </div>
+                <b>{fmtYen(f.remain)}</b>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {overdue.length>0 && (
         <div style={{ background:"linear-gradient(135deg,#ff3b30,#c0392b)", borderRadius:16, padding:"16px 20px", marginBottom:16 }}>
           <div style={{ fontSize:15, fontWeight:700, color:"white" }}>{t('portal.invoices.overdueAlert', { count: overdue.length })}</div>

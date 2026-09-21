@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { placeNotifPanel, panelBoxStyle } from '../src/lib/notifPanel.js'
 import { buildBarOpsGlance, opsGlanceItems, posTodayFromTickets } from '../src/lib/barOpsGlance.js'
-import { orderCastFromObs, orderDetailsFromObs, withOrderCast } from '../src/lib/orderMeta.js'
+import { orderCastFromObs, orderDetailsFromObs, withOrderCast, orderCastIdFromObs } from '../src/lib/orderMeta.js'
 import { splitCostBooks } from '../src/lib/costBooks.js'
 import en from '../src/locales/en.js'
 import ja from '../src/locales/ja.js'
@@ -121,6 +121,9 @@ assert('pack CAST + details', withOrderCast('morning delivery', 'Yuki') === 'Cas
 assert('read CAST', orderCastFromObs('Cast: Yuki\nmorning delivery') === 'Yuki')
 assert('read details without CAST line', orderDetailsFromObs('Cast: Yuki\nmorning delivery') === 'morning delivery')
 assert('empty CAST is just details', withOrderCast('urgent', '') === 'urgent')
+assert('CAST unique id packs name|id', withOrderCast('restock', { name: 'Yuki', id: 'cast-1' }) === 'Cast: Yuki|cast-1\nrestock')
+assert('CAST unique id reads name', orderCastFromObs('Cast: Yuki|cast-1\nrestock') === 'Yuki')
+assert('CAST unique id reads id', orderCastIdFromObs('Cast: Yuki|cast-1\nrestock') === 'cast-1')
 
 
 if (failed) {

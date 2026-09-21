@@ -204,6 +204,7 @@ export async function commitPosSale(supabase, {
   guestId = null,
   visitId = null,
   obs = '',
+  keepPour = null,
   userId = null,
   shots = [],
   syncStock,
@@ -310,6 +311,18 @@ export async function commitPosSale(supabase, {
 
   if (visitId && venda?.id) {
     await supabase.from('bar_visits').update({ pos_venda_id: venda.id }).eq('id', visitId).catch(() => {})
+  }
+
+  if (keepPour?.id && +keepPour.pct > 0) {
+    try {
+      const { data: keep } = await supabase.from('bar_bottle_keeps').select('id,remaining_pct').eq('id', keepPour.id).maybeSingle()
+      if (keep) {
+        const remaining = Math.max(0, Math.round((+keep.remaining_pct || 0) - +keepPour.pct))
+        await supabase.from('bar_bottle_keeps').update({ remaining_pct: remaining, ativo: remaining > 0 }).eq('id', keep.id)
+      }
+    } catch {
+      // Keep pour is POS-side only; a miss must not roll back the till sale.
+    }
   }
 
   return { ok: true, venda, total, desconto, stock, shots }

@@ -14,6 +14,7 @@ assert('no pedidos writes', !/from\('pedidos'\)/.test(storeSrc))
 assert('no faturas writes', !/from\('faturas'\)/.test(storeSrc))
 assert('seeds POS and staff lane logins', storeSrc.includes('pos@atomic.bar') && storeSrc.includes('funcionario@atomic.bar'))
 assert('HQ overhead tables exist', storeSrc.includes("'bar_overhead'") && storeSrc.includes("'bar_hq_meta'"))
+assert('night close live tables exist', storeSrc.includes("'pos_shifts'") && storeSrc.includes("'pos_settings'"))
 
 console.log('\n== Query filters ==')
 const rows = [

@@ -35,6 +35,16 @@ export function tokyoDateKey(date = new Date()) {
   return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`
 }
 
+/** Nightlife day (締め): 06:00–05:59 JST. Before 06:00 belongs to the previous calendar day. */
+export function tokyoNightKey(date = new Date()) {
+  const p = tokyoParts(date)
+  if (p.hour < 6) {
+    const prev = new Date(tokyoWallToUtcMs(p.year, p.month, p.day, 12) - 86400000)
+    return tokyoDateKey(prev)
+  }
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`
+}
+
 export function tokyoMonthKey(date = new Date()) {
   return tokyoDateKey(date).slice(0, 7)
 }

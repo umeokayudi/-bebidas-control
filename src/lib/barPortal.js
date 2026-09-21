@@ -44,6 +44,31 @@ export function faturaRemaining(f) {
   return Math.max(0, faturaValor(f) - faturaPago(f))
 }
 
+/** Aging buckets for JBM AR — never POS till. daysOverdue < 0 is not yet due. */
+export function arAging(faturas = [], todayIso = '') {
+  const today = String(todayIso || new Date().toISOString().slice(0, 10)).slice(0, 10)
+  const buckets = { current: 0, d30: 0, d60: 0, d90: 0 }
+  const overdue = []
+  for (const f of faturas || []) {
+    if (f.status === 'pago') continue
+    const remain = faturaRemaining(f)
+    if (remain <= 0) continue
+    const venc = String(faturaVencimento(f) || '').slice(0, 10)
+    const days = venc ? Math.floor((Date.parse(`${today}T12:00:00+09:00`) - Date.parse(`${venc}T12:00:00+09:00`)) / 86400000) : 0
+    if (days <= 0) buckets.current += remain
+    else if (days <= 30) buckets.d30 += remain
+    else if (days <= 60) buckets.d60 += remain
+    else buckets.d90 += remain
+    if (days > 0) overdue.push({ ...f, daysOverdue: days, remain })
+  }
+  overdue.sort((a, b) => b.daysOverdue - a.daysOverdue)
+  return {
+    ...buckets,
+    total: buckets.current + buckets.d30 + buckets.d60 + buckets.d90,
+    overdue,
+  }
+}
+
 export function faturaStatusLabel(status) {
   if (status === 'pago') return 'Pago'
   if (status === 'pendente') return 'Pendente'
