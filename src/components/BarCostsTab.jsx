@@ -19,12 +19,12 @@ import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
 
 const ACTIONS = [
-  { id: 'pos', icon: '🧾', labelKey: 'portal.home.goPos' },
-  { id: 'pedidos', icon: '🛒', labelKey: 'portal.home.goOrders' },
-  { id: 'espacos', icon: '🪑', labelKey: 'portal.home.goFloor' },
-  { id: 'clientes', icon: '🥂', labelKey: 'portal.home.goGuests' },
-  { id: 'ponto', icon: '🕒', labelKey: 'portal.home.goClock' },
-  { id: 'custos', icon: '🏛️', labelKey: 'portal.home.goHq' },
+  { id: 'pos', icon: '🧾', labelKey: 'portal.home.goPos', hintKey: 'portal.home.goPosHint' },
+  { id: 'pedidos', icon: '🛒', labelKey: 'portal.home.goOrders', hintKey: 'portal.home.goOrdersHint' },
+  { id: 'espacos', icon: '🪑', labelKey: 'portal.home.goFloor', hintKey: 'portal.home.goFloorHint' },
+  { id: 'clientes', icon: '🥂', labelKey: 'portal.home.goGuests', hintKey: 'portal.home.goGuestsHint' },
+  { id: 'ponto', icon: '🕒', labelKey: 'portal.home.goClock', hintKey: 'portal.home.goClockHint' },
+  { id: 'custos', icon: '🏛️', labelKey: 'portal.home.goHq', hintKey: 'portal.home.goHqHint' },
   { id: 'equipe', icon: '👥', labelKey: 'nav.portalTeam' },
   { id: 'estoque', icon: '📊', labelKey: 'nav.portalInventory' },
   { id: 'faturas', icon: '💳', labelKey: 'nav.portalInvoices' },
@@ -87,6 +87,7 @@ export function BarCommandActions({ onTab, ids }) {
         <button key={a.id} type="button" className="hq-action" data-hq-action={a.id} onClick={() => onTab?.(a.id)}>
           <span className="hq-action-icon">{a.icon}</span>
           <span>{t(a.labelKey)}</span>
+          {a.hintKey && <span className="hq-action-hint">{t(a.hintKey)}</span>}
         </button>
       ))}
     </div>

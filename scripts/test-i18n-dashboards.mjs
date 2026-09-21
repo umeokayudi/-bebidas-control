@@ -37,6 +37,7 @@ assert('default hint mentions English', /english/i.test(en.shell.languageHint))
 assert('POS hero is English', en.atomicPos.todayAtCounter === 'Today at the counter')
 assert('till verbs are English', en.atomicPos.chargeNow === 'Charge {amount}' && en.portal.home.goPos === 'Sell drinks')
 assert('JA till verbs exist', ja.atomicPos.payCash === '現金' && ja.portal.home.goHq === 'バー本部')
+assert('home tile hints exist', en.portal.home.goPosHint.includes('Till') && ja.portal.home.goPosHint.includes('レジ'))
 assert('JA has matching glance keys', !!(ja.portal.home.payJbm && ja.portal.home.barSold && ja.portal.home.youKeep))
 
 console.log('\n== Locale key parity (en vs ja) ==')

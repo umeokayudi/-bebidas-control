@@ -1948,7 +1948,7 @@ html[data-layout="tablet"] .app-main {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 8px;
-  max-height: min(56vh, 520px);
+  max-height: min(62vh, 580px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
@@ -2339,6 +2339,12 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   gap: 8px;
 }
 .easy-dash .hq-action-icon { font-size: 28px; }
+.hq-action-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text2);
+  line-height: 1.2;
+}
 .hq-sources {
   display: flex;
   flex-wrap: wrap;
@@ -2778,6 +2784,8 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   background: var(--navy);
   color: #fff;
   z-index: 2;
+  position: sticky;
+  bottom: 8px;
 }
 .ord-send-kicker { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.72); }
 .ord-send-total { font-size: 18px; font-weight: 800; color: var(--gold); }
@@ -2902,6 +2910,34 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
 .pos-ticket-compact {
   margin-top: 16px;
   background: var(--bg3);
+}
+.pos-cast-bar {
+  background: rgba(193, 156, 86, 0.12);
+  border: 1.5px solid var(--gold);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.pos-row-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.pos-row-scroll .pos-chip { flex: 0 0 auto; }
+.pos-cats { margin-bottom: 12px; }
+.pos-clear {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
 }
 .pos-pay-methods {
   display: grid;

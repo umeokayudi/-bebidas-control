@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { tokyoNightKey, tokyoDateKey } from '../src/lib/tokyo.js'
 import { summarizeNight, saleOnNight, nightWindow, closeVariance, pourKeep } from '../src/lib/nightClose.js'
-import { packTicketObs, readTicketMeta, ticketChargeLines } from '../src/lib/nightTicket.js'
+import { packTicketObs, readTicketMeta, ticketChargeLines, effectiveServicePct } from '../src/lib/nightTicket.js'
 import { withOrderCast, orderCastIdFromObs, orderDetailsFromObs } from '../src/lib/orderMeta.js'
 import { arAging } from '../src/lib/barPortal.js'
 import { buildGuestReceiptHtml, buildPosReceiptNumero } from '../src/lib/guestReceipt.js'
@@ -69,6 +69,9 @@ assert('個室 min only if below', !charges.lines.some(l => l.kind === 'room_min
 const roomOnly = ticketChargeLines({ drinksTotal: 1000, servicePct: 0, roomMin: 10000, spaceType: 'vip_room' })
 assert('個室チャージ fills the min', roomOnly.lines.some(l => l.kind === 'room_min') && roomOnly.total === 10000)
 assert('counter has no room min', ticketChargeLines({ drinksTotal: 1000, roomMin: 10000, spaceType: 'counter' }).total === 1000)
+assert('walk-up service is 0', effectiveServicePct({ servicePct: 10, tableTicket: false, extrasOpen: false }) === 0)
+assert('CAST table gets service', effectiveServicePct({ servicePct: 10, tableTicket: true }) === 10)
+assert('extras open gets service', effectiveServicePct({ servicePct: 10, extrasOpen: true }) === 10)
 
 console.log('\n== Keep pour + guest receipt is POS not JBM ==')
 assert('pour 10 from 70', pourKeep({ remaining_pct: 70, ativo: true }, 10).remaining_pct === 60)
@@ -107,12 +110,15 @@ assert('POS night close exists', posUi.includes('NightCloseBar') && posUi.includ
 assert('POS guest receipt exists', posUi.includes('printGuestReceipt'))
 assert('POS never writes vendas', !posUi.includes("from('vendas')"))
 assert('checkout is drinks-first', posUi.includes("t('atomicPos.stepDrinks')") && posUi.indexOf('stepDrinks') < posUi.indexOf('stepCharge'))
+assert('CAST bar sits above drinks', posUi.includes('pos-cast-bar') && posUi.indexOf('pos-cast-bar') < posUi.indexOf('stepDrinks'))
+assert('walk-up skips auto service', posUi.includes('effectiveServicePct') && posUi.includes('tableTicket'))
+assert('qty minus can remove', posUi.includes('function bumpCart'))
 assert('pay methods are buttons', posUi.includes('pos-pay-methods') && posUi.includes('chargeNow') && posUi.includes('PAY_METHODS'))
 assert('no leftover pay select', !posUi.includes("['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer']"))
 assert('sale errors are inline not alert', posUi.includes('setSaleErr') && !posUi.includes("alert(t('atomicPos.saleRegistered"))
 assert('night-keyed till load', posUi.includes(".gte('data', nightKey)") && posUi.includes('summarizeNight') && posUi.includes('tillTonight'))
 const costsUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
-assert('Home action tiles use verbs', costsUi.includes("portal.home.goPos") && costsUi.includes("portal.home.goHq"))
+assert('Home action tiles use verbs', costsUi.includes("portal.home.goPos") && costsUi.includes("portal.home.goHq") && costsUi.includes('hintKey'))
 assert('nav labels stay short', en.nav.portalPos === 'POS' && en.nav.portalCosts === 'Bar HQ')
 assert('charge copy is a verb', en.atomicPos.chargeNow.includes('Charge') && ja.atomicPos.payCash === '現金')
 const hqUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
