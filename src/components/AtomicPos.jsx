@@ -24,7 +24,7 @@ import { tokyoMonthKey, tokyoNightKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
 import { matchCheckoutVisit, spacesByZone, activeKeeps } from '../lib/barCrm'
 import { packTicketObs, ticketChargeLines, settingsFromRow, DEFAULT_POS_SETTINGS } from '../lib/nightTicket'
-import { summarizeNight, closeVariance } from '../lib/nightClose'
+import { summarizeNight, closeVariance, saleOnNight } from '../lib/nightClose'
 import { printGuestReceipt } from '../lib/guestReceipt'
 
 const SUB_TAB_IDS = [
@@ -34,6 +34,12 @@ const SUB_TAB_IDS = [
   { id: 'drinkback', key: 'tabDrinkBack', icon: '💃' },
   { id: 'prices', key: 'tabPrices', icon: '💴' },
   { id: 'discounts', key: 'tabDiscounts', icon: '🏷️' },
+]
+
+const PAY_METHODS = [
+  { id: 'Cash', key: 'payCash' },
+  { id: 'Credit card', key: 'payCard' },
+  { id: 'PayPay', key: 'payPaypay' },
 ]
 
 function SetupBanner({ onRefresh }) {
@@ -52,7 +58,7 @@ function SetupBanner({ onRefresh }) {
   )
 }
 
-function NightCloseBar({ bar, salesHint = [] }) {
+function NightCloseBar({ bar, salesHint = [], compact = false }) {
   const { t } = useI18n()
   const { user } = useAuth()
   const nightKey = tokyoNightKey()
@@ -61,6 +67,7 @@ function NightCloseBar({ bar, salesHint = [] }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [nightSales, setNightSales] = useState(salesHint || [])
+  const [open, setOpen] = useState(!compact)
 
   useEffect(() => {
     Promise.all([
@@ -74,6 +81,14 @@ function NightCloseBar({ bar, salesHint = [] }) {
 
   const summary = summarizeNight(nightSales, nightKey)
   const closed = shift?.status === 'closed'
+
+  if (compact && !open) {
+    return (
+      <button type="button" className="pos-close-mini" onClick={() => setOpen(true)}>
+        {t('atomicPos.nightClose')} · {summary.ticketCount} · {fmtYen(summary.drinksTotal)}
+      </button>
+    )
+  }
 
   async function closeNight() {
     setBusy(true)
@@ -141,6 +156,9 @@ function NightCloseBar({ bar, salesHint = [] }) {
         </div>
       )}
       {msg && <div className="pos-close-msg">{msg}</div>}
+      {compact && (
+        <button type="button" className="pos-close-hide" onClick={() => setOpen(false)}>{t('atomicPos.hideClose')}</button>
+      )}
     </div>
   )
 }
@@ -176,6 +194,9 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [keepId, setKeepId] = useState('')
   const [keepPourPct, setKeepPourPct] = useState('')
   const [lastSale, setLastSale] = useState(null)
+  const [saleErr, setSaleErr] = useState('')
+  const [showExtras, setShowExtras] = useState(false)
+  const [cat, setCat] = useState('all')
 
   useEffect(() => { setAgents(drinkBackAgents || []) }, [drinkBackAgents])
 
@@ -221,7 +242,10 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     return [...menuItems, ...shotItems]
   }, [drinks, shots])
 
+  const cats = useMemo(() => [...new Set(catalog.map(it => it.categoria).filter(Boolean))], [catalog])
+
   const filtered = catalog.filter(it => {
+    if (cat !== 'all' && it.categoria !== cat) return false
     if (!search) return true
     const s = search.toLowerCase()
     return it.nome.toLowerCase().includes(s) || it.categoria.toLowerCase().includes(s)
@@ -229,14 +253,22 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
 
   function applyCode() {
     const code = discountCodes.find(c => c.codigo.toUpperCase() === codeInput.trim().toUpperCase())
-    if (!code) return alert(t('atomicPos.codeNotFound'))
+    if (!code) {
+      setSaleErr(t('atomicPos.codeNotFound'))
+      return
+    }
     const v = validateDiscountCode(code)
-    if (!v.ok) return alert(t(v.errorKey || 'atomicPos.codeNotFound'))
+    if (!v.ok) {
+      setSaleErr(t(v.errorKey || 'atomicPos.codeNotFound'))
+      return
+    }
+    setSaleErr('')
     setActiveCode(code)
     setPriceType('codigo')
   }
 
   function addToCart(item) {
+    setSaleErr('')
     const pricing = resolveItemPrice(item, priceType === 'codigo' ? 'regular' : priceType, activeCode)
     setCart(prev => {
       const ex = prev.find(x => x.key === item.key && x.tipo_preco === pricing.tipo_preco)
@@ -270,8 +302,12 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
 
   async function completeSale() {
     if (!cart.length && !charges.lines.length) return
-    if (priceType === 'vip' && !vipId) return alert(t('atomicPos.vipMemberRequired'))
+    if (priceType === 'vip' && !vipId) {
+      setSaleErr(t('atomicPos.vipMemberRequired'))
+      return
+    }
     setSaving(true)
+    setSaleErr('')
     const openVisit = matchCheckoutVisit(visits, { spaceId, guestId })
     const guest = guests.find(g => g.id === guestId)
     const agent = agents.find(a => a.id === agentId)
@@ -312,7 +348,8 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     })
     setSaving(false)
     if (!result.ok) {
-      return alert(result.errorKey ? t(result.errorKey) : (result.error || t('atomicPos.saleStockFailed')))
+      setSaleErr(result.errorKey ? t(result.errorKey) : (result.error || t('atomicPos.saleStockFailed')))
+      return
     }
     const snapshot = {
       sale: result.venda,
@@ -336,47 +373,65 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     setKeepId('')
     setKeepPourPct('')
     onSale?.()
-    const tax = includedTaxBreakdown(result.total)
-    const restockNote = result.stock?.pedido
-      ? `\n${t('atomicPos.restockSent', { count: result.stock.restockItems?.length || 0 })}`
-      : ''
-    alert(
-      t('atomicPos.saleRegistered', { amount: fmtYen(result.total) })
-      + `\n${t('atomicPos.taxIncluded')} ${fmtYen(tax.total)}`
-      + `\n${t('atomicPos.consumptionTaxIncluded')} ${fmtYen(tax.tax)}`
-      + restockNote
-    )
   }
 
   return (
     <div className="pos-checkout">
-      <div>
-        <div className="pos-price-row">
-          {['regular', 'vip', 'codigo'].map(pt => (
-            <button key={pt} className={`pos-chip${priceType === pt ? ' is-on' : ''}`} onClick={() => { setPriceType(pt); if (pt !== 'codigo') setActiveCode(null) }}>
-              {pt === 'regular' ? t('atomicPos.regularPrice') : pt === 'vip' ? t('atomicPos.vipPrice') : t('atomicPos.discountCode')}
-            </button>
-          ))}
-        </div>
-
-        {priceType === 'codigo' && (
-          <div className="pos-code-row">
-            <input placeholder={t('atomicPos.codePlaceholder')} value={codeInput} onChange={e => setCodeInput(e.target.value.toUpperCase())} />
-            <button className="btn-primary" onClick={applyCode}>{t('atomicPos.apply')}</button>
-            {activeCode && <span className="pos-code-ok">✓ {activeCode.codigo}</span>}
+      <div className="pos-menu">
+        <div className="pos-step">{t('atomicPos.stepDrinks')}</div>
+        <input className="pos-search" placeholder={t('atomicPos.searchDrinks')} value={search} onChange={e => setSearch(e.target.value)} />
+        {cats.length > 0 && (
+          <div className="pos-ticket-chips pos-cats">
+            <button type="button" className={`pos-chip${cat === 'all' ? ' is-on' : ''}`} onClick={() => setCat('all')}>{t('atomicPos.allDrinks')}</button>
+            {cats.map(c => (
+              <button key={c} type="button" className={`pos-chip${cat === c ? ' is-on' : ''}`} onClick={() => setCat(c)}>{c}</button>
+            ))}
           </div>
         )}
+        <div className="pos-grid">
+          {filtered.length === 0 && (
+            <div className="pos-empty-menu">{catalog.length === 0 ? t('atomicPos.noMenuYet') : t('atomicPos.tapToAdd')}</div>
+          )}
+          {filtered.map(item => {
+            const p = resolveItemPrice(item, priceType === 'codigo' ? 'regular' : priceType, activeCode)
+            const inCart = cart.find(x => x.key === item.key)
+            return (
+              <button key={item.key} className={`pos-tile${inCart ? ' is-on' : ''}`} onClick={() => addToCart(item)}>
+                {inCart && <span className="pos-tile-badge">{inCart.qtd}</span>}
+                <div className="pos-tile-name">{item.nome}</div>
+                <div className="pos-tile-cat">{item.categoria}</div>
+                <div className="pos-tile-price">{fmtYen(p.preco)}</div>
+                {p.preco_lista > p.preco && <div className="pos-tile-was">{fmtYen(p.preco_lista)}</div>}
+              </button>
+            )
+          })}
+        </div>
 
-        {priceType === 'vip' && (
-          <select value={vipId} onChange={e => setVipId(e.target.value)} className="pos-select">
-            <option value="">{t('atomicPos.vipMemberRequired')}</option>
-            {(vipMembers || []).filter(v => v.ativo).map(v => (
-              <option key={v.id} value={v.id}>{v.nome}{v.codigo ? ` · ${v.codigo}` : ''}</option>
+        <div className="pos-ticket pos-ticket-compact">
+          <div className="pos-step">{t('atomicPos.stepTicket')}</div>
+          <div className="pos-price-row">
+            {['regular', 'vip', 'codigo'].map(pt => (
+              <button key={pt} className={`pos-chip${priceType === pt ? ' is-on' : ''}`} onClick={() => { setPriceType(pt); if (pt !== 'codigo') setActiveCode(null) }}>
+                {pt === 'regular' ? t('atomicPos.regularPrice') : pt === 'vip' ? t('atomicPos.vipPrice') : t('atomicPos.discountCode')}
+              </button>
             ))}
-          </select>
-        )}
+          </div>
+          {priceType === 'codigo' && (
+            <div className="pos-code-row">
+              <input placeholder={t('atomicPos.codePlaceholder')} value={codeInput} onChange={e => setCodeInput(e.target.value.toUpperCase())} />
+              <button className="btn-primary" onClick={applyCode}>{t('atomicPos.apply')}</button>
+              {activeCode && <span className="pos-code-ok">✓ {activeCode.codigo}</span>}
+            </div>
+          )}
+          {priceType === 'vip' && (
+            <select value={vipId} onChange={e => setVipId(e.target.value)} className="pos-select">
+              <option value="">{t('atomicPos.vipMemberRequired')}</option>
+              {(vipMembers || []).filter(v => v.ativo).map(v => (
+                <option key={v.id} value={v.id}>{v.nome}{v.codigo ? ` · ${v.codigo}` : ''}</option>
+              ))}
+            </select>
+          )}
 
-        <div className="pos-ticket">
           <div className="pos-ticket-cast">
             <div className="pos-ticket-label">{t('atomicPos.castLabel')}</div>
             <div className="pos-ticket-chips">
@@ -405,7 +460,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                     setNewCastName('')
                     setAddCastOpen(false)
                   } else {
-                    alert(error?.message || t('atomicPos.drinkBackSetup'))
+                    setSaleErr(error?.message || t('atomicPos.drinkBackSetup'))
                   }
                 }}>{t('common.confirm')}</button>
               </div>
@@ -446,6 +501,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
               if (g?.vip_member_id && priceType === 'vip') setVipId(g.vip_member_id)
               const visit = matchCheckoutVisit(visits, { guestId: id })
               if (visit?.space_id) setSpaceId(visit.space_id)
+              if (id) setShowExtras(true)
             }}
             className="pos-select"
           >
@@ -488,54 +544,43 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             )
           })()}
 
-          <div className="pos-extras">
-            <label>{t('atomicPos.servicePct')}
-              <input type="number" min="0" max="30" value={servicePct} onChange={e => setServicePct(e.target.value)} />
-            </label>
-            <label>{t('atomicPos.nominho')}
-              <input type="number" min="0" value={nominho} onChange={e => setNominho(e.target.value)} placeholder="¥" />
-            </label>
-            <label>{t('atomicPos.setMinutes')}
-              <input type="number" min="0" value={setMinutes} onChange={e => setSetMinutes(e.target.value)} />
-            </label>
-            <label>{t('atomicPos.setPrice')}
-              <input type="number" min="0" value={setPrice} onChange={e => setSetPrice(e.target.value)} placeholder="¥" />
-            </label>
-          </div>
-          {space?.tipo === 'vip_room' && settings.room_min > 0 && (
-            <div className="pos-room-min">{t('atomicPos.roomMin')}: {fmtYen(settings.room_min)}</div>
+          <button type="button" className="easy-dash-more" onClick={() => setShowExtras(v => !v)}>
+            {showExtras ? t('atomicPos.hideCharges') : t('atomicPos.showCharges')}
+          </button>
+          {showExtras && (
+            <>
+              <div className="pos-extras">
+                <label>{t('atomicPos.servicePct')}
+                  <input type="number" min="0" max="30" value={servicePct} onChange={e => setServicePct(e.target.value)} />
+                </label>
+                <label>{t('atomicPos.nominho')}
+                  <input type="number" min="0" value={nominho} onChange={e => setNominho(e.target.value)} placeholder="¥" />
+                </label>
+                <label>{t('atomicPos.setMinutes')}
+                  <input type="number" min="0" value={setMinutes} onChange={e => setSetMinutes(e.target.value)} />
+                </label>
+                <label>{t('atomicPos.setPrice')}
+                  <input type="number" min="0" value={setPrice} onChange={e => setSetPrice(e.target.value)} placeholder="¥" />
+                </label>
+              </div>
+              {space?.tipo === 'vip_room' && settings.room_min > 0 && (
+                <div className="pos-room-min">{t('atomicPos.roomMin')}: {fmtYen(settings.room_min)}</div>
+              )}
+              <label className="pos-ticket-label" htmlFor="pos-ticket-note">{t('atomicPos.detailsLabel')}</label>
+              <textarea
+                id="pos-ticket-note"
+                className="pos-ticket-note"
+                rows={2}
+                value={ticketNote}
+                onChange={e => setTicketNote(e.target.value)}
+                placeholder={t('atomicPos.detailsPlaceholder')}
+              />
+            </>
           )}
-
-          <label className="pos-ticket-label" htmlFor="pos-ticket-note">{t('atomicPos.detailsLabel')}</label>
-          <textarea
-            id="pos-ticket-note"
-            className="pos-ticket-note"
-            rows={2}
-            value={ticketNote}
-            onChange={e => setTicketNote(e.target.value)}
-            placeholder={t('atomicPos.detailsPlaceholder')}
-          />
-        </div>
-
-        <input className="pos-search" placeholder={t('atomicPos.searchDrinks')} value={search} onChange={e => setSearch(e.target.value)} />
-
-        <div className="pos-grid">
-          {filtered.map(item => {
-            const p = resolveItemPrice(item, priceType === 'codigo' ? 'regular' : priceType, activeCode)
-            return (
-              <button key={item.key} className="pos-tile" onClick={() => addToCart(item)}>
-                <div className="pos-tile-name">{item.nome}</div>
-                <div className="pos-tile-cat">{item.categoria}</div>
-                <div className="pos-tile-price">{fmtYen(p.preco)}</div>
-                {p.preco_lista > p.preco && <div className="pos-tile-was">{fmtYen(p.preco_lista)}</div>}
-              </button>
-            )
-          })}
         </div>
       </div>
 
       <div className="pos-cart">
-        <NightCloseBar bar={bar} />
         {lastSale && (
           <div className="pos-receipt-bar">
             <span>{t('atomicPos.saleRegisteredShort', { amount: fmtYen(lastSale.total) })}</span>
@@ -551,55 +596,63 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             <div className="pos-receipt-hint">{t('atomicPos.guestReceiptHint')}</div>
           </div>
         )}
-        <div className="pos-cart-title">{t('atomicPos.cart')}</div>
-        {(agentId || spaceId || guestId || ticketNote) && (
+        {saleErr && <div className="pos-sale-err">{saleErr}</div>}
+        <div className="pos-cart-title">{t('atomicPos.stepCharge')}</div>
+        {(agentId || spaceId || guestId) && (
           <div className="pos-cart-ticket">
             {agentId && <span>💃 {(agents.find(a => a.id === agentId)?.nome) || 'CAST'}</span>}
             {spaceId && <span>🪑 {(spaces.find(s => s.id === spaceId)?.nome)}</span>}
             {guestId && <span>🥂 {(guests.find(g => g.id === guestId)?.nome)}</span>}
-            {ticketNote && <span>{ticketNote}</span>}
           </div>
         )}
         {cart.length === 0 && charges.lines.length === 0 ? <div className="pos-cart-empty">{t('atomicPos.tapToAdd')}</div> : (
-          <>
-            <div className="pos-cart-list">
-              {cart.map((it, i) => (
-                <div key={i} className="pos-cart-row">
-                  <div>
-                    <div className="pos-cart-name">{it.nome}</div>
-                    <div className="pos-cart-meta">{it.tipo_preco} × {it.qtd}</div>
-                  </div>
-                  <div className="pos-cart-qty">
-                    <button className="pos-qty" onClick={() => setCart(c => c.map((x, j) => j === i ? { ...x, qtd: Math.max(1, x.qtd - 1) } : x))}>−</button>
-                    <span>{it.qtd}</span>
-                    <button className="pos-qty" onClick={() => setCart(c => c.map((x, j) => j === i ? { ...x, qtd: x.qtd + 1 } : x))}>+</button>
-                    <strong>{fmtYen(lineUnitPrice(it) * it.qtd)}</strong>
-                    <button className="pos-qty-del" onClick={() => setCart(c => c.filter((_, j) => j !== i))}>✕</button>
-                  </div>
+          <div className="pos-cart-list">
+            {cart.map((it, i) => (
+              <div key={i} className="pos-cart-row">
+                <div>
+                  <div className="pos-cart-name">{it.nome}</div>
+                  <div className="pos-cart-meta">{it.tipo_preco} × {it.qtd}</div>
                 </div>
-              ))}
-              {charges.lines.map(it => (
-                <div key={it.key} className="pos-cart-row pos-cart-extra">
-                  <div>
-                    <div className="pos-cart-name">{it.nome}</div>
-                    <div className="pos-cart-meta">{it.tipo_preco}</div>
-                  </div>
-                  <strong>{fmtYen(it.preco)}</strong>
+                <div className="pos-cart-qty">
+                  <button className="pos-qty" onClick={() => setCart(c => c.map((x, j) => j === i ? { ...x, qtd: Math.max(1, x.qtd - 1) } : x))}>−</button>
+                  <span>{it.qtd}</span>
+                  <button className="pos-qty" onClick={() => setCart(c => c.map((x, j) => j === i ? { ...x, qtd: x.qtd + 1 } : x))}>+</button>
+                  <strong>{fmtYen(lineUnitPrice(it) * it.qtd)}</strong>
+                  <button className="pos-qty-del" onClick={() => setCart(c => c.filter((_, j) => j !== i))}>✕</button>
                 </div>
-              ))}
-            </div>
-            <div className="pos-cart-total">{fmtYen(ticketTotal)}</div>
-            <div style={{ fontSize: 11, color: 'var(--text2)', margin: '-4px 0 10px' }}>
-              {t('atomicPos.taxIncluded')} · {t('atomicPos.consumptionTaxIncluded')} {fmtYen(includedTaxBreakdown(ticketTotal).tax)}
-            </div>
-            <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="pos-select">
-              {['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer'].map(m => <option key={m}>{m}</option>)}
-            </select>
-            <button className="btn-primary pos-pay" onClick={completeSale} disabled={saving || (priceType === 'vip' && !vipId)}>
-              {saving ? t('common.saving') : t('atomicPos.registerPosSale')}
-            </button>
-          </>
+              </div>
+            ))}
+            {charges.lines.map(it => (
+              <div key={it.key} className="pos-cart-row pos-cart-extra">
+                <div>
+                  <div className="pos-cart-name">{it.nome}</div>
+                  <div className="pos-cart-meta">{it.tipo_preco}</div>
+                </div>
+                <strong>{fmtYen(it.preco)}</strong>
+              </div>
+            ))}
+          </div>
         )}
+        <div className="pos-cart-pay">
+          <div className="pos-cart-total">{fmtYen(ticketTotal)}</div>
+          <div className="pos-tax-line">
+            {t('atomicPos.taxIncluded')} · {t('atomicPos.consumptionTaxIncluded')} {fmtYen(includedTaxBreakdown(ticketTotal).tax)}
+          </div>
+          <div className="pos-pay-methods">
+            {PAY_METHODS.map(m => (
+              <button
+                key={m.id}
+                type="button"
+                className={`pos-pay-method${payMethod === m.id ? ' is-on' : ''}`}
+                onClick={() => setPayMethod(m.id)}
+              >{t(`atomicPos.${m.key}`)}</button>
+            ))}
+          </div>
+          <button className="btn-gold pos-pay" onClick={completeSale} disabled={saving || (!cart.length && !charges.lines.length) || (priceType === 'vip' && !vipId)}>
+            {saving ? t('common.saving') : t('atomicPos.chargeNow', { amount: fmtYen(ticketTotal) })}
+          </button>
+          <NightCloseBar bar={bar} compact />
+        </div>
       </div>
     </div>
   )
@@ -1247,12 +1300,13 @@ export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
     const schema = await checkPosSchema(supabase)
     setReady(schema.ready)
 
+    const nightKey = tokyoNightKey()
     const [dR, sR, cR, vR, pR, aR] = await Promise.all([
       supabase.from('drink_menu').select('*').eq('bar_id', bar.id).order('nome'),
       supabase.from('bar_pricing').select('*, produtos(nome,categoria,preco_venda)').eq('bar_id', bar.id),
       schema.ready ? supabase.from('discount_codes').select('*').eq('bar_id', bar.id).eq('ativo', true) : { data: [] },
       schema.ready ? supabase.from('vip_members').select('*').eq('bar_id', bar.id).eq('ativo', true) : { data: [] },
-      schema.ready ? supabase.from('pos_vendas').select('total,criado_em,drink_back_agent_id').eq('bar_id', bar.id).eq('data', todayKey()).order('criado_em') : { data: [] },
+      schema.ready ? supabase.from('pos_vendas').select('total,criado_em,data,metodo_pagamento,drink_back_agent_id').eq('bar_id', bar.id).gte('data', nightKey).order('criado_em') : { data: [] },
       schema.ready ? supabase.from('drink_back_agents').select('*').eq('bar_id', bar.id).eq('ativo', true) : { data: [] },
     ])
     setDrinks(dR.data || [])
@@ -1260,9 +1314,9 @@ export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
     setDiscountCodes(cR.data || [])
     setVipMembers(vR.data || [])
     setDrinkBackAgents(aR.data || [])
-    const sales = pR.data || []
-    setSalesList(sales)
-    setTodaySales({ count: sales.length, total: sales.reduce((a, s) => a + (+s.total || 0), 0) })
+    const night = summarizeNight(pR.data || [], nightKey)
+    setSalesList((pR.data || []).filter(s => saleOnNight(s, nightKey)))
+    setTodaySales({ count: night.ticketCount, total: night.drinksTotal })
     setLoading(false)
   }
 
@@ -1274,26 +1328,28 @@ export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
 
       <div className="pos-head">
         <div>
-          <div className="pos-head-title">{t('atomicPos.title')}</div>
-          <div className="pos-head-sub">{t('atomicPos.subtitle')}</div>
+          <div className="pos-head-title">{access === 'cashier' ? t('atomicPos.tillTitle') : t('atomicPos.title')}</div>
+          <div className="pos-head-sub">{access === 'cashier' ? t('atomicPos.tillSubtitle') : t('atomicPos.subtitle')}</div>
           {access === 'cashier' && (
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>{t('atomicPos.tillOnly')}</div>
           )}
         </div>
         <div className="pos-head-today">
-          <div className="pos-head-label">{t('atomicPos.today')}</div>
+          <div className="pos-head-label">{t('atomicPos.tillTonight')}</div>
           <div className="pos-head-total">{fmtYen(todaySales.total)}</div>
           <div className="pos-head-count">{t('atomicPos.salesCount', { count: todaySales.count })}</div>
         </div>
       </div>
 
-      <div className="pos-subnav">
-        {tabs.map(tab => (
-          <button key={tab.id} className={`pos-chip${subTab === tab.id ? ' is-on' : ''}`} onClick={() => setSubTab(tab.id)}>
-            {tab.icon} {t(`atomicPos.${tab.key}`)}
-          </button>
-        ))}
-      </div>
+      {tabs.length > 1 && (
+        <div className="pos-subnav">
+          {tabs.map(tab => (
+            <button key={tab.id} className={`pos-chip${subTab === tab.id ? ' is-on' : ''}`} onClick={() => setSubTab(tab.id)}>
+              {tab.icon} {t(`atomicPos.${tab.key}`)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {subTab === 'dashboard' && (
         <PosDashboardTab bar={bar} todaySales={todaySales} salesList={salesList} onOrder={onOrder} />

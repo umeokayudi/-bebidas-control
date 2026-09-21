@@ -19,12 +19,12 @@ import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
 
 const ACTIONS = [
-  { id: 'pos', icon: '🧾', labelKey: 'nav.portalPos' },
-  { id: 'pedidos', icon: '🛒', labelKey: 'nav.portalOrders' },
-  { id: 'espacos', icon: '🪑', labelKey: 'nav.portalSpaces' },
-  { id: 'clientes', icon: '🥂', labelKey: 'nav.portalGuests' },
-  { id: 'ponto', icon: '🕒', labelKey: 'nav.portalClock' },
-  { id: 'custos', icon: '🏛️', labelKey: 'nav.portalCosts' },
+  { id: 'pos', icon: '🧾', labelKey: 'portal.home.goPos' },
+  { id: 'pedidos', icon: '🛒', labelKey: 'portal.home.goOrders' },
+  { id: 'espacos', icon: '🪑', labelKey: 'portal.home.goFloor' },
+  { id: 'clientes', icon: '🥂', labelKey: 'portal.home.goGuests' },
+  { id: 'ponto', icon: '🕒', labelKey: 'portal.home.goClock' },
+  { id: 'custos', icon: '🏛️', labelKey: 'portal.home.goHq' },
   { id: 'equipe', icon: '👥', labelKey: 'nav.portalTeam' },
   { id: 'estoque', icon: '📊', labelKey: 'nav.portalInventory' },
   { id: 'faturas', icon: '💳', labelKey: 'nav.portalInvoices' },

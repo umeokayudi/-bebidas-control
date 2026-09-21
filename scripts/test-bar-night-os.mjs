@@ -6,6 +6,8 @@ import { packTicketObs, readTicketMeta, ticketChargeLines } from '../src/lib/nig
 import { withOrderCast, orderCastIdFromObs, orderDetailsFromObs } from '../src/lib/orderMeta.js'
 import { arAging } from '../src/lib/barPortal.js'
 import { buildGuestReceiptHtml, buildPosReceiptNumero } from '../src/lib/guestReceipt.js'
+import en from '../src/locales/en.js'
+import ja from '../src/locales/ja.js'
 
 let failed = 0
 function assert(name, cond, extra) {
@@ -104,6 +106,15 @@ assert('POS packs CAST id into obs', posUi.includes('packTicketObs') && posUi.in
 assert('POS night close exists', posUi.includes('NightCloseBar') && posUi.includes('pos_shifts'))
 assert('POS guest receipt exists', posUi.includes('printGuestReceipt'))
 assert('POS never writes vendas', !posUi.includes("from('vendas')"))
+assert('checkout is drinks-first', posUi.includes("t('atomicPos.stepDrinks')") && posUi.indexOf('stepDrinks') < posUi.indexOf('stepCharge'))
+assert('pay methods are buttons', posUi.includes('pos-pay-methods') && posUi.includes('chargeNow') && posUi.includes('PAY_METHODS'))
+assert('no leftover pay select', !posUi.includes("['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer']"))
+assert('sale errors are inline not alert', posUi.includes('setSaleErr') && !posUi.includes("alert(t('atomicPos.saleRegistered"))
+assert('night-keyed till load', posUi.includes(".gte('data', nightKey)") && posUi.includes('summarizeNight') && posUi.includes('tillTonight'))
+const costsUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
+assert('Home action tiles use verbs', costsUi.includes("portal.home.goPos") && costsUi.includes("portal.home.goHq"))
+assert('nav labels stay short', en.nav.portalPos === 'POS' && en.nav.portalCosts === 'Bar HQ')
+assert('charge copy is a verb', en.atomicPos.chargeNow.includes('Charge') && ja.atomicPos.payCash === '現金')
 const hqUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
 assert('HQ UI has no demo passwords', !hqUi.includes('PosOnly#2026') && !hqUi.includes('password'))
 const home = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
