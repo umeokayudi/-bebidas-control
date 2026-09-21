@@ -85,7 +85,7 @@ assert('SQL does not create vendas/pedidos/faturas', !/create table if not exist
 assert('checkout can attach guest/space on pos_vendas', pos.includes('space_id') && pos.includes('guest_id'))
 assert('checkout saves CAST agent and details note', pos.includes('drink_back_agent_id') && pos.includes('vendaPayload.obs'))
 assert('POS auto-links seated guest from space', posUi.includes('matchCheckoutVisit') && posUi.includes('keepChip'))
-assert('POS ticket shows CAST chips', posUi.includes('castLabel') && posUi.includes('pos-ticket'))
+assert('POS ticket shows CAST chips', posUi.includes('pos-chip-cast') && posUi.includes('pos-cast-bar'))
 assert('owner nav has guests+spaces', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
 const ordersUi = readFileSync(new URL('../src/components/BarOrdersTab.jsx', import.meta.url), 'utf8')
 assert('JBM order UI never writes vendas', !ordersUi.includes("from('vendas')") && ordersUi.includes("from('pedidos')"))
