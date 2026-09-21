@@ -399,7 +399,9 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
               >💃 {a.nome}</button>
             ))}
             <button type="button" className="pos-chip" onClick={() => setAddCastOpen(v => !v)}>{t('atomicPos.addCast')}</button>
-            {!ticketReady && <span className="pos-ticket-empty">{t('common.loading')}</span>}
+            {!ticketReady && !agents.some(a => a.ativo !== false) && spaces.length === 0 && (
+              <span className="pos-ticket-empty">{t('common.loading')}</span>
+            )}
             {ticketReady && spaces.length === 0 && <span className="pos-ticket-empty">{t('atomicPos.spaceOptional')}</span>}
             {spacesByZone(spaces).flatMap(z => z.spaces).map(s => {
               const visit = matchCheckoutVisit(visits, { spaceId: s.id })
