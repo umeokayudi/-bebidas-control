@@ -77,6 +77,7 @@ const glance = buildBarOpsGlance({
   floor: { seated: 4, reserved: 1, free: 6, birthdays: 1 },
   openOrders: 3,
   today: '2026-09-18',
+  nightKey: '2026-09-18',
 })
 assert('never mixed into one total', glance.mixed === false)
 assert('POS tonight is only today tickets', glance.posToday === 2400)
@@ -87,6 +88,20 @@ assert('rent stays 450000', glance.rent === 450000)
 assert('wages stay 12750', glance.wages === 12750)
 assert('floor + birthdays + stock + orders', glance.seated === 4 && glance.birthdays === 1 && glance.lowStock === 2 && glance.openOrders === 3)
 assert('today count helper', posTodayFromTickets([{ data: '2026-09-18T20:00:00', total: 900 }, { data: '2026-09-17', total: 10 }], '2026-09-18') === 900)
+assert(
+  'after-midnight ticket stays on nightlife day',
+  posTodayFromTickets([{ data: '2026-09-19', criado_em: '2026-09-19T01:00:00+09:00', total: 1500 }], '2026-09-18') === 1500
+)
+assert(
+  'after-midnight ticket is not the civil next day',
+  posTodayFromTickets([{ data: '2026-09-19', criado_em: '2026-09-19T01:00:00+09:00', total: 1500 }], '2026-09-19') === 0
+)
+const lateGlance = buildBarOpsGlance({
+  posTickets: [{ data: '2026-09-19', criado_em: '2026-09-19T01:00:00+09:00', total: 1500 }],
+  today: '2026-09-19',
+  nightKey: '2026-09-18',
+})
+assert('Home POS tonight uses 06:00 night key', lateGlance.posToday === 1500)
 
 const fmt = n => `¥${n}`
 const items = opsGlanceItems(glance, (k, vars) => {

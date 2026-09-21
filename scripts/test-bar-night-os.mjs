@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { tokyoNightKey, tokyoDateKey } from '../src/lib/tokyo.js'
 import { summarizeNight, saleOnNight, nightWindow, closeVariance, pourKeep } from '../src/lib/nightClose.js'
+import { cashChange, isCashMethod, payRecordNote } from '../src/lib/posPay.js'
 import { packTicketObs, readTicketMeta, ticketChargeLines, effectiveServicePct } from '../src/lib/nightTicket.js'
 import { withOrderCast, orderCastIdFromObs, orderDetailsFromObs } from '../src/lib/orderMeta.js'
 import { arAging } from '../src/lib/barPortal.js'
@@ -35,6 +36,20 @@ const sum = summarizeNight(nightSales, '2026-09-18')
 assert('night till excludes next afternoon', sum.ticketCount === 2 && sum.drinksTotal === 3900, JSON.stringify(sum))
 assert('cash vs card split', sum.cashTotal === 2400 && sum.cardTotal === 1500)
 assert('variance counted-expected', closeVariance(2400, 2350) === -50)
+const withPaypay = summarizeNight([
+  ...nightSales,
+  { total: 1100, data: '2026-09-18', criado_em: '2026-09-18T22:00:00+09:00', metodo_pagamento: 'PayPay' },
+], '2026-09-18')
+assert('PayPay is not dumped into other', withPaypay.paypayTotal === 1100 && withPaypay.otherTotal === 0)
+assert('expected cash stays cash-only', withPaypay.expectedCash === 2400)
+
+console.log('\n== Cash tender is till math, not a gateway ==')
+assert('empty tendered is exact', cashChange(2200, '').exact && cashChange(2200, '').change === 0)
+assert('¥5000 on ¥2200 is ¥2800 change', cashChange(2200, 5000).change === 2800 && !cashChange(2200, 5000).short)
+assert('short cash blocks Charge', cashChange(2200, 1000).short && cashChange(2200, 1000).change === -1200)
+assert('Cash is cash', isCashMethod('Cash') && isCashMethod('現金') && !isCashMethod('PayPay'))
+assert('cash note packs tender', payRecordNote({ method: 'Cash', total: 2200, tendered: 5000 }) === 'Pay: Cash tendered 5000 change 2800')
+assert('card note is record-only', payRecordNote({ method: 'Credit card', total: 2200 }) === 'Pay: Credit card record-only')
 
 console.log('\n== CAST id + ticket extras in obs ==')
 const packed = packTicketObs({
@@ -54,6 +69,8 @@ assert('obs has CAST id', orderCastIdFromObs(packed) === 'cast-9')
 assert('details drop meta lines', orderDetailsFromObs(packed) === 'allergy gin')
 const meta = readTicketMeta(packed)
 assert('reads service nominho set keep', meta.servicePct === 10 && meta.nominho === 2000 && meta.setPrice === 8000 && meta.keepPourPct === 10 && meta.keepId === 'keep-1')
+const paidObs = packTicketObs({ details: 'allergy gin', payNote: 'Pay: Cash exact 2200' })
+assert('Pay line is meta not details', readTicketMeta(paidObs).payNote === 'Cash exact 2200' && orderDetailsFromObs(paidObs) === 'allergy gin')
 assert('string CAST still works', withOrderCast('hi', 'Aya') === 'Cast: Aya\nhi')
 
 const charges = ticketChargeLines({
@@ -115,6 +132,8 @@ assert('CAST bar sits above drinks', posUi.includes('pos-cast-bar') && posUi.ind
 assert('walk-up skips auto service', posUi.includes('effectiveServicePct') && posUi.includes('tableTicket') && !posUi.includes('extrasOpen: showExtras'))
 assert('qty minus can remove', posUi.includes('function bumpCart'))
 assert('pay methods are buttons', posUi.includes('pos-pay-methods') && posUi.includes('chargeNow') && posUi.includes('PAY_METHODS'))
+assert('cash tender + short blocks Charge', posUi.includes('pos-cash-box') && posUi.includes('cashShort') && posUi.includes('payRecordHint'))
+assert('no fake PayPay gateway', !posUi.includes('paypay.com') && !posUi.includes('PayPay API'))
 assert('no leftover pay select', !posUi.includes("['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer']"))
 assert('sale errors are inline not alert', posUi.includes('setSaleErr') && !posUi.includes("alert(t('atomicPos.saleRegistered"))
 assert('night-keyed till load', posUi.includes(".gte('data', nightKey)") && posUi.includes('summarizeNight') && posUi.includes('tillTonight'))
@@ -132,6 +151,7 @@ const orders = readFileSync(new URL('../src/components/BarOrdersTab.jsx', import
 assert('JBM order CAST uses id', orders.includes('castId') && orders.includes("withOrderCast(obs, { name: castName, id: castId })"))
 const commit = readFileSync(new URL('../src/lib/atomicPos.js', import.meta.url), 'utf8')
 assert('keep pour updates bottle keep only', commit.includes('keepPour') && commit.includes('bar_bottle_keeps') && !commit.includes("from('vendas')"))
+assert('new tickets store nightlife day', commit.includes('data: tokyoNightKey()'))
 
 if (failed) {
   console.log(`\n${failed} failed`)

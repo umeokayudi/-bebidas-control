@@ -37,11 +37,12 @@ export function saleOnNight(sale, nightKey) {
 
 export function summarizeNight(sales = [], nightKey = tokyoNightKey()) {
   const rows = (sales || []).filter(s => saleOnNight(s, nightKey))
-  const pay = { Cash: 0, card: 0, other: 0 }
+  const pay = { Cash: 0, card: 0, paypay: 0, other: 0 }
   for (const s of rows) {
     const method = String(s.metodo_pagamento || s.pay_method || 'Cash')
     const total = +s.total || 0
     if (/cash|現金/i.test(method)) pay.Cash += total
+    else if (/paypay|ペイペイ/i.test(method)) pay.paypay += total
     else if (/card|credit|debit|visa|クレジット/i.test(method)) pay.card += total
     else pay.other += total
   }
@@ -53,6 +54,7 @@ export function summarizeNight(sales = [], nightKey = tokyoNightKey()) {
     drinksTotal,
     cashTotal: pay.Cash,
     cardTotal: pay.card,
+    paypayTotal: pay.paypay,
     otherTotal: pay.other,
     expectedCash: pay.Cash,
   }

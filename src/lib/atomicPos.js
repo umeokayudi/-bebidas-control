@@ -1,6 +1,6 @@
 /** Helpers do POS Atomic — preços, descontos, códigos, dashboard e estoque */
 
-import { tokyoDateKey, tokyoHour } from './tokyo.js'
+import { tokyoDateKey, tokyoHour, tokyoNightKey } from './tokyo.js'
 
 export function generateDiscountCode(prefix = 'ATOMIC') {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -219,7 +219,7 @@ export async function commitPosSale(supabase, {
 
   const vendaPayload = {
     bar_id: bar.id,
-    data: tokyoDateKey(),
+    data: tokyoNightKey(),
     subtotal,
     desconto_total: desconto,
     total,

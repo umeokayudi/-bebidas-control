@@ -11,6 +11,8 @@ import {
   zoneLabelKey,
   visitMinutes,
   formatVisitDuration,
+  isStaleOpenVisit,
+  staleOpenVisits,
   crmTableMissing,
   withTimeout,
 } from '../lib/barCrm'
@@ -84,6 +86,7 @@ export default function BarSpacesTab({ bar }) {
   const seated = floor.filter(s => s.occupied).length
   const reserved = floor.filter(s => s.reserved).length
   const free = floor.filter(s => !s.occupied && !s.reserved).length
+  const staleVisits = staleOpenVisits(visits)
 
   async function addSpace() {
     if (!form.nome.trim()) return
@@ -144,6 +147,17 @@ export default function BarSpacesTab({ bar }) {
     load()
   }
 
+  async function clearStale() {
+    if (!staleVisits.length) return
+    setSaving(true)
+    const now = new Date().toISOString()
+    await Promise.all(staleVisits.map(v =>
+      supabase.from('bar_visits').update({ status: 'done', fim: now }).eq('id', v.id)
+    ))
+    setSaving(false)
+    load()
+  }
+
   function openSeat(space, mode) {
     const g = guests.find(x => x.id === guestId)
     setSeat(space)
@@ -168,6 +182,18 @@ export default function BarSpacesTab({ bar }) {
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{t('spaces.title')}</div>
       <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{t('spaces.subtitle')}</div>
       {loadErr && <div className="pos-sale-err" style={{ marginBottom: 12 }}>{loadErr}</div>}
+
+      {staleVisits.length > 0 && (
+        <div className="floor-stale-banner">
+          <div>
+            <div className="floor-stale-title">{t('spaces.staleVisit')}</div>
+            <div className="floor-stale-hint">{t('spaces.staleHint', { count: staleVisits.length })}</div>
+          </div>
+          <button type="button" className="floor-stale-btn" disabled={saving} onClick={clearStale}>
+            {t('spaces.clearStale')}
+          </button>
+        </div>
+      )}
 
       <div className="floor-kpis">
         {[
@@ -213,6 +239,9 @@ export default function BarSpacesTab({ bar }) {
                     <div style={{ fontSize: 12, fontWeight: 700 }}>
                       {s.visit.bar_guests?.nome || t('spaces.walkIn')}
                     </div>
+                    {isStaleOpenVisit(s.visit) && (
+                      <div className="floor-stale-badge">{t('spaces.staleVisit')}</div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 8 }}>
                       {s.visit.status === 'reserved' ? t('spaces.reserved') : t('spaces.duration', { time: formatVisitDuration(visitMinutes(s.visit)) })}
                       {s.visit.party_size ? ` · ${s.visit.party_size}` : ''}

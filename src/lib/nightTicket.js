@@ -9,6 +9,7 @@ const LINE = {
   set: /^Set:\s*(\d+)@([\d.]+)$/im,
   room: /^RoomMin:\s*([\d.]+)$/im,
   keep: /^Keep:\s*([^:]+):([\d.]+)$/im,
+  pay: /^Pay:\s*(.+)$/im,
 }
 
 export const DEFAULT_POS_SETTINGS = {
@@ -35,6 +36,7 @@ export function readTicketMeta(obs) {
     roomMin: room ? +room[1] : 0,
     keepId: keep ? keep[1].trim() : '',
     keepPourPct: keep ? +keep[2] : 0,
+    payNote: text.match(LINE.pay)?.[1]?.trim() || '',
     details: orderDetailsFromObs(text),
   }
 }
@@ -51,11 +53,13 @@ export function packTicketObs({
   roomMin = 0,
   keepId = '',
   keepPourPct = 0,
+  payNote = '',
 } = {}) {
   const head = []
   const castLine = withOrderCast('', { name: castName, id: castId })
   if (castLine) head.push(castLine)
   if (nightKey) head.push(`Night: ${nightKey}`)
+  if (payNote) head.push(String(payNote).startsWith('Pay:') ? payNote : `Pay: ${payNote}`)
   if (servicePct != null && servicePct !== '') head.push(`Svc: ${servicePct}`)
   if (+nominho > 0) head.push(`Nom: ${Math.round(+nominho)}`)
   if (+setMinutes > 0 || +setPrice > 0) head.push(`Set: ${Math.round(+setMinutes || 0)}@${Math.round(+setPrice || 0)}`)

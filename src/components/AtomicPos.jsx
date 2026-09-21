@@ -25,6 +25,7 @@ import { useI18n } from '../lib/i18n'
 import { matchCheckoutVisit, spacesByZone, activeKeeps } from '../lib/barCrm'
 import { packTicketObs, ticketChargeLines, settingsFromRow, DEFAULT_POS_SETTINGS, effectiveServicePct } from '../lib/nightTicket'
 import { summarizeNight, closeVariance, saleOnNight } from '../lib/nightClose'
+import { CASH_CHIPS, cashChange, isCashMethod, payRecordNote } from '../lib/posPay'
 import { printGuestReceipt } from '../lib/guestReceipt'
 
 const SUB_TAB_IDS = [
@@ -109,7 +110,7 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
       drinks_total: sum.drinksTotal,
       cash_total: sum.cashTotal,
       card_total: sum.cardTotal,
-      other_total: sum.otherTotal,
+      other_total: (sum.otherTotal || 0) + (sum.paypayTotal || 0),
       expected_cash: sum.expectedCash,
       counted_cash: countedCash,
       variance: closeVariance(sum.expectedCash, countedCash),
@@ -137,6 +138,7 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
         <div className="pos-ticket-label">{t('atomicPos.nightClose')}</div>
         <div className="pos-close-meta">
           {t('atomicPos.nightOpen', { date: nightKey })} · {summary.ticketCount} · {fmtYen(summary.drinksTotal)}
+          {summary.paypayTotal > 0 ? ` · PayPay ${fmtYen(summary.paypayTotal)}` : ''}
         </div>
       </div>
       {closed ? (
@@ -186,6 +188,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [ticketReady, setTicketReady] = useState(false)
   const [agents, setAgents] = useState(drinkBackAgents || [])
   const [payMethod, setPayMethod] = useState('Cash')
+  const [cashTendered, setCashTendered] = useState('')
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_POS_SETTINGS)
   const [servicePct, setServicePct] = useState(String(DEFAULT_POS_SETTINGS.service_pct))
@@ -301,11 +304,17 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   })
   const ticketTotal = charges.total
   const checkoutCart = [...cart, ...charges.lines]
+  const cash = isCashMethod(payMethod) ? cashChange(ticketTotal, cashTendered) : null
+  const cashShort = !!(cash && cash.short)
 
   async function completeSale() {
     if (!cart.length && !charges.lines.length) return
     if (priceType === 'vip' && !vipId) {
       setSaleErr(t('atomicPos.vipMemberRequired'))
+      return
+    }
+    if (cashShort) {
+      setSaleErr(t('atomicPos.cashShort'))
       return
     }
     setSaving(true)
@@ -325,6 +334,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       roomMin: space?.tipo === 'vip_room' ? settings.room_min : 0,
       keepId,
       keepPourPct: +keepPourPct || 0,
+      payNote: payRecordNote({ method: payMethod, total: ticketTotal, tendered: isCashMethod(payMethod) ? cashTendered : undefined }),
     })
     const result = await commitPosSale(supabase, {
       bar,
@@ -374,6 +384,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     setSetPrice('')
     setKeepId('')
     setKeepPourPct('')
+    setCashTendered('')
     onSale?.()
   }
 
@@ -658,7 +669,44 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
               >{t(`atomicPos.${m.key}`)}</button>
             ))}
           </div>
-          <button className="btn-gold pos-pay" onClick={completeSale} disabled={saving || (!cart.length && !charges.lines.length) || (priceType === 'vip' && !vipId)}>
+          {isCashMethod(payMethod) ? (
+            <div className="pos-cash-box">
+              <div className="pos-pay-hint">{t('atomicPos.payCashHint')}</div>
+              <div className="pos-cash-chips">
+                <button type="button" className={`pos-cash-chip${!cashTendered ? ' is-on' : ''}`} onClick={() => setCashTendered('')}>
+                  {t('atomicPos.cashExact')}
+                </button>
+                {CASH_CHIPS.map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`pos-cash-chip${String(cashTendered) === String(n) ? ' is-on' : ''}`}
+                    onClick={() => setCashTendered(String(n))}
+                  >{fmtYen(n)}</button>
+                ))}
+              </div>
+              <label className="pos-cash-label" htmlFor="pos-cash-tendered">{t('atomicPos.cashTendered')}</label>
+              <input
+                id="pos-cash-tendered"
+                className="pos-cash-input"
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={cashTendered}
+                onChange={e => setCashTendered(e.target.value)}
+                placeholder={fmtYen(ticketTotal)}
+              />
+              {cash && !cash.short && (
+                <div className={`pos-cash-change${cash.exact ? ' is-exact' : ''}`}>
+                  {cash.exact ? t('atomicPos.cashExact') : t('atomicPos.cashChange', { amount: fmtYen(cash.change) })}
+                </div>
+              )}
+              {cashShort && <div className="pos-cash-short">{t('atomicPos.cashShort')}</div>}
+            </div>
+          ) : (
+            <div className="pos-pay-hint">{t('atomicPos.payRecordHint')}</div>
+          )}
+          <button className="btn-gold pos-pay" onClick={completeSale} disabled={saving || cashShort || (!cart.length && !charges.lines.length) || (priceType === 'vip' && !vipId)}>
             {saving ? t('common.saving') : t('atomicPos.chargeNow', { amount: fmtYen(ticketTotal) })}
           </button>
           <NightCloseBar bar={bar} compact />
@@ -1340,6 +1388,7 @@ export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
         <div>
           <div className="pos-head-title">{access === 'cashier' ? t('atomicPos.tillTitle') : t('atomicPos.title')}</div>
           <div className="pos-head-sub">{access === 'cashier' ? t('atomicPos.tillSubtitle') : t('atomicPos.subtitle')}</div>
+          <div className="pos-head-bar">{t('atomicPos.thisTill', { name: bar.nome || 'Atomic' })}</div>
           {access === 'cashier' && (
             <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 6 }}>{t('atomicPos.tillOnly')}</div>
           )}

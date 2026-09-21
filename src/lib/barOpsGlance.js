@@ -1,16 +1,16 @@
 /** Bar-ops KPIs for HQ and Home. Never add the four books into one number. */
 
-import { tokyoDateKey } from './tokyo.js'
+import { tokyoDateKey, tokyoNightKey } from './tokyo.js'
 import { faturaRemaining } from './barPortal.js'
+import { saleOnNight } from './nightClose.js'
 
-export function posTodayFromTickets(tickets = [], today = tokyoDateKey()) {
-  return (tickets || [])
-    .filter(s => String(s.data || '').slice(0, 10) === today)
-    .reduce((a, s) => a + (+s.total || 0), 0)
+/** POS tonight uses nightlife 06:00–05:59, not civil midnight. */
+export function posTodayFromTickets(tickets = [], nightKey = tokyoNightKey()) {
+  return (tickets || []).filter(s => saleOnNight(s, nightKey)).reduce((a, s) => a + (+s.total || 0), 0)
 }
 
-export function posTodayCount(tickets = [], today = tokyoDateKey()) {
-  return (tickets || []).filter(s => String(s.data || '').slice(0, 10) === today).length
+export function posTodayCount(tickets = [], nightKey = tokyoNightKey()) {
+  return (tickets || []).filter(s => saleOnNight(s, nightKey)).length
 }
 
 function invoiceGlance(invoices = [], today) {
@@ -36,12 +36,13 @@ export function buildBarOpsGlance({
   account = null,
   invoices = null,
   today = tokyoDateKey(),
+  nightKey = tokyoNightKey(),
 } = {}) {
   const ledgers = hq?.books || books || {}
   const jbm = hq?.jbm || {}
   const tickets = posTickets || hq?.pos?.tickets || []
-  const posToday = posTodayFromTickets(tickets, today)
-  const tonightCount = posTodayCount(tickets, today)
+  const posToday = posTodayFromTickets(tickets, nightKey)
+  const tonightCount = posTodayCount(tickets, nightKey)
   const monthKey = String(today || '').slice(0, 7)
   const monthTicketCount = hq?.pos?.salesCount
     || tickets.filter(s => String(s.data || '').startsWith(monthKey)).length

@@ -3,7 +3,8 @@
  * Nunca grava em vendas / pedidos / faturas — só pos_vendas e tabelas bar_*.
  */
 
-import { tokyoParts } from './tokyo.js'
+import { tokyoParts, tokyoNightKey } from './tokyo.js'
+import { nightWindow } from './nightClose.js'
 
 export const SPACE_TYPES = [
   { id: 'counter', labelKey: 'spaces.types.counter' },
@@ -41,6 +42,18 @@ export function isOpenVisit(visit) {
   return OPEN_VISIT_STATUSES.includes(visit?.status)
 }
 
+/** Open visit whose start is before tonight's 06:00 window — seed Kenji, leftover seats. */
+export function isStaleOpenVisit(visit, nightKey = tokyoNightKey()) {
+  if (!isOpenVisit(visit)) return false
+  const ts = visit?.inicio || visit?.criado_em
+  if (!ts) return false
+  return new Date(ts).toISOString() < nightWindow(nightKey).from
+}
+
+export function staleOpenVisits(visits = [], nightKey = tokyoNightKey()) {
+  return (visits || []).filter(v => isStaleOpenVisit(v, nightKey))
+}
+
 export function zoneLabelKey(zona) {
   if (zona === 'counter') return 'spaces.zoneCounter'
   if (zona === 'table') return 'spaces.zoneTable'
@@ -60,6 +73,7 @@ export function decorateSpaces(spaces = [], visits = []) {
         visit,
         occupied: visit?.status === 'seated',
         reserved: visit?.status === 'reserved',
+        stale: visit ? isStaleOpenVisit(visit) : false,
       }
     })
 }

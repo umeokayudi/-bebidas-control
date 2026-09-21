@@ -9,6 +9,8 @@ import {
   guestSpendFromPos,
   toggleTag,
   isOpenVisit,
+  isStaleOpenVisit,
+  staleOpenVisits,
   matchCheckoutVisit,
   visitMinutes,
   formatVisitDuration,
@@ -48,6 +50,13 @@ assert('counter 1 occupied', live[0].occupied)
 assert('table reserved not occupied', live.find(s => s.id === '9')?.reserved && !live.find(s => s.id === '9')?.occupied)
 assert('done visit does not occupy', !live.find(s => s.id === '10')?.occupied)
 assert('isOpenVisit seated', isOpenVisit({ status: 'seated' }) && !isOpenVisit({ status: 'done' }))
+assert('seed seated from yesterday is stale', isStaleOpenVisit({ status: 'seated', inicio: '2026-09-17T12:00:00Z' }, '2026-09-18'))
+assert('tonight seated is not stale', !isStaleOpenVisit({ status: 'seated', inicio: '2026-09-18T12:00:00+09:00' }, '2026-09-18'))
+assert('done visit is not stale', !isStaleOpenVisit({ status: 'done', inicio: '2026-09-17T12:00:00Z' }, '2026-09-18'))
+assert('stale list is open leftovers only', staleOpenVisits([
+  { status: 'seated', inicio: '2026-09-17T12:00:00Z' },
+  { status: 'seated', inicio: '2026-09-18T20:00:00+09:00' },
+], '2026-09-18').length === 1)
 assert('match by space then guest', matchCheckoutVisit([{ space_id: '1', guest_id: 'g1', status: 'seated' }], { spaceId: '1' })?.guest_id === 'g1')
 assert('duration format', formatVisitDuration(90) === '1h 30m' && formatVisitDuration(5) === '5m')
 assert('visit minutes ~60', visitMinutes({ inicio: '2026-09-17T12:00:00Z' }, Date.parse('2026-09-17T13:00:00Z')) === 60)
@@ -102,6 +111,7 @@ assert('checkout saves CAST agent and details note', pos.includes('drink_back_ag
 assert('POS auto-links seated guest from space', posUi.includes('matchCheckoutVisit') && posUi.includes('keepChip'))
 assert('POS ticket shows CAST chips', posUi.includes('pos-chip-cast') && posUi.includes('pos-cast-bar'))
 assert('floor board loads without a second schema ping', spacesUi.includes('floor-page') && spacesUi.includes('floor-board') && !spacesUi.includes('checkCrmSchema'))
+assert('floor can mark last-night leftover seats', spacesUi.includes('staleVisit') && spacesUi.includes('onClick={clearStale}'))
 assert('guest book has labels and retry', guestsUi.includes('guests-book') && guestsUi.includes('guests-form') && guestsUi.includes('common.retry'))
 assert('qty plus/minus are labeled', posUi.includes('pos-qty-minus') && posUi.includes('pos-qty-plus'))
 assert('owner nav has guests+spaces', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
