@@ -20,14 +20,15 @@ import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
 
 const ACTIONS = [
-  { id: 'pos', icon: '🧾', labelKey: 'portal.hq.linkPos' },
-  { id: 'ponto', icon: '🕒', labelKey: 'portal.hq.linkClock' },
-  { id: 'equipe', icon: '👥', labelKey: 'portal.hq.linkTeam' },
-  { id: 'clientes', icon: '🥂', labelKey: 'nav.portalGuests' },
+  { id: 'pos', icon: '🧾', labelKey: 'nav.portalPos' },
+  { id: 'pedidos', icon: '🛒', labelKey: 'nav.portalOrders' },
   { id: 'espacos', icon: '🪑', labelKey: 'nav.portalSpaces' },
-  { id: 'pedidos', icon: '🛒', labelKey: 'portal.hq.linkOrders' },
-  { id: 'faturas', icon: '💳', labelKey: 'portal.hq.linkJbm' },
+  { id: 'clientes', icon: '🥂', labelKey: 'nav.portalGuests' },
+  { id: 'ponto', icon: '🕒', labelKey: 'nav.portalClock' },
+  { id: 'custos', icon: '🏛️', labelKey: 'nav.portalCosts' },
+  { id: 'equipe', icon: '👥', labelKey: 'nav.portalTeam' },
   { id: 'estoque', icon: '📊', labelKey: 'nav.portalInventory' },
+  { id: 'faturas', icon: '💳', labelKey: 'nav.portalInvoices' },
 ]
 
 function BookCard({ kicker, value, hint, tone = 'navy', active, onClick }) {
