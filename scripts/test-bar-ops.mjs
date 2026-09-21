@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { placeNotifPanel, panelBoxStyle } from '../src/lib/notifPanel.js'
-import { buildBarOpsGlance, opsGlanceItems, posTodayFromTickets } from '../src/lib/barOpsGlance.js'
+import { buildBarOpsGlance, opsGlanceItems, posTodayFromTickets, OPS_KPI_ROWS } from '../src/lib/barOpsGlance.js'
 import { orderCastFromObs, orderDetailsFromObs, withOrderCast, orderCastIdFromObs } from '../src/lib/orderMeta.js'
 import { splitCostBooks } from '../src/lib/costBooks.js'
 import en from '../src/locales/en.js'
@@ -97,6 +97,9 @@ const items = opsGlanceItems(glance, (k, vars) => {
   return cur.replace(/\{(\w+)\}/g, (_, n) => vars?.[n] ?? '')
 }, fmt)
 assert('13 management KPIs', items.length === 13, String(items.length))
+const rowIds = OPS_KPI_ROWS.flat()
+assert('KPI rows are 6+4+3', OPS_KPI_ROWS.map(r => r.length).join() === '6,4,3')
+assert('KPI rows cover every KPI once', rowIds.length === 13 && items.every(it => rowIds.includes(it.id)))
 assert('every KPI has a tab', items.every(it => it.tab))
 assert('warn on AR / overdue / orders / stock', items.filter(it => it.warn).map(it => it.id).join() === 'ar,pending,overdue,orders,stock')
 assert('EN labels exist', !!(en.portal.home.opsTitle && en.portal.home.kpiPosToday && en.notifications.delete))

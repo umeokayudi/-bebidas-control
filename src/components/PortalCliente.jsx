@@ -245,9 +245,12 @@ function HomeTab({ bar, onTab }) {
         </div>
       </div>
 
-      <div className="hq-actions-label">{t('portal.home.doTonight')}</div>
-      <BarCommandActions onTab={onTab} ids={['pos', 'pedidos', 'espacos', 'clientes', 'ponto', 'custos']} />
+      <section className="home-band">
+        <div className="hq-actions-label">{t('portal.home.doTonight')}</div>
+        <BarCommandActions onTab={onTab} ids={['pos', 'pedidos', 'espacos', 'clientes', 'ponto', 'custos']} />
+      </section>
 
+      <section className="home-band">
       <BarOpsGlance
         glance={buildBarOpsGlance({
           hq,
@@ -260,9 +263,9 @@ function HomeTab({ bar, onTab }) {
         })}
         onTab={onTab}
       />
+      </section>
 
-      <div className="hq-layout" style={{ marginBottom: 16 }}>
-        <div>
+      <section className="home-band home-band-books">
           {costBooks ? (
             <CostBooksHero books={costBooks} access={access} onSelect={() => onTab('custos')} />
           ) : (
@@ -312,21 +315,8 @@ function HomeTab({ bar, onTab }) {
       </div>
       )}
 
-      {floorGlance && (
-        <div className="card" style={{ marginBottom: 16, padding: 14, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={() => onTab('espacos')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', fontWeight: 700 }}>{t('portal.home.floorGlance')}</div>
-            <div style={{ fontWeight: 800 }}>{t('portal.home.seatedFree', { seated: floorGlance.seated, free: floorGlance.free, reserved: floorGlance.reserved })}</div>
-          </button>
-          <button onClick={() => onTab('clientes')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <div style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', fontWeight: 700 }}>{t('portal.home.birthdaysLabel')}</div>
-            <div style={{ fontWeight: 800 }}>{t('portal.home.birthdaysMonth', { count: floorGlance.birthdays })}</div>
-          </button>
-        </div>
-      )}
-
       {attentionItems.length > 0 ? (
-        <div className="easy-dash-alert" style={{ marginBottom:16 }}>
+        <div className="easy-dash-alert">
           <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:8 }}>{t('portal.home.needsAttention')}</div>
           {attentionItems.map(item => (
             <button key={item.tab} type="button" onClick={() => onTab(item.tab)} className="easy-dash-alert-item">
@@ -335,11 +325,10 @@ function HomeTab({ bar, onTab }) {
           ))}
         </div>
       ) : (
-        <div className="easy-dash-ok" style={{ marginBottom:16 }}>{t('portal.home.allClear')}</div>
+        <div className="easy-dash-ok">{t('portal.home.allClear')}</div>
       )}
-        </div>
-        <HqAiDock snapshot={hq} compact />
-      </div>
+      <HqAiDock snapshot={hq} compact strip />
+      </section>
 
       <button type="button" className="easy-dash-more" onClick={() => setShowMore(v => !v)}>
         {showMore ? t('portal.home.hideDetails') : t('portal.home.showDetails')}

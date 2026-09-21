@@ -56,10 +56,8 @@ export function CostBooksHero({ books, access, selected = 'all', onSelect }) {
   const { t } = useI18n()
   const pick = id => onSelect?.(selected === id ? 'all' : id)
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.5 }}>
-        {t('portal.costs.neverMix')}
-      </div>
+    <div className="hq-books-wrap">
+      <div className="hq-books-kicker">{t('portal.costs.neverMix')}</div>
       <div className="hq-books">
         {access.posTill && (
           <BookCard kicker={t('portal.costs.posTill')} value={fmtYen(books.pos.amount)} hint={t('portal.costs.posTillHint')} tone="light" active={selected === 'pos'} onClick={() => pick('pos')} />
@@ -82,7 +80,7 @@ export function BarCommandActions({ onTab, ids }) {
   const { t } = useI18n()
   const list = ids ? ACTIONS.filter(a => ids.includes(a.id)) : ACTIONS
   return (
-    <div className="hq-actions">
+    <div className="hq-actions" style={{ '--hq-cols': list.length }}>
       {list.map(a => (
         <button key={a.id} type="button" className="hq-action" data-hq-action={a.id} onClick={() => onTab?.(a.id)}>
           <span className="hq-action-icon">{a.icon}</span>

@@ -126,6 +126,7 @@ const hqUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.me
 assert('HQ UI has no demo passwords', !hqUi.includes('PosOnly#2026') && !hqUi.includes('password'))
 const home = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
 assert('Home prefers HQ POS snapshot', home.includes('hqPos') && home.includes('snap.pos.till'))
+assert('Home frames actions/KPIs/books in bands', home.includes('home-band') && home.includes('home-band-books') && home.includes('strip'))
 assert('AR war room on invoices tab', home.includes('arAging') && home.includes('warTitle'))
 const orders = readFileSync(new URL('../src/components/BarOrdersTab.jsx', import.meta.url), 'utf8')
 assert('JBM order CAST uses id', orders.includes('castId') && orders.includes("withOrderCast(obs, { name: castName, id: castId })"))

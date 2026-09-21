@@ -3,7 +3,7 @@ import { callGeminiChat } from '../lib/ai'
 import { buildHqChatSystem, localHqAnswer } from '../lib/hqSnapshot'
 import { useI18n } from '../lib/i18n'
 
-export default function HqAiDock({ snapshot, compact = false }) {
+export default function HqAiDock({ snapshot, compact = false, strip = false }) {
   const { t } = useI18n()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -61,7 +61,7 @@ export default function HqAiDock({ snapshot, compact = false }) {
   ]
 
   return (
-    <aside className={`hq-ai-dock${compact ? ' is-compact' : ''}`} aria-label={t('portal.hq.aiSlot')}>
+    <aside className={`hq-ai-dock${compact ? ' is-compact' : ''}${strip ? ' is-strip' : ''}`} aria-label={t('portal.hq.aiSlot')}>
       <div className="hq-ai-head">
         <div>
           <div className="hq-ai-title">{t('portal.hq.aiSlot')}</div>
@@ -76,12 +76,17 @@ export default function HqAiDock({ snapshot, compact = false }) {
           <button key={c} type="button" className="hq-chip" onClick={() => send(c)}>{c}</button>
         ))}
       </div>
-      <div ref={listRef} className="hq-ai-log">
-        {messages.map((m, i) => (
-          <div key={i} className={`hq-ai-bubble hq-ai-${m.role}`}>{m.content}</div>
-        ))}
-        {busy && <div className="hq-ai-bubble hq-ai-assistant">{t('portal.aiThinking')}</div>}
-      </div>
+      {!strip && (
+        <div ref={listRef} className="hq-ai-log">
+          {messages.map((m, i) => (
+            <div key={i} className={`hq-ai-bubble hq-ai-${m.role}`}>{m.content}</div>
+          ))}
+          {busy && <div className="hq-ai-bubble hq-ai-assistant">{t('portal.aiThinking')}</div>}
+        </div>
+      )}
+      {strip && (
+        <div className="hq-ai-strip-line">{messages[messages.length - 1]?.content || t('portal.hq.aiHello')}</div>
+      )}
       <div className="hq-ai-compose">
         <input
           value={input}

@@ -71,6 +71,13 @@ export function buildBarOpsGlance({
   }
 }
 
+/** Home / HQ KPI bands — 6 + 4 + 3 = 13, each row fills the frame. */
+export const OPS_KPI_ROWS = [
+  ['posToday', 'posMonth', 'jbm', 'ar', 'pending', 'overdue'],
+  ['orders', 'floor', 'stock', 'birthdays'],
+  ['hours', 'wages', 'rent'],
+]
+
 export function opsGlanceItems(g, t, fmtYen) {
   const floorText = t('portal.home.seatedFree', {
     seated: g.seated,
