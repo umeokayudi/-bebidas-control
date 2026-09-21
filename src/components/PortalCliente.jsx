@@ -29,7 +29,7 @@ import BarTeamTab from './BarTeamTab'
 import BarGuestsTab from './BarGuestsTab'
 import BarSpacesTab from './BarSpacesTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
-import { navForBarRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
+import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
@@ -229,8 +229,8 @@ function HomeTab({ bar, onTab }) {
         </div>
       </div>
 
-      <div className="hq-actions-label">{t('portal.hq.actionsTitle')}</div>
-      <BarCommandActions onTab={onTab} />
+      <div className="hq-actions-label">{t('portal.home.doTonight')}</div>
+      <BarCommandActions onTab={onTab} ids={['pos', 'pedidos', 'espacos', 'clientes', 'ponto', 'custos']} />
 
       <BarOpsGlance
         glance={buildBarOpsGlance({
@@ -244,16 +244,6 @@ function HomeTab({ bar, onTab }) {
         })}
         onTab={onTab}
       />
-
-      <div className="hq-filters">
-        <div className="hq-filter-group">
-          <span className="hq-filter-label">{t('portal.home.filterWindow')}</span>
-          {[['7', '7d'], ['30', '30d'], ['90', '90d'], ['365', '1y']].map(([v, l]) => (
-            <button key={v} type="button" className={`hq-chip${periodo === v ? ' is-on' : ''}`} onClick={() => setPeriodo(v)}>{l}</button>
-          ))}
-        </div>
-        <div className="hq-panel-hint" style={{ margin: 0 }}>{t('portal.home.windowHint')}</div>
-      </div>
 
       <div className="hq-layout" style={{ marginBottom: 16 }}>
         <div>
@@ -333,6 +323,22 @@ function HomeTab({ bar, onTab }) {
       )}
         </div>
         <HqAiDock snapshot={hq} compact />
+      </div>
+
+      <button type="button" className="easy-dash-more" onClick={() => setShowMore(v => !v)}>
+        {showMore ? t('portal.home.hideDetails') : t('portal.home.showDetails')}
+      </button>
+
+      {showMore && (
+        <div className="easy-dash-details">
+      <div className="hq-filters">
+        <div className="hq-filter-group">
+          <span className="hq-filter-label">{t('portal.home.filterWindow')}</span>
+          {[['7', '7d'], ['30', '30d'], ['90', '90d'], ['365', '1y']].map(([v, l]) => (
+            <button key={v} type="button" className={`hq-chip${periodo === v ? ' is-on' : ''}`} onClick={() => setPeriodo(v)}>{l}</button>
+          ))}
+        </div>
+        <div className="hq-panel-hint" style={{ margin: 0 }}>{t('portal.home.windowHint')}</div>
       </div>
 
       {/* Spend chart — clickable */}
@@ -566,12 +572,6 @@ function HomeTab({ bar, onTab }) {
         </div>
       </div>
 
-      <button type="button" className="easy-dash-more" onClick={() => setShowMore(v => !v)}>
-        {showMore ? t('portal.home.hideDetails') : t('portal.home.showDetails')}
-      </button>
-
-      {showMore && (
-        <div className="easy-dash-details">
           <div className="portal-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
             {[
               { label:t('portal.home.totalSpend'), value:fmtYen(totalPeriod), sub: growthSub, subColor:growth>=0?'var(--green)':'var(--red)', color:'var(--navy)' },
@@ -1983,7 +1983,8 @@ function PrecosCardapioTab({ bar }) {
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markRead, markAllRead, deleteNotif, deleteAll }) {
   const { perfil } = useAuth()
-  const NAV = navForBarRole(perfil?.role)
+  const NAV_GROUPS = groupedNavForRole(perfil?.role)
+  const DOCK = primaryDockForRole(perfil?.role)
   const [tab, setTab] = useState(() => defaultBarTab(perfil?.role))
   const [menuOpen, setMenuOpen] = useState(false)
   const { t } = useI18n()
@@ -1998,9 +1999,10 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
 
   const posAccess = posAccessForRole(perfil?.role)
   const footerKey = perfil?.role === 'caixa' ? 'portal.footerCaixa' : perfil?.role === 'bar_staff' ? 'portal.footerStaff' : 'portal.footerHint'
+  const dockOn = DOCK.some(d => d.id === tab)
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${DOCK.length ? ' has-easy-dock' : ''}`}>
       <ShellOverlay open={menuOpen} onClose={() => setMenuOpen(false)} />
       <MobileTopBar
         open={menuOpen}
@@ -2015,11 +2017,16 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <LogoSidebar />
         </div>
         <nav className="sidebar-nav">
-          {NAV.map(n => (
-            <button key={n.id} onClick={() => selectTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
-              <span>{n.icon}</span>
-              <span>{t(n.labelKey)}</span>
-            </button>
+          {NAV_GROUPS.map(g => (
+            <div key={g.id} className="nav-group">
+              {g.labelKey && <div className="nav-group-label">{t(g.labelKey)}</div>}
+              {g.items.map(n => (
+                <button key={n.id} onClick={() => selectTab(n.id)} className={`nav-item ${tab===n.id?'active':''}`}>
+                  <span>{n.icon}</span>
+                  <span>{t(n.labelKey)}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="sidebar-footer">
@@ -2053,6 +2060,20 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='recibos'  && canManageBarTeam(perfil?.role) && <PortalRecibosTab bar={bar} />}
         {tab==='ia'       && canManageBarTeam(perfil?.role) && <PortalClienteAI bar={bar} />}
       </main>
+      {DOCK.length > 0 && (
+        <nav className="easy-dock" aria-label={t('nav.portalHome')}>
+          {DOCK.map(d => (
+            <button key={d.id} type="button" className={tab===d.id ? 'is-on' : ''} onClick={() => selectTab(d.id)}>
+              <span className="easy-dock-icon">{d.icon}</span>
+              <span>{t(d.labelKey)}</span>
+            </button>
+          ))}
+          <button type="button" className={!dockOn || menuOpen ? 'is-on' : ''} onClick={() => setMenuOpen(o => !o)}>
+            <span className="easy-dock-icon">☰</span>
+            <span>{t('nav.more')}</span>
+          </button>
+        </nav>
+      )}
     </div>
   )
 }

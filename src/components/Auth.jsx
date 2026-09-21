@@ -146,10 +146,8 @@ function LoginLanguagePicker() {
 }
 
 export function LoginPage() {
-  const { signIn, signUp } = useAuth()
+  const { signIn } = useAuth()
   const { t } = useI18n()
-  const [mode,  setMode]  = useState('login')
-  const [nome,  setName]  = useState('')
   const [email, setEmail] = useState('')
   const [pass,  setPass]  = useState('')
   const [err,   setErr]   = useState('')
@@ -163,15 +161,8 @@ export function LoginPage() {
     }
     setBusy(true)
     try {
-      if (mode === 'login') {
-        const { error } = await signIn(email, pass)
-        if (error) setErr(t('auth.wrongCredentials'))
-      } else {
-        if (!nome.trim()) return setErr(t('auth.enterName'))
-        const { error } = await signUp(email, pass, nome)
-        if (error) setErr(error.message)
-        else setErr(`✅ ${t('auth.checkEmail')}`)
-      }
+      const { error } = await signIn(email, pass)
+      if (error) setErr(t('auth.wrongCredentials'))
     } finally { setBusy(false) }
   }
 
@@ -180,9 +171,9 @@ export function LoginPage() {
     border: '1px solid rgba(193,156,86,0.22)',
     color: 'white',
     width: '100%',
-    padding: '12px 14px',
-    borderRadius: 10,
-    fontSize: 15,
+    padding: '14px 16px',
+    borderRadius: 12,
+    fontSize: 16,
   }
 
   return (
@@ -213,16 +204,9 @@ export function LoginPage() {
             fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)',
             marginBottom: 22, textAlign: 'center', letterSpacing: '0.08em', textTransform: 'uppercase',
           }}>
-            {mode === 'login' ? t('auth.systemAccess') : t('auth.createAccount')}
+            {t('auth.systemAccess')}
           </div>
 
-          {mode === 'signup' && (
-            <div style={{ marginBottom: 14 }}>
-              <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.name')}</label>
-              <input type="text" autoComplete="name" value={nome} onChange={e => setName(e.target.value)}
-                placeholder={t('auth.yourName')} style={field} />
-            </div>
-          )}
           <div style={{ marginBottom: 14 }}>
             <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.email')}</label>
             <input
@@ -259,15 +243,8 @@ export function LoginPage() {
 
           <button className="btn-gold" onClick={submit} disabled={busy}
             style={{ width: '100%', padding: 13, fontSize: 14, borderRadius: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            {busy ? <><span className="spinner" />{t('common.wait')}</> : mode === 'login' ? t('auth.enter') : t('auth.create')}
+            {busy ? <><span className="spinner" />{t('common.wait')}</> : t('auth.enter')}
           </button>
-
-          <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
-            {mode === 'login'
-              ? <>{t('auth.noAccess')} <button onClick={() => setMode('signup')} style={{ border: 'none', background: 'none', color: 'var(--gold)', fontWeight: 600, padding: 0, cursor: 'pointer', fontSize: 12 }}>{t('auth.requestAccess')}</button></>
-              : <>{t('auth.haveAccount')} <button onClick={() => setMode('login')} style={{ border: 'none', background: 'none', color: 'var(--gold)', fontWeight: 600, padding: 0, cursor: 'pointer', fontSize: 12 }}>{t('auth.enter')}</button></>
-            }
-          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>

@@ -78,11 +78,12 @@ export function CostBooksHero({ books, access, selected = 'all', onSelect }) {
   )
 }
 
-export function BarCommandActions({ onTab }) {
+export function BarCommandActions({ onTab, ids }) {
   const { t } = useI18n()
+  const list = ids ? ACTIONS.filter(a => ids.includes(a.id)) : ACTIONS
   return (
     <div className="hq-actions">
-      {ACTIONS.map(a => (
+      {list.map(a => (
         <button key={a.id} type="button" className="hq-action" data-hq-action={a.id} onClick={() => onTab?.(a.id)}>
           <span className="hq-action-icon">{a.icon}</span>
           <span>{t(a.labelKey)}</span>

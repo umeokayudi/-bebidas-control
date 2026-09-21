@@ -32,24 +32,31 @@ export function needsBarLink(role) {
 export function defaultBarTab(role) {
   if (role === ROLES.caixa) return 'pos'
   if (role === ROLES.bar_staff) return 'ponto'
-  return 'custos'
+  return 'inicio'
 }
 
 const GERENTE_NAV = [
-  { id: 'custos', labelKey: 'nav.portalCosts', icon: '🏛️' },
   { id: 'inicio', labelKey: 'nav.portalHome', icon: '🏠' },
   { id: 'pos', labelKey: 'nav.portalPos', icon: '🧾' },
+  { id: 'pedidos', labelKey: 'nav.portalOrders', icon: '🛒' },
+  { id: 'espacos', labelKey: 'nav.portalSpaces', icon: '🪑' },
+  { id: 'clientes', labelKey: 'nav.portalGuests', icon: '🥂' },
   { id: 'ponto', labelKey: 'nav.portalClock', icon: '🕒' },
   { id: 'equipe', labelKey: 'nav.portalTeam', icon: '👥' },
-  { id: 'clientes', labelKey: 'nav.portalGuests', icon: '🥂' },
-  { id: 'espacos', labelKey: 'nav.portalSpaces', icon: '🪑' },
-  { id: 'pedidos', labelKey: 'nav.portalOrders', icon: '🛒' },
-  { id: 'entregas', labelKey: 'nav.portalDeliveries', icon: '📦' },
   { id: 'estoque', labelKey: 'nav.portalInventory', icon: '📊' },
-  { id: 'precos', labelKey: 'nav.portalPrices', icon: '💰' },
+  { id: 'entregas', labelKey: 'nav.portalDeliveries', icon: '📦' },
   { id: 'faturas', labelKey: 'nav.portalInvoices', icon: '💳' },
+  { id: 'custos', labelKey: 'nav.portalCosts', icon: '🏛️' },
+  { id: 'precos', labelKey: 'nav.portalPrices', icon: '💰' },
   { id: 'recibos', labelKey: 'nav.portalReceipts', icon: '🧾' },
   { id: 'ia', labelKey: 'nav.portalAi', icon: '🤖' },
+]
+
+const NAV_GROUPS = [
+  { id: 'tonight', labelKey: 'nav.groupTonight', ids: ['inicio', 'pos', 'pedidos', 'espacos', 'clientes'] },
+  { id: 'people', labelKey: 'nav.groupPeople', ids: ['ponto', 'equipe'] },
+  { id: 'supply', labelKey: 'nav.groupSupply', ids: ['estoque', 'entregas', 'faturas'] },
+  { id: 'office', labelKey: 'nav.groupOffice', ids: ['custos', 'precos', 'recibos', 'ia'] },
 ]
 
 const CAIXA_NAV = [
@@ -64,6 +71,28 @@ export function navForBarRole(role) {
   if (role === ROLES.caixa) return CAIXA_NAV
   if (role === ROLES.bar_staff) return STAFF_NAV
   return GERENTE_NAV
+}
+
+export function groupedNavForRole(role) {
+  const nav = navForBarRole(role)
+  const byId = Object.fromEntries(nav.map(n => [n.id, n]))
+  const grouped = NAV_GROUPS.map(g => ({
+    id: g.id,
+    labelKey: g.labelKey,
+    items: g.ids.map(id => byId[id]).filter(Boolean),
+  })).filter(g => g.items.length)
+  if (grouped.length) return grouped
+  return [{ id: 'main', labelKey: null, items: nav }]
+}
+
+export function primaryDockForRole(role) {
+  if (role === ROLES.caixa || role === ROLES.bar_staff) return []
+  return [
+    { id: 'inicio', icon: '🏠', labelKey: 'nav.portalHome' },
+    { id: 'pos', icon: '🧾', labelKey: 'nav.portalPos' },
+    { id: 'pedidos', icon: '🛒', labelKey: 'nav.portalOrders' },
+    { id: 'ponto', icon: '🕒', labelKey: 'nav.portalClock' },
+  ]
 }
 
 export function posAccessForRole(role) {

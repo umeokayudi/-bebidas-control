@@ -390,6 +390,15 @@ tbody tr:hover td { background: var(--bg3); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+.nav-group { margin-bottom: 12px; }
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(193,156,86,0.55);
+  padding: 8px 14px 6px;
+}
 
 .sidebar-footer {
   padding: 16px 20px;
@@ -1044,6 +1053,9 @@ body.menu-open {
   .app-main {
     padding: calc(72px + env(safe-area-inset-top, 0)) 16px 24px;
     max-width: none;
+  }
+  .has-easy-dock .app-main {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0));
   }
 
   .card {
@@ -2486,6 +2498,43 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   .hq-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hq-books { grid-template-columns: 1fr; }
   .hq-title { font-size: 22px; }
+  .easy-dash .hq-ai-dock { display: none; }
+  .easy-dash .hq-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .easy-dash .hq-action { min-height: 92px; font-size: 14px; }
+  .easy-dash .hq-action-icon { font-size: 28px; }
+}
+
+.easy-dock { display: none; }
+@media (max-width: 768px) {
+  .easy-dock {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 170;
+    gap: 2px;
+    padding: 6px 6px calc(8px + env(safe-area-inset-bottom, 0));
+    background: var(--navy);
+    border-top: 1px solid rgba(193,156,86,0.28);
+  }
+  .easy-dock button {
+    flex: 1;
+    min-height: 52px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.55);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .easy-dock button.is-on { color: var(--gold); }
+  .easy-dock-icon { font-size: 18px; line-height: 1; }
 }
 
 .ops-kpis {
