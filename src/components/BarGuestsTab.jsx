@@ -7,11 +7,12 @@ import {
   searchGuests,
   toggleTag,
   guestSpendFromPos,
-  checkCrmSchema,
   birthdayThisMonth,
   birthdayToday,
   activeKeeps,
   keepExpiringSoon,
+  crmTableMissing,
+  withTimeout,
 } from '../lib/barCrm'
 
 const emptyForm = {
@@ -27,6 +28,8 @@ export default function BarGuestsTab({ bar }) {
   const [vips, setVips] = useState([])
   const [keeps, setKeeps] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
+  const [formErr, setFormErr] = useState('')
   const [q, setQ] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [editId, setEditId] = useState(null)
@@ -35,20 +38,36 @@ export default function BarGuestsTab({ bar }) {
   const [keepForm, setKeepForm] = useState({ nome: '', remaining_pct: 100, expires_on: '' })
 
   async function load() {
-    const schema = await checkCrmSchema(supabase)
-    setReady(schema)
-    if (!schema.ready) { setLoading(false); return }
-    const [gR, sR, vR, kR] = await Promise.all([
-      supabase.from('bar_guests').select('*').eq('bar_id', bar.id).order('nome'),
-      supabase.from('pos_vendas').select('id,guest_id,total,data,criado_em,space_id').eq('bar_id', bar.id).order('criado_em', { ascending: false }).limit(400),
-      supabase.from('vip_members').select('id,nome').eq('bar_id', bar.id).eq('ativo', true),
-      supabase.from('bar_bottle_keeps').select('*').eq('bar_id', bar.id).eq('ativo', true).order('criado_em', { ascending: false }),
-    ])
-    setGuests(gR.data || [])
-    setSales(sR.data || [])
-    setVips(vR.data || [])
-    setKeeps(kR.error ? [] : (kR.data || []))
-    setLoading(false)
+    setLoading(true)
+    setLoadErr('')
+    try {
+      const [gR, sR, vR, kR] = await withTimeout(Promise.all([
+        supabase.from('bar_guests').select('*').eq('bar_id', bar.id).order('nome'),
+        supabase.from('pos_vendas').select('id,guest_id,total,data,criado_em,space_id').eq('bar_id', bar.id).order('criado_em', { ascending: false }).limit(400),
+        supabase.from('vip_members').select('id,nome').eq('bar_id', bar.id).eq('ativo', true),
+        supabase.from('bar_bottle_keeps').select('*').eq('bar_id', bar.id).eq('ativo', true).order('criado_em', { ascending: false }),
+      ]))
+      const err = gR.error || sR.error
+      if (err && crmTableMissing(err)) {
+        setReady({ ready: false, error: err.message })
+        setGuests([])
+        setSales([])
+        setVips([])
+        setKeeps([])
+      } else {
+        setReady({ ready: true })
+        setGuests(gR.data || [])
+        setSales(sR.data || [])
+        setVips(vR.data || [])
+        setKeeps(kR.error ? [] : (kR.data || []))
+        if (err) setLoadErr(err.message)
+      }
+    } catch (e) {
+      setReady({ ready: false, error: e.message })
+      setLoadErr(e.message || t('guests.loadError'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [bar.id])
@@ -58,8 +77,12 @@ export default function BarGuestsTab({ bar }) {
   const todayBirthdays = birthdayToday(guests.filter(g => g.ativo !== false))
 
   async function save() {
-    if (!form.nome.trim()) return alert(t('guests.nameRequired'))
+    if (!form.nome.trim()) {
+      setFormErr(t('guests.nameRequired'))
+      return
+    }
     setSaving(true)
+    setFormErr('')
     const payload = {
       bar_id: bar.id,
       nome: form.nome.trim(),
@@ -123,9 +146,10 @@ export default function BarGuestsTab({ bar }) {
   if (loading) return <Spinner text={t('guests.loading')} />
   if (!ready?.ready) {
     return (
-      <div className="card" style={{ padding: 20 }}>
+      <div className="card guests-book" style={{ padding: 20 }}>
         <SectionTitle>{t('guests.title')}</SectionTitle>
-        <p style={{ fontSize: 13, color: 'var(--text2)' }}>{t('guests.setupHint')}</p>
+        <p style={{ fontSize: 13, color: 'var(--text2)' }}>{loadErr || t('guests.setupHint')}</p>
+        <button type="button" className="btn-primary" onClick={load} style={{ marginTop: 12 }}>{t('common.retry')}</button>
       </div>
     )
   }
@@ -135,9 +159,10 @@ export default function BarGuestsTab({ bar }) {
   const guestKeeps = profile ? activeKeeps(keeps, profile.id) : []
 
   return (
-    <div className="fade-in">
+    <div className="fade-in guests-book">
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{t('guests.title')}</div>
       <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{t('guests.subtitle')}</div>
+      {loadErr && <div className="pos-sale-err" style={{ marginBottom: 12 }}>{loadErr}</div>}
 
       {(todayBirthdays.length > 0 || monthBirthdays.length > 0) && (
         <div className="card" style={{ marginBottom: 16, padding: 14 }}>
@@ -154,7 +179,7 @@ export default function BarGuestsTab({ bar }) {
 
       <div className="fluid-2">
         <div>
-          <input placeholder={t('guests.search')} value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', marginBottom: 12 }} />
+          <input className="guests-search" placeholder={t('guests.search')} value={q} onChange={e => setQ(e.target.value)} />
           {list.length === 0 ? <Empty text={t('guests.empty')} icon="🥂" /> : list.map(g => {
             const st = guestSpendFromPos(sales, g.id)
             const nKeeps = activeKeeps(keeps, g.id).length
@@ -187,25 +212,46 @@ export default function BarGuestsTab({ bar }) {
         </div>
 
         <div>
-          <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card guests-form" style={{ marginBottom: 16 }}>
             <SectionTitle>{editId ? t('guests.edit') : t('guests.new')}</SectionTitle>
-            <input placeholder={t('guests.name')} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            {formErr && <div className="pos-sale-err" style={{ marginBottom: 8 }}>{formErr}</div>}
+            <label className="form-label">{t('guests.name')}
+              <input placeholder={t('guests.name')} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-              <input placeholder={t('guests.phone')} value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} />
-              <input placeholder={t('guests.lineId')} value={form.line_id} onChange={e => setForm({ ...form, line_id: e.target.value })} />
+              <label className="form-label">{t('guests.phone')}
+                <input placeholder={t('guests.phone')} value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} />
+              </label>
+              <label className="form-label">{t('guests.lineId')}
+                <input placeholder={t('guests.lineId')} value={form.line_id} onChange={e => setForm({ ...form, line_id: e.target.value })} />
+              </label>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-              <input placeholder={t('guests.email')} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-              <input type="date" value={form.aniversario} onChange={e => setForm({ ...form, aniversario: e.target.value })} />
+              <label className="form-label">{t('guests.email')}
+                <input placeholder={t('guests.email')} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              </label>
+              <label className="form-label">{t('guests.birthday')}
+                <input type="date" value={form.aniversario} onChange={e => setForm({ ...form, aniversario: e.target.value })} />
+              </label>
             </div>
-            <input placeholder={t('guests.prefs')} value={form.preferencias} onChange={e => setForm({ ...form, preferencias: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
-            <input placeholder={t('guests.allergies')} value={form.alergias} onChange={e => setForm({ ...form, alergias: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
-            <input placeholder={t('guests.preferredHost')} value={form.preferred_host} onChange={e => setForm({ ...form, preferred_host: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
-            <textarea placeholder={t('guests.notes')} value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} style={{ width: '100%', marginBottom: 8, resize: 'vertical' }} />
-            <select value={form.vip_member_id} onChange={e => setForm({ ...form, vip_member_id: e.target.value })} style={{ width: '100%', marginBottom: 10 }}>
-              <option value="">{t('guests.linkVipOptional')}</option>
-              {vips.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
-            </select>
+            <label className="form-label">{t('guests.prefs')}
+              <input placeholder={t('guests.prefs')} value={form.preferencias} onChange={e => setForm({ ...form, preferencias: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            </label>
+            <label className="form-label">{t('guests.allergies')}
+              <input placeholder={t('guests.allergies')} value={form.alergias} onChange={e => setForm({ ...form, alergias: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            </label>
+            <label className="form-label">{t('guests.preferredHost')}
+              <input placeholder={t('guests.preferredHost')} value={form.preferred_host} onChange={e => setForm({ ...form, preferred_host: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+            </label>
+            <label className="form-label">{t('guests.notes')}
+              <textarea placeholder={t('guests.notes')} value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} style={{ width: '100%', marginBottom: 8, resize: 'vertical' }} />
+            </label>
+            <label className="form-label">{t('guests.linkVipOptional')}
+              <select value={form.vip_member_id} onChange={e => setForm({ ...form, vip_member_id: e.target.value })} style={{ width: '100%', marginBottom: 10 }}>
+                <option value="">{t('guests.linkVipOptional')}</option>
+                {vips.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
+              </select>
+            </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {GUEST_TAGS.map(tag => (
                 <button key={tag.id} type="button" onClick={() => setForm({ ...form, tags: toggleTag(form.tags, tag.id) })} style={{
@@ -215,11 +261,11 @@ export default function BarGuestsTab({ bar }) {
                 }}>{t(tag.labelKey)}</button>
               ))}
             </div>
-            <button className="btn-primary" disabled={saving} onClick={save} style={{ width: '100%', padding: 10 }}>
+            <button type="button" className="btn-primary" disabled={saving} onClick={save} style={{ width: '100%', padding: 10 }}>
               {saving ? t('common.saving') : t('guests.save')}
             </button>
             {editId && (
-              <button onClick={() => { setEditId(null); setForm(emptyForm) }} style={{ width: '100%', marginTop: 8, padding: 8, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent' }}>
+              <button type="button" onClick={() => { setEditId(null); setForm(emptyForm); setFormErr('') }} style={{ width: '100%', marginTop: 8, padding: 8, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent' }}>
                 {t('common.cancel')}
               </button>
             )}

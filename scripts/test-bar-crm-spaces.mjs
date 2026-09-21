@@ -17,6 +17,8 @@ import {
   activeKeeps,
   keepExpiringSoon,
   pourKeep,
+  crmTableMissing,
+  withTimeout,
 } from '../src/lib/barCrm.js'
 import { navForBarRole } from '../src/lib/access.js'
 import { isSupplierVenda } from './lib/supplierVenda.mjs'
@@ -69,6 +71,19 @@ assert('active keeps filter', activeKeeps([{ guest_id: 'g1', ativo: true }, { gu
 assert('keep expiring within 14d', keepExpiringSoon({ expires_on: tokyoDateKey(new Date('2026-09-24T00:00:00+09:00')) }, new Date('2026-09-17T00:00:00+09:00')))
 assert('pour deducts remaining_pct', pourKeep({ remaining_pct: 70 }, 10).remaining_pct === 60)
 assert('empty keep deactivates', pourKeep({ remaining_pct: 5 }, 10).ativo === false)
+assert('PGRST205 is missing CRM table', crmTableMissing({ code: 'PGRST205' }) && crmTableMissing({ message: 'relation bar_spaces does not exist' }))
+assert('timeout is not a missing table', !crmTableMissing({ message: 'timeout', code: 'TIMEOUT' }))
+{
+  let resolveHang
+  const hang = new Promise(r => { resolveHang = r })
+  try {
+    await withTimeout(hang, 25)
+    assert('timeout helper fires', false)
+  } catch (e) {
+    assert('timeout helper fires', e.code === 'TIMEOUT')
+  }
+  resolveHang()
+}
 
 console.log('\n== Source isolation ==')
 const crm = readFileSync(new URL('../src/lib/barCrm.js', import.meta.url), 'utf8')
@@ -86,10 +101,14 @@ assert('checkout can attach guest/space on pos_vendas', pos.includes('space_id')
 assert('checkout saves CAST agent and details note', pos.includes('drink_back_agent_id') && pos.includes('vendaPayload.obs'))
 assert('POS auto-links seated guest from space', posUi.includes('matchCheckoutVisit') && posUi.includes('keepChip'))
 assert('POS ticket shows CAST chips', posUi.includes('pos-chip-cast') && posUi.includes('pos-cast-bar'))
+assert('floor board loads without a second schema ping', spacesUi.includes('floor-page') && spacesUi.includes('floor-board') && !spacesUi.includes('checkCrmSchema'))
+assert('guest book has labels and retry', guestsUi.includes('guests-book') && guestsUi.includes('guests-form') && guestsUi.includes('common.retry'))
+assert('qty plus/minus are labeled', posUi.includes('pos-qty-minus') && posUi.includes('pos-qty-plus'))
 assert('owner nav has guests+spaces', navForBarRole('cliente').some(n => n.id === 'clientes') && navForBarRole('cliente').some(n => n.id === 'espacos'))
 const ordersUi = readFileSync(new URL('../src/components/BarOrdersTab.jsx', import.meta.url), 'utf8')
 assert('JBM order UI never writes vendas', !ordersUi.includes("from('vendas')") && ordersUi.includes("from('pedidos')"))
 assert('JBM order has CAST + details', ordersUi.includes('portal.orders.cast') && ordersUi.includes('withOrderCast'))
+assert('JBM send errors are inline', ordersUi.includes('setOrderErr') && !ordersUi.includes('alert('))
 assert('caixa stays POS only', navForBarRole('caixa').map(n => n.id).join() === 'pos')
 
 console.log('\n== Checkout still never writes JBM vendas ==')

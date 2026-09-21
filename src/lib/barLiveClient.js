@@ -117,6 +117,7 @@ class LiveQuery {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(this.spec),
+        signal: AbortSignal.timeout(12000),
       })
       const j = await r.json().catch(() => ({ error: r.statusText }))
       if (!r.ok) return { data: this.spec.wantSingle ? null : [], error: { message: j.error || j.message || r.statusText, code: 'LIVE' } }

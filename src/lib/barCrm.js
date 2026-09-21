@@ -163,16 +163,27 @@ export function keepExpiringSoon(keep, date = new Date(), days = 14) {
   return exp - now <= days * 86400000 && exp >= now - 86400000
 }
 
+export function crmTableMissing(error) {
+  if (!error) return false
+  const msg = String(error.message || '')
+  return error.code === 'PGRST205' || /does not exist|schema cache/i.test(msg)
+}
+
+export function withTimeout(promise, ms = 12000) {
+  let id
+  const timeout = new Promise((_, reject) => {
+    id = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), ms)
+  })
+  return Promise.race([Promise.resolve(promise), timeout]).finally(() => clearTimeout(id))
+}
+
 export async function checkCrmSchema(supabase) {
-  const { error } = await supabase.from('bar_spaces').select('id').limit(1)
-  if (!error) return { ready: true }
   try {
-    const r = await fetch('/api/pos-status')
-    const j = await r.json()
-    if (j?.ready) return { ready: true, source: j.source }
-  } catch {}
-  if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
-    return { ready: false, error: 'Run BAR_CRM_SPACES_SCHEMA.sql' }
+    const { error } = await withTimeout(supabase.from('bar_spaces').select('id').limit(1))
+    if (!error) return { ready: true }
+    if (crmTableMissing(error)) return { ready: false, error: 'Run BAR_CRM_SPACES_SCHEMA.sql' }
+    return { ready: true, error: error.message }
+  } catch (e) {
+    return { ready: false, error: e.message }
   }
-  return { ready: false, error: error.message }
 }

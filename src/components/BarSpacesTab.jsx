@@ -8,10 +8,11 @@ import {
   tokyoFloorPreset,
   decorateSpaces,
   spacesByZone,
-  checkCrmSchema,
   zoneLabelKey,
   visitMinutes,
   formatVisitDuration,
+  crmTableMissing,
+  withTimeout,
 } from '../lib/barCrm'
 
 function typeLabel(t, tipo) {
@@ -32,6 +33,7 @@ export default function BarSpacesTab({ bar }) {
   const [visits, setVisits] = useState([])
   const [guests, setGuests] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ nome: '', tipo: 'counter', capacidade: 1, zona: 'counter', notas: '' })
   const [seat, setSeat] = useState(null)
@@ -42,18 +44,33 @@ export default function BarSpacesTab({ bar }) {
   const [, setTick] = useState(0)
 
   async function load() {
-    const schema = await checkCrmSchema(supabase)
-    setReady(schema)
-    if (!schema.ready) { setLoading(false); return }
-    const [sR, vR, gR] = await Promise.all([
-      supabase.from('bar_spaces').select('*').eq('bar_id', bar.id).order('ordem'),
-      supabase.from('bar_visits').select('*, bar_guests(nome)').eq('bar_id', bar.id).in('status', ['reserved', 'seated']).order('inicio', { ascending: false }),
-      supabase.from('bar_guests').select('id,nome,telefone,line_id,preferred_host').eq('bar_id', bar.id).eq('ativo', true).order('nome'),
-    ])
-    setSpaces(sR.data || [])
-    setVisits(vR.data || [])
-    setGuests(gR.data || [])
-    setLoading(false)
+    setLoading(true)
+    setLoadErr('')
+    try {
+      const [sR, vR, gR] = await withTimeout(Promise.all([
+        supabase.from('bar_spaces').select('*').eq('bar_id', bar.id).order('ordem'),
+        supabase.from('bar_visits').select('*, bar_guests(nome)').eq('bar_id', bar.id).in('status', ['reserved', 'seated']).order('inicio', { ascending: false }),
+        supabase.from('bar_guests').select('id,nome,telefone,line_id,preferred_host').eq('bar_id', bar.id).eq('ativo', true).order('nome'),
+      ]))
+      const err = sR.error || vR.error || gR.error
+      if (err && crmTableMissing(err)) {
+        setReady({ ready: false, error: err.message })
+        setSpaces([])
+        setVisits([])
+        setGuests([])
+      } else {
+        setReady({ ready: true })
+        setSpaces(sR.data || [])
+        setVisits(vR.data || [])
+        setGuests(gR.data || [])
+        if (err) setLoadErr(err.message)
+      }
+    } catch (e) {
+      setReady({ ready: false, error: e.message })
+      setLoadErr(e.message || t('spaces.loadError'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [bar.id])
@@ -86,8 +103,12 @@ export default function BarSpacesTab({ bar }) {
   }
 
   async function seedTokyoFloor() {
-    if (spaces.length) return alert(t('spaces.alreadyHasSpaces'))
+    if (spaces.length) {
+      setLoadErr(t('spaces.alreadyHasSpaces'))
+      return
+    }
     setSaving(true)
+    setLoadErr('')
     await supabase.from('bar_spaces').insert(
       tokyoFloorPreset().map(s => ({ ...s, bar_id: bar.id }))
     )
@@ -134,19 +155,21 @@ export default function BarSpacesTab({ bar }) {
   if (loading) return <Spinner text={t('spaces.loading')} />
   if (!ready?.ready) {
     return (
-      <div className="card" style={{ padding: 20 }}>
+      <div className="card floor-page" style={{ padding: 20 }}>
         <SectionTitle>{t('spaces.title')}</SectionTitle>
-        <p style={{ fontSize: 13, color: 'var(--text2)' }}>{t('spaces.setupHint')}</p>
+        <p style={{ fontSize: 13, color: 'var(--text2)' }}>{loadErr || t('spaces.setupHint')}</p>
+        <button type="button" className="btn-primary" onClick={load} style={{ marginTop: 12 }}>{t('common.retry')}</button>
       </div>
     )
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in floor-page">
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{t('spaces.title')}</div>
       <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{t('spaces.subtitle')}</div>
+      {loadErr && <div className="pos-sale-err" style={{ marginBottom: 12 }}>{loadErr}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+      <div className="floor-kpis">
         {[
           { label: t('spaces.total'), value: floor.length },
           { label: t('spaces.seated'), value: seated, color: 'var(--navy)' },
@@ -161,21 +184,22 @@ export default function BarSpacesTab({ bar }) {
       </div>
 
       {!spaces.length && (
-        <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+        <div className="card floor-seed" style={{ marginBottom: 16, padding: 16 }}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('spaces.seedTitle')}</div>
           <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10 }}>{t('spaces.seedHint')}</div>
-          <button className="btn-primary" disabled={saving} onClick={seedTokyoFloor}>{t('spaces.seedBtn')}</button>
+          <button type="button" className="btn-primary" disabled={saving} onClick={seedTokyoFloor}>{t('spaces.seedBtn')}</button>
         </div>
       )}
 
+      <div className="floor-board">
       {zones.map(z => (
-        <div key={z.zona} style={{ marginBottom: 18 }}>
+        <div key={z.zona} className="floor-zone" style={{ marginBottom: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
             {zoneTitle(t, z.zona)}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+          <div className="floor-grid">
             {z.spaces.map(s => (
-              <div key={s.id} className="card" style={{
+              <div key={s.id} className="card floor-card" style={{
                 padding: 12,
                 borderColor: s.occupied ? 'var(--navy)' : s.reserved ? 'var(--gold, #b8860b)' : 'var(--border)',
                 background: s.occupied ? 'rgba(26,78,138,0.06)' : 'var(--bg2)',
@@ -194,16 +218,16 @@ export default function BarSpacesTab({ bar }) {
                       {s.visit.party_size ? ` · ${s.visit.party_size}` : ''}
                       {s.visit.host_nome ? ` · ${s.visit.host_nome}` : ''}
                     </div>
-                    <button onClick={() => freeSpace(s)} style={{ width: '100%', padding: 8, borderRadius: 8, border: 'none', background: 'var(--bg3)', fontWeight: 700, cursor: 'pointer' }}>
+                    <button type="button" className="floor-free-btn" onClick={() => freeSpace(s)}>
                       {t('spaces.freeBtn')}
                     </button>
                   </>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    <button className="btn-primary" onClick={() => openSeat(s, 'seated')} style={{ padding: 8 }}>
+                  <div className="floor-card-actions">
+                    <button type="button" className="btn-primary" onClick={() => openSeat(s, 'seated')}>
                       {t('spaces.seatBtn')}
                     </button>
-                    <button onClick={() => openSeat(s, 'reserved')} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', fontWeight: 700, cursor: 'pointer' }}>
+                    <button type="button" className="floor-reserve-btn" onClick={() => openSeat(s, 'reserved')}>
                       {t('spaces.reserveBtn')}
                     </button>
                   </div>
@@ -213,6 +237,7 @@ export default function BarSpacesTab({ bar }) {
           </div>
         </div>
       ))}
+      </div>
 
       <div className="card" style={{ maxWidth: 480, marginTop: 8 }}>
         <SectionTitle>{t('spaces.addSpace')}</SectionTitle>
@@ -223,7 +248,7 @@ export default function BarSpacesTab({ bar }) {
           </select>
           <input type="number" min="1" value={form.capacidade} onChange={e => setForm({ ...form, capacidade: e.target.value })} />
         </div>
-        <button className="btn-primary" disabled={saving} onClick={addSpace} style={{ width: '100%', padding: 10 }}>{t('spaces.saveSpace')}</button>
+        <button type="button" className="btn-primary" disabled={saving} onClick={addSpace} style={{ width: '100%', padding: 10 }}>{t('spaces.saveSpace')}</button>
       </div>
 
       {seat && (
@@ -248,10 +273,10 @@ export default function BarSpacesTab({ bar }) {
             <input value={hostNome} onChange={e => setHostNome(e.target.value)} placeholder={t('spaces.hostPlaceholder')} style={{ width: '100%', marginBottom: 10 }} />
             <label className="form-label">{t('spaces.partySize')}</label>
             <input type="number" min="1" value={party} onChange={e => setParty(e.target.value)} style={{ width: '100%', marginBottom: 12 }} />
-            <button className="btn-primary" disabled={saving} onClick={confirmVisit} style={{ width: '100%', padding: 12, marginBottom: 8 }}>
+            <button type="button" className="btn-primary" disabled={saving} onClick={confirmVisit} style={{ width: '100%', padding: 12, marginBottom: 8 }}>
               {seatMode === 'reserved' ? t('spaces.confirmReserve') : t('spaces.confirmSeat')}
             </button>
-            <button onClick={() => setSeat(null)} style={{ width: '100%', padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: 'transparent' }}>{t('common.cancel')}</button>
+            <button type="button" onClick={() => setSeat(null)} style={{ width: '100%', padding: 10, borderRadius: 10, border: '1px solid var(--border)', background: 'transparent' }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}

@@ -183,6 +183,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [guests, setGuests] = useState([])
   const [visits, setVisits] = useState([])
   const [keeps, setKeeps] = useState([])
+  const [ticketReady, setTicketReady] = useState(false)
   const [agents, setAgents] = useState(drinkBackAgents || [])
   const [payMethod, setPayMethod] = useState('Cash')
   const [saving, setSaving] = useState(false)
@@ -216,7 +217,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       setSettings(next)
       setServicePct(String(next.service_pct))
       setSetMinutes(String(next.set_minutes || 60))
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setTicketReady(true))
   }, [bar.id])
 
   const catalog = useMemo(() => {
@@ -291,7 +292,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const tableTicket = !!(agentId || spaceId || guestId || +nominho || +setPrice)
   const charges = ticketChargeLines({
     drinksTotal,
-    servicePct: effectiveServicePct({ servicePct, tableTicket, extrasOpen: showExtras }),
+    servicePct: effectiveServicePct({ servicePct, tableTicket }),
     nominho: +nominho || 0,
     setMinutes: +setMinutes || 0,
     setPrice: +setPrice || 0,
@@ -317,7 +318,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       castName: agent?.nome || '',
       castId: agentId,
       nightKey: tokyoNightKey(),
-      servicePct: effectiveServicePct({ servicePct, tableTicket, extrasOpen: showExtras }),
+      servicePct: effectiveServicePct({ servicePct, tableTicket }),
       nominho: +nominho || 0,
       setMinutes: +setMinutes || 0,
       setPrice: +setPrice || 0,
@@ -398,7 +399,8 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
               >💃 {a.nome}</button>
             ))}
             <button type="button" className="pos-chip" onClick={() => setAddCastOpen(v => !v)}>{t('atomicPos.addCast')}</button>
-            {spaces.length === 0 && <span className="pos-ticket-empty">{t('atomicPos.spaceOptional')}</span>}
+            {!ticketReady && <span className="pos-ticket-empty">{t('common.loading')}</span>}
+            {ticketReady && spaces.length === 0 && <span className="pos-ticket-empty">{t('atomicPos.spaceOptional')}</span>}
             {spacesByZone(spaces).flatMap(z => z.spaces).map(s => {
               const visit = matchCheckoutVisit(visits, { spaceId: s.id })
               const who = visit ? (guests.find(g => g.id === visit.guest_id)?.nome || t('atomicPos.walkIn')) : ''
@@ -617,11 +619,11 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                   <div className="pos-cart-meta">{it.tipo_preco} × {it.qtd}</div>
                 </div>
                 <div className="pos-cart-qty">
-                  <button className="pos-qty" onClick={() => bumpCart(i, -1)}>−</button>
+                  <button type="button" className="pos-qty pos-qty-minus" onClick={() => bumpCart(i, -1)}>−</button>
                   <span>{it.qtd}</span>
-                  <button className="pos-qty" onClick={() => bumpCart(i, 1)}>+</button>
+                  <button type="button" className="pos-qty pos-qty-plus" onClick={() => bumpCart(i, 1)}>+</button>
                   <strong>{fmtYen(lineUnitPrice(it) * it.qtd)}</strong>
-                  <button className="pos-qty-del" onClick={() => setCart(c => c.filter((_, j) => j !== i))}>✕</button>
+                  <button type="button" className="pos-qty-del" onClick={() => setCart(c => c.filter((_, j) => j !== i))}>✕</button>
                 </div>
               </div>
             ))}

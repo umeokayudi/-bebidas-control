@@ -27,6 +27,7 @@ export default function BarOrdersTab({ bar }) {
   const [casts, setCasts] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [orderErr, setOrderErr] = useState('')
   const [qtyPopup, setQtyPopup] = useState(null)
   const [orderPreview, setOrderPreview] = useState(null)
   const [qtyInput, setQtyInput] = useState('')
@@ -112,8 +113,12 @@ export default function BarOrdersTab({ bar }) {
   }
 
   async function enviarOrder() {
-    if (items.length === 0) return alert(t('portal.orders.addOneItem'))
+    if (items.length === 0) {
+      setOrderErr(t('portal.orders.addOneItem'))
+      return
+    }
     setSaving(true)
+    setOrderErr('')
     const packed = withOrderCast(obs, { name: castName, id: castId })
     const { data: pedido, error } = await supabase.from('pedidos').insert({
       bar_id: bar.id, criado_por: user?.id,
@@ -123,8 +128,8 @@ export default function BarOrdersTab({ bar }) {
       obs: packed, total_estimado: totalOrder,
     }).select().single()
 
-    if (error) { alert(t('portal.orders.saveError', { message: error.message })); setSaving(false); return }
-    if (!pedido) { alert(t('portal.orders.saveOrderError')); setSaving(false); return }
+    if (error) { setOrderErr(t('portal.orders.saveError', { message: error.message })); setSaving(false); return }
+    if (!pedido) { setOrderErr(t('portal.orders.saveOrderError')); setSaving(false); return }
 
     const { error: itemsError } = await supabase.from('pedidos_itens').insert(
       items.map(it => {
@@ -132,7 +137,7 @@ export default function BarOrdersTab({ bar }) {
         return { pedido_id: pedido.id, produto_id: it.produto_id, qtd: it.qtd, preco_unitario: p?.preco_venda || 0 }
       })
     )
-    if (itemsError) alert(t('portal.orders.saveItemsError', { message: itemsError.message }))
+    if (itemsError) setOrderErr(t('portal.orders.saveItemsError', { message: itemsError.message }))
 
     const { data: admins } = await supabase.from('perfis').select('id').eq('role', 'admin')
     if (admins && admins.length > 0) {
@@ -337,6 +342,7 @@ export default function BarOrdersTab({ bar }) {
                 : <div className="ord-send-kicker">{t('portal.orders.cast')}</div>}
               <div className="ord-send-kicker">{bottleCount} {t('portal.orders.items')}</div>
               <div className="ord-send-total">{t('portal.orders.estimatedTotal', { amount: fmtYen(totalOrder) })}</div>
+              {orderErr && <div className="pos-sale-err">{orderErr}</div>}
             </div>
             <button type="button" className="btn-primary ord-send-btn" onClick={enviarOrder} disabled={saving || items.length === 0}>
               {saving ? t('portal.orders.sending') : t('portal.orders.sendOrder')}

@@ -144,9 +144,9 @@ export function ticketChargeLines({
   return { lines, extraTotal, total: Math.round(+drinksTotal || 0) + extraTotal }
 }
 
-/** Walk-up till is face price. Service % only on CAST / table / extras. */
-export function effectiveServicePct({ servicePct = 0, tableTicket = false, extrasOpen = false } = {}) {
-  if (tableTicket || extrasOpen) return Math.max(0, +servicePct || 0)
+/** Walk-up till is face price. Service % only on CAST / table / guest / set / 指名 — not just opening extras. */
+export function effectiveServicePct({ servicePct = 0, tableTicket = false } = {}) {
+  if (tableTicket) return Math.max(0, +servicePct || 0)
   return 0
 }
 
