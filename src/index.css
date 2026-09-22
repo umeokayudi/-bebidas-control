@@ -3278,6 +3278,106 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   width: 100%;
   margin-top: 4px;
 }
+.login-doors {
+  display: grid;
+  gap: 10px;
+}
+.login-door {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 16px 18px;
+  min-height: 72px;
+  border-radius: 14px;
+  border: 1px solid rgba(193,156,86,0.28);
+  background: rgba(255,255,255,0.04);
+  color: white;
+  cursor: pointer;
+}
+.login-door strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.login-door span {
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.62);
+}
+.login-door-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.55);
+  text-align: center;
+  margin-bottom: 6px;
+}
+.login-keep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+.login-back {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  background: none;
+  border: 0;
+  color: rgba(255,255,255,0.45);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-shell.is-till-kiosk {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+}
+.app-shell.is-till-kiosk .till-kiosk-main {
+  margin: 0;
+  padding: 12px 16px 24px;
+  max-width: none;
+}
+.till-kiosk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--navy);
+  color: white;
+}
+.till-kiosk-name { font-size: 14px; font-weight: 800; }
+.till-kiosk-lane { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+.till-kiosk-actions { display: flex; gap: 8px; }
+.till-kiosk-actions button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(193,156,86,0.35);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.till-kiosk-wrong {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--navy);
+  color: white;
+  text-align: center;
+  padding: 24px;
+}
 @media (max-width: 640px) {
   .ord-meta-grid { grid-template-columns: 1fr; }
   .pos-checkout { grid-template-columns: 1fr; }

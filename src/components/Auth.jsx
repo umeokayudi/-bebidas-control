@@ -9,6 +9,14 @@ import {
   clearLaneSession,
   isLaneEmail,
 } from '../lib/barLanes'
+import {
+  LOGIN_DOORS,
+  doorById,
+  loginDoorFromHash,
+  setDoorHash,
+  readDoorPref,
+  writeDoorPref,
+} from '../lib/barDoors'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -74,14 +82,14 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
-  async function signIn(email, password) {
+  async function signIn(email, password, { keep } = {}) {
     const e = String(email || '').trim().toLowerCase()
     const p = String(password || '')
 
     if (isLaneEmail(e)) {
       const lane = await tryLaneLogin(e, p)
       if (lane.error) return lane
-      writeLaneSession(lane.token, lane.perfil)
+      writeLaneSession(lane.token, lane.perfil, !!keep)
       applyLane(lane.perfil)
       return { error: null, perfil: lane.perfil }
     }
@@ -92,7 +100,7 @@ export function AuthProvider({ children }) {
 
     const lane = await tryLaneLogin(e, p)
     if (!lane.error) {
-      writeLaneSession(lane.token, lane.perfil)
+      writeLaneSession(lane.token, lane.perfil, !!keep)
       applyLane(lane.perfil)
       return { error: null, perfil: lane.perfil }
     }
@@ -148,10 +156,33 @@ function LoginLanguagePicker() {
 export function LoginPage() {
   const { signIn } = useAuth()
   const { t } = useI18n()
-  const [email, setEmail] = useState('')
+  const [doorId, setDoorId] = useState(() => loginDoorFromHash() || readDoorPref() || '')
+  const door = doorById(doorId)
+  const [email, setEmail] = useState(() => doorById(loginDoorFromHash() || readDoorPref() || '')?.prefillEmail || '')
   const [pass,  setPass]  = useState('')
+  const [keep,  setKeep]  = useState(() => doorById(loginDoorFromHash() || readDoorPref() || '')?.keep !== false)
   const [err,   setErr]   = useState('')
   const [busy,  setBusy]  = useState(false)
+
+  useEffect(() => {
+    const sync = () => {
+      const fromHash = loginDoorFromHash()
+      if (fromHash && fromHash !== doorId) pickDoor(fromHash, false)
+    }
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [doorId])
+
+  function pickDoor(id, writeHash = true) {
+    const next = doorById(id)
+    setDoorId(id || '')
+    setErr('')
+    setPass('')
+    setEmail(next?.prefillEmail || '')
+    setKeep(next?.keep !== false)
+    writeDoorPref(id || '')
+    if (writeHash) setDoorHash(id || '')
+  }
 
   const submit = async () => {
     setErr('')
@@ -161,8 +192,9 @@ export function LoginPage() {
     }
     setBusy(true)
     try {
-      const { error } = await signIn(email, pass)
+      const { error } = await signIn(email, pass, { keep: !!(door?.keep && keep) })
       if (error) setErr(t('auth.wrongCredentials'))
+      else if (doorId) setDoorHash(doorId)
     } finally { setBusy(false) }
   }
 
@@ -187,7 +219,7 @@ export function LoginPage() {
         backgroundSize: '20px 20px',
       }} />
 
-      <div style={{ width: '100%', maxWidth: 400, position: 'relative' }}>
+      <div style={{ width: '100%', maxWidth: door ? 400 : 520, position: 'relative' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <LogoLogin />
         </div>
@@ -200,57 +232,95 @@ export function LoginPage() {
           backdropFilter: 'blur(10px)',
         }}>
           <LoginLanguagePicker />
-          <div style={{
-            fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)',
-            marginBottom: 22, textAlign: 'center', letterSpacing: '0.08em', textTransform: 'uppercase',
-          }}>
-            {t('auth.systemAccess')}
-          </div>
+          {!door ? (
+            <>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)',
+                marginBottom: 18, textAlign: 'center', letterSpacing: '0.08em', textTransform: 'uppercase',
+              }}>
+                {t('auth.pickDevice')}
+              </div>
+              <div className="login-doors">
+                {LOGIN_DOORS.map(d => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className="login-door"
+                    onClick={() => pickDoor(d.id)}
+                  >
+                    <strong>{t(d.titleKey)}</strong>
+                    <span>{t(d.hintKey)}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)',
+                marginBottom: 8, textAlign: 'center', letterSpacing: '0.08em', textTransform: 'uppercase',
+              }}>
+                {t(door.titleKey)}
+              </div>
+              <div className="login-door-hint">{t(door.hintKey)}</div>
+              {door.id === 'pos' && <div className="login-door-hint">{t('auth.posBookmark')}</div>}
+              {door.id === 'clock' && <div className="login-door-hint">{t('auth.clockBookmark')}</div>}
 
-          <div style={{ marginBottom: 14 }}>
-            <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.email')}</label>
-            <input
-              type="email"
-              autoComplete="username"
-              autoFocus
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder={t('auth.emailPlaceholder')}
-              style={field}
-            />
-          </div>
-          <div style={{ marginBottom: 22 }}>
-            <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.password')}</label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={pass}
-              onChange={e => setPass(e.target.value)}
-              placeholder="••••••••"
-              style={field}
-              onKeyDown={e => e.key === 'Enter' && submit()}
-            />
-          </div>
+              <div style={{ marginBottom: 14, marginTop: 18 }}>
+                <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.email')}</label>
+                <input
+                  type="email"
+                  autoComplete="username"
+                  autoFocus
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder={t('auth.emailPlaceholder')}
+                  style={field}
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.password')}</label>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={pass}
+                  onChange={e => setPass(e.target.value)}
+                  placeholder="••••••••"
+                  style={field}
+                  onKeyDown={e => e.key === 'Enter' && submit()}
+                />
+              </div>
+              {door.keep && (
+                <label className="login-keep">
+                  <input type="checkbox" checked={keep} onChange={e => setKeep(e.target.checked)} />
+                  {t('auth.keepTablet')}
+                </label>
+              )}
 
-          {err && (
-            <div style={{
-              fontSize: 13, marginBottom: 16, padding: '10px 14px', borderRadius: 8,
-              background: err.startsWith('✅') ? 'rgba(26,107,74,0.2)' : 'rgba(160,41,28,0.2)',
-              color: err.startsWith('✅') ? '#6ee7b7' : '#fca5a5',
-              border: `1px solid ${err.startsWith('✅') ? 'rgba(26,107,74,0.3)' : 'rgba(160,41,28,0.3)'}`,
-            }}>{err}</div>
+              {err && (
+                <div style={{
+                  fontSize: 13, marginBottom: 16, padding: '10px 14px', borderRadius: 8,
+                  background: 'rgba(160,41,28,0.2)',
+                  color: '#fca5a5',
+                  border: '1px solid rgba(160,41,28,0.3)',
+                }}>{err}</div>
+              )}
+
+              <button className="btn-gold" onClick={submit} disabled={busy}
+                style={{ width: '100%', padding: 13, fontSize: 14, borderRadius: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                {busy
+                  ? <><span className="spinner" />{door.id === 'pos' || isLaneEmail(email) ? t('auth.openingLane') : t('common.wait')}</>
+                  : t('auth.enter')}
+              </button>
+              <button type="button" className="login-back" onClick={() => pickDoor('')}>
+                {t('auth.backDoors')}
+              </button>
+            </>
           )}
-
-          <button className="btn-gold" onClick={submit} disabled={busy}
-            style={{ width: '100%', padding: 13, fontSize: 14, borderRadius: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            {busy
-              ? <><span className="spinner" />{isLaneEmail(email) ? t('auth.openingLane') : t('common.wait')}</>
-              : t('auth.enter')}
-          </button>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          {t('auth.panelTitle')}
+          {t('auth.costsNeverMix')}
         </div>
       </div>
     </div>

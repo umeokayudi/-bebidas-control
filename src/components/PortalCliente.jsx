@@ -33,6 +33,7 @@ import BarSpacesTab from './BarSpacesTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
 import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, posPourMoves, stockFlow, stockGlance } from '../lib/barStock'
 import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
+import { isTillKiosk, isClockKiosk, loginDoorFromHash, setDoorHash, doorAllowsRole } from '../lib/barDoors'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
@@ -2087,10 +2088,17 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   const DOCK = primaryDockForRole(perfil?.role)
   const [tab, setTab] = useState(() => defaultBarTab(perfil?.role))
   const [menuOpen, setMenuOpen] = useState(false)
+  const [door, setDoor] = useState(() => loginDoorFromHash())
   const { t } = useI18n()
   const overdueAlerts = useBarOverdueAlerts(bar?.id)
 
   useMobileMenuLock(menuOpen)
+
+  useEffect(() => {
+    const sync = () => setDoor(loginDoorFromHash())
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
 
   function selectTab(id) {
     setTab(id)
@@ -2098,8 +2106,48 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   }
 
   const posAccess = posAccessForRole(perfil?.role)
+  const tillKiosk = isTillKiosk(perfil?.role, door)
+  const clockKiosk = isClockKiosk(perfil?.role)
   const footerKey = perfil?.role === 'caixa' ? 'portal.footerCaixa' : perfil?.role === 'bar_staff' ? 'portal.footerStaff' : 'portal.footerHint'
   const dockOn = DOCK.some(d => d.id === tab)
+  const kioskAccess = tillKiosk ? 'cashier' : posAccess
+
+  if (!doorAllowsRole(door, perfil?.role) && (door === 'pos' || door === 'clock')) {
+    return (
+      <div className="till-kiosk-wrong">
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{t(door === 'pos' ? 'auth.doorPosTitle' : 'auth.doorStaffTitle')}</div>
+          <p>{t('auth.wrongDoor')}</p>
+          <button className="btn-gold" onClick={signOut}>{t('common.signOut')}</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (tillKiosk || clockKiosk) {
+    return (
+      <div className={`app-shell is-till-kiosk${tillKiosk ? ' is-pos' : ' is-clock'}`}>
+        <header className="till-kiosk-bar">
+          <div>
+            <div className="till-kiosk-name">{bar.nome}</div>
+            <div className="till-kiosk-lane">{tillKiosk ? t('auth.lanePos') : t('auth.laneStaff')}</div>
+          </div>
+          <div className="till-kiosk-actions">
+            {tillKiosk && isGerente(perfil?.role) && (
+              <button type="button" onClick={() => { setDoorHash('gerente'); setDoor('gerente') }}>{t('auth.openHq')}</button>
+            )}
+            <button type="button" onClick={signOut}>{t('atomicPos.lockTill')}</button>
+          </div>
+        </header>
+        <main className="app-main app-main-wide till-kiosk-main">
+          {tillKiosk && posAccess !== 'none' && (
+            <AtomicPosPanel bar={bar} access={kioskAccess} />
+          )}
+          {clockKiosk && <TimeClockPanel bar={bar} />}
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className={`app-shell${DOCK.length ? ' has-easy-dock' : ''}`}>
@@ -2139,6 +2187,11 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
             <NotificationBell notifs={notifs} unread={unread} markRead={markRead} markAllRead={markAllRead} deleteNotif={deleteNotif} deleteAll={deleteAll} onNavigate={selectTab} overdueAlerts={overdueAlerts} placement="sidebar"/>
           </div>
           <UiPrefsPanel />
+          {isGerente(perfil?.role) && (
+            <button type="button" className="sidebar-signout" onClick={() => { setDoorHash('pos'); setDoor('pos') }}>
+              {t('auth.openTillTablet')}
+            </button>
+          )}
           <button onClick={signOut} className="sidebar-signout">{t('common.signOut')}</button>
         </div>
       </aside>

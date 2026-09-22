@@ -112,6 +112,8 @@ export default function BarTeamTab({ bar }) {
             </div>
           )}
           <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 8 }}>{data?.bar?.tabletPaired ? t('team.tabletPaired') : t('team.tabletNotPaired')}</div>
+          <div className="stock-from-hint" style={{ marginTop: 12 }}>{t('auth.posBookmark')}</div>
+          <div className="stock-from-hint">{t('auth.clockBookmark')}</div>
         </div>
 
         <div className="card">

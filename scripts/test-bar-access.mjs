@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply, defaultBarTab, costAccessForRole, primaryDockForRole, groupedNavForRole } from '../src/lib/access.js'
 import { haversineMeters, isInsideGeofence, hoursBetween, calcPay, pairPunches, payrollFromPunches } from '../src/lib/timeClock.js'
 import { WRITTEN_LOGINS } from '../src/lib/barLanes.js'
+import { loginDoorFromHash, isTillKiosk, isClockKiosk, doorAllowsRole, hashForDoor } from '../src/lib/barDoors.js'
 import { splitCostBooks, booksAreSeparate, booksGrandTotal } from '../src/lib/costBooks.js'
 import { signLanePayload, verifyLaneToken } from '../api/_hash.js'
 
@@ -32,6 +33,13 @@ assert('tab inicial gerente = inicio', defaultBarTab('cliente') === 'inicio')
 assert('tab inicial staff = ponto', defaultBarTab('bar_staff') === 'ponto')
 assert('gerente dock is Home POS Orders Clock', primaryDockForRole('cliente').map(n => n.id).join() === 'inicio,pos,pedidos,ponto')
 assert('caixa has no extra dock', primaryDockForRole('caixa').length === 0)
+assert('POS hash is till door', loginDoorFromHash('#/pos') === 'pos' && hashForDoor('pos') === '#/pos')
+assert('clock hash is staff door', loginDoorFromHash('#/clock') === 'clock')
+assert('caixa is always till kiosk', isTillKiosk('caixa', ''))
+assert('gerente on /#/pos is till kiosk', isTillKiosk('cliente', 'pos') && !isTillKiosk('cliente', 'gerente'))
+assert('staff is clock kiosk', isClockKiosk('bar_staff') && !isClockKiosk('caixa'))
+assert('staff cannot use POS door', !doorAllowsRole('pos', 'bar_staff'))
+assert('POS login can use POS door', doorAllowsRole('pos', 'caixa'))
 assert('gerente menu grouped with tonight first', groupedNavForRole('cliente')[0].id === 'tonight' && groupedNavForRole('cliente')[0].items.some(n => n.id === 'pedidos'))
 
 const caixaCost = costAccessForRole('caixa')
@@ -75,8 +83,9 @@ const vjson = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url)
 assert('time-clock rewrite keeps path (query preserved)', vjson.rewrites.some(r => r.source === '/api/time-clock' && !String(r.destination).includes('?')))
 assert('lane-login rewrite keeps path', vjson.rewrites.some(r => r.source === '/api/lane-login' && r.destination === '/api/bar/lane-login'))
 const authUi = readFileSync(new URL('../src/components/Auth.jsx', import.meta.url), 'utf8')
-assert('login é só email e senha', authUi.includes('type="email"') && authUi.includes('type="password"') && !authUi.includes('DoorCard') && !authUi.includes('WRITTEN_LOGINS'))
+assert('login tem portas de tablet e email/senha', authUi.includes('login-door') && authUi.includes('type="email"') && authUi.includes('type="password"') && !authUi.includes('DoorCard') && !authUi.includes('WRITTEN_LOGINS'))
 assert('login não imprime senhas na tela', !authUi.includes('PosOnly#2026') && !authUi.includes('Funcionario#2026') && !authUi.includes('JbmVer#2026'))
+assert('POS tablet URL is /#/pos', authUi.includes('#/pos') || readFileSync(new URL('../src/lib/barDoors.js', import.meta.url), 'utf8').includes("#/pos"))
 const hqUi = readFileSync(new URL('../src/components/BarCostsTab.jsx', import.meta.url), 'utf8')
 assert('HQ tablet não imprime senhas', !hqUi.includes('PosOnly#2026') && !hqUi.includes('Funcionario#2026') && !hqUi.includes('WRITTEN_LOGINS'))
 

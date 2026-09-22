@@ -43,23 +43,42 @@ export const WRITTEN_LOGINS = {
   },
 }
 
+function readStore(key) {
+  try { return sessionStorage.getItem(key) || localStorage.getItem(key) || '' } catch { return '' }
+}
+
 export function readLaneToken() {
-  try { return sessionStorage.getItem(LANE_TOKEN_KEY) || '' } catch { return '' }
+  return readStore(LANE_TOKEN_KEY)
 }
 
 export function readLanePerfil() {
-  try { return JSON.parse(sessionStorage.getItem(LANE_PERFIL_KEY) || 'null') } catch { return null }
+  try {
+    const raw = readStore(LANE_PERFIL_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
 }
 
-export function writeLaneSession(token, perfil) {
+/** keep=true stores on this tablet (localStorage) so the till survives overnight. */
+export function writeLaneSession(token, perfil, keep = false) {
   sessionStorage.setItem(LANE_TOKEN_KEY, token)
   sessionStorage.setItem(LANE_PERFIL_KEY, JSON.stringify(perfil))
+  try {
+    if (keep) {
+      localStorage.setItem(LANE_TOKEN_KEY, token)
+      localStorage.setItem(LANE_PERFIL_KEY, JSON.stringify(perfil))
+    } else {
+      localStorage.removeItem(LANE_TOKEN_KEY)
+      localStorage.removeItem(LANE_PERFIL_KEY)
+    }
+  } catch {}
 }
 
 export function clearLaneSession() {
   try {
     sessionStorage.removeItem(LANE_TOKEN_KEY)
     sessionStorage.removeItem(LANE_PERFIL_KEY)
+    localStorage.removeItem(LANE_TOKEN_KEY)
+    localStorage.removeItem(LANE_PERFIL_KEY)
   } catch {}
 }
 

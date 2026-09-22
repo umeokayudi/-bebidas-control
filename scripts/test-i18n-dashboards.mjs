@@ -32,6 +32,7 @@ assert('home window is not HQ month', en.portal.home.filterWindow.includes('wind
 assert('written login doors exist as copy keys', !!(en.auth.doorPosTitle && en.auth.doorGerenteTitle && en.auth.doorStaffTitle))
 const authSrc = readFileSync(new URL('../src/components/Auth.jsx', import.meta.url), 'utf8')
 assert('login page does not print door passwords', !authSrc.includes('PosOnly#2026') && !authSrc.includes('DoorCard'))
+assert('login page has tablet doors', authSrc.includes('login-door') && authSrc.includes('pickDevice'))
 assert('Japanese is optional copy', en.shell.langJaOptional.toLowerCase().includes('optional'))
 assert('default hint mentions English', /english/i.test(en.shell.languageHint))
 assert('POS hero is English', en.atomicPos.todayAtCounter === 'Today at the counter')
