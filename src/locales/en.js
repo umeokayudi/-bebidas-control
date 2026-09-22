@@ -1143,6 +1143,8 @@ export default {
       kpiStock: 'Low-stock SKUs',
       kpiBirthdays: 'Guest birthdays',
       kpiLastNight: 'last night {amount}',
+      kpiLastSession: '{date} · {amount}',
+      kpiMonthStill: 'month still {amount}',
       kpiTickets: '{count} tickets',
       kpiNotes: '{count} delivery notes',
     },

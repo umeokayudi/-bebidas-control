@@ -2,7 +2,7 @@
 
 import { tokyoDateKey, tokyoNightKey } from './tokyo.js'
 import { faturaRemaining } from './barPortal.js'
-import { prevTokyoDateKey, saleOnNight } from './nightClose.js'
+import { lastBusyNight, prevTokyoDateKey, saleOnNight } from './nightClose.js'
 
 /** POS tonight uses nightlife 06:00–05:59, not civil midnight. */
 export function posTodayFromTickets(tickets = [], nightKey = tokyoNightKey()) {
@@ -51,6 +51,7 @@ export function buildBarOpsGlance({
   const lastNightKey = prevTokyoDateKey(nightKey)
   const posLastNight = posTodayFromTickets(tickets, lastNightKey)
   const lastNightCount = posTodayCount(tickets, lastNightKey)
+  const busy = lastBusyNight(tickets, nightKey)
   const monthKey = String(today || '').slice(0, 7)
   const monthTicketCount = hq?.pos?.salesCount
     || tickets.filter(s => String(s.data || '').startsWith(monthKey)).length
@@ -65,6 +66,9 @@ export function buildBarOpsGlance({
     posLastNight,
     lastNightCount,
     lastNightKey,
+    lastSession: busy.total,
+    lastSessionDate: busy.date,
+    lastSessionCount: busy.ticketCount,
     posMonth: Math.round(+ledgers.pos?.amount || posMonthFallback || 0),
     posTickets: monthTicketCount,
     jbmBill: Math.round(+ledgers.jbm?.amount || account?.contaMes || 0),
@@ -103,9 +107,15 @@ export function opsGlanceItems(g, t, fmtYen) {
       tab: 'pos',
       kicker: t('portal.home.kpiPosToday'),
       value: fmtYen(g.posToday),
-      hint: g.posToday === 0 && g.posLastNight > 0
-        ? t('portal.home.kpiLastNight', { amount: fmtYen(g.posLastNight) })
-        : t('portal.home.kpiTickets', { count: g.tonightCount }),
+      hint: g.posToday > 0
+        ? t('portal.home.kpiTickets', { count: g.tonightCount })
+        : g.posLastNight > 0
+          ? t('portal.home.kpiLastNight', { amount: fmtYen(g.posLastNight) })
+          : g.lastSession > 0
+            ? t('portal.home.kpiLastSession', { date: g.lastSessionDate, amount: fmtYen(g.lastSession) })
+            : g.posMonth > 0
+              ? t('portal.home.kpiMonthStill', { amount: fmtYen(g.posMonth) })
+              : t('portal.home.kpiTickets', { count: g.tonightCount }),
     },
     {
       id: 'posMonth',

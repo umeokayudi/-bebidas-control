@@ -119,6 +119,21 @@ const morningItems = opsGlanceItems(morning, (k, vars) => {
   return cur.replace(/\{(\w+)\}/g, (_, n) => vars?.[n] ?? '')
 }, fmt)
 assert('empty tonight shows last night hint', /last night/i.test(morningItems.find(it => it.id === 'posToday')?.hint || ''))
+const staleNight = buildBarOpsGlance({
+  posTickets: [{ data: '2026-09-18', criado_em: '2026-09-18T22:00:00+09:00', total: 3900 }],
+  books: splitCostBooks({ posMonthTotal: 3900, jbmMonthBill: 0, staffMonthPay: 0, rentMonth: 450000 }),
+  today: '2026-09-22',
+  nightKey: '2026-09-22',
+})
+assert('older till night is last session not tonight', staleNight.posToday === 0 && staleNight.lastSession === 3900 && staleNight.lastSessionDate === '2026-09-18')
+const staleItems = opsGlanceItems(staleNight, (k, vars) => {
+  const path = k.split('.').slice(2)
+  let cur = en.portal.home
+  for (const p of path) cur = cur?.[p]
+  if (typeof cur !== 'string') return k
+  return cur.replace(/\{(\w+)\}/g, (_, n) => vars?.[n] ?? '')
+}, fmt)
+assert('empty tonight shows last session date', /2026-09-18/.test(staleItems.find(it => it.id === 'posToday')?.hint || ''))
 const items = opsGlanceItems(glance, (k, vars) => {
   const path = k.split('.').slice(2)
   let cur = en.portal.home

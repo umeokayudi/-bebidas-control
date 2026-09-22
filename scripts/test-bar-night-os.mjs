@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs'
 import { tokyoNightKey, tokyoDateKey } from '../src/lib/tokyo.js'
-import { summarizeNight, saleOnNight, nightWindow, closeVariance, pourKeep, prevTokyoDateKey, paySplitFromObs } from '../src/lib/nightClose.js'
+import { summarizeNight, saleOnNight, nightWindow, closeVariance, pourKeep, prevTokyoDateKey, paySplitFromObs, lastBusyNight } from '../src/lib/nightClose.js'
 import { cashChange, cashSettle, isCashMethod, payRecordNote } from '../src/lib/posPay.js'
 import { packTicketObs, readTicketMeta, ticketChargeLines, effectiveServicePct } from '../src/lib/nightTicket.js'
 import { withOrderCast, orderCastIdFromObs, orderDetailsFromObs } from '../src/lib/orderMeta.js'
@@ -58,6 +58,9 @@ const splitNight = summarizeNight([
 ], '2026-09-18')
 assert('night close books split cash not the whole ticket', splitNight.cashTotal === 5000 && splitNight.cardTotal === 2200 && splitNight.expectedCash === 5000)
 assert('previous nightlife day', prevTokyoDateKey('2026-09-22') === '2026-09-21')
+assert('last busy night skips empty last calendar night', lastBusyNight([
+  { total: 3900, data: '2026-09-18', criado_em: '2026-09-18T22:00:00+09:00' },
+], '2026-09-22').date === '2026-09-18')
 
 console.log('\n== CAST id + ticket extras in obs ==')
 const packed = packTicketObs({

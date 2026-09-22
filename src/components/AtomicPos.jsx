@@ -24,7 +24,7 @@ import { tokyoMonthKey, tokyoNightKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
 import { matchCheckoutVisit, spacesByZone, activeKeeps } from '../lib/barCrm'
 import { packTicketObs, ticketChargeLines, settingsFromRow, DEFAULT_POS_SETTINGS, effectiveServicePct } from '../lib/nightTicket'
-import { summarizeNight, closeVariance, saleOnNight, prevTokyoDateKey } from '../lib/nightClose'
+import { summarizeNight, closeVariance, saleOnNight, prevTokyoDateKey, lastBusyNight } from '../lib/nightClose'
 import { CASH_CHIPS, cashSettle, isCashMethod, payRecordNote } from '../lib/posPay'
 import { printGuestReceipt } from '../lib/guestReceipt'
 
@@ -74,7 +74,7 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
   useEffect(() => {
     Promise.all([
       supabase.from('pos_shifts').select('*').eq('bar_id', bar.id).eq('night_key', nightKey).maybeSingle(),
-      supabase.from('pos_vendas').select('id,total,data,criado_em,metodo_pagamento,obs').eq('bar_id', bar.id).gte('data', lastNightKey),
+      supabase.from('pos_vendas').select('id,total,data,criado_em,metodo_pagamento,obs').eq('bar_id', bar.id).gte('data', `${tokyoMonthKey()}-01`),
     ]).then(([sh, sl]) => {
       setShift(sh.data || null)
       setNightSales(sl.data || salesHint || [])
@@ -83,16 +83,22 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
 
   const summary = summarizeNight(nightSales, nightKey)
   const lastNight = summarizeNight(nightSales, lastNightKey)
+  const busy = lastBusyNight(nightSales, nightKey)
+  const prior = lastNight.ticketCount > 0
+    ? { date: lastNightKey, count: lastNight.ticketCount, amount: lastNight.drinksTotal, split: lastNight }
+    : busy.total > 0
+      ? { date: busy.date, count: busy.ticketCount, amount: busy.total, split: summarizeNight(nightSales, busy.date) }
+      : null
   const closed = shift?.status === 'closed'
-  const miniTotal = summary.ticketCount > 0 ? summary.drinksTotal : lastNight.drinksTotal
-  const miniCount = summary.ticketCount > 0 ? summary.ticketCount : lastNight.ticketCount
 
   if (compact && !open) {
     return (
       <button type="button" className="pos-close-mini" onClick={() => setOpen(true)}>
         {summary.ticketCount > 0
           ? `${t('atomicPos.nightClose')} · ${summary.ticketCount} · ${fmtYen(summary.drinksTotal)}`
-          : t('atomicPos.lastNight', { date: lastNightKey, count: miniCount, amount: fmtYen(miniTotal) })}
+          : prior
+            ? t('atomicPos.lastNight', { date: prior.date, count: prior.count, amount: fmtYen(prior.amount) })
+            : `${t('atomicPos.nightClose')} · 0 · ${fmtYen(0)}`}
       </button>
     )
   }
@@ -151,18 +157,18 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
               paypay: fmtYen(summary.paypayTotal || 0),
             })}
           </div>
-          {summary.ticketCount === 0 && lastNight.ticketCount > 0 && (
+          {summary.ticketCount === 0 && prior && (
             <div className="pos-close-last">
               {t('atomicPos.lastNight', {
-                date: lastNightKey,
-                count: lastNight.ticketCount,
-                amount: fmtYen(lastNight.drinksTotal),
+                date: prior.date,
+                count: prior.count,
+                amount: fmtYen(prior.amount),
               })}
               <div className="pos-close-split">
                 {t('atomicPos.paySplit', {
-                  cash: fmtYen(lastNight.cashTotal),
-                  card: fmtYen(lastNight.cardTotal),
-                  paypay: fmtYen(lastNight.paypayTotal || 0),
+                  cash: fmtYen(prior.split.cashTotal),
+                  card: fmtYen(prior.split.cardTotal),
+                  paypay: fmtYen(prior.split.paypayTotal || 0),
                 })}
               </div>
             </div>

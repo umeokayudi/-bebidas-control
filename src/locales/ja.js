@@ -1143,6 +1143,8 @@ export default {
       kpiStock: '在庫不足',
       kpiBirthdays: '誕生日ゲスト',
       kpiLastNight: '昨夜 {amount}',
+      kpiLastSession: '{date} · {amount}',
+      kpiMonthStill: '今月はまだ {amount}',
       kpiTickets: '{count}件',
       kpiNotes: '{count}件の納品',
     },
