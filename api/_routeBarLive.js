@@ -7,7 +7,7 @@ import { resolveBarActor } from './_barLaneAuth.js'
 
 const SECRET_TABLES = new Set(['bar_logins', 'bar_sessions'])
 const PG_MENU_TABLES = new Set(['drink_menu', 'bar_pricing', 'bars'])
-const GERENTE_WRITE = new Set(['bar_overhead', 'bar_hq_meta'])
+const GERENTE_WRITE = new Set(['bar_overhead', 'bar_hq_meta', 'bar_sundry'])
 
 function bodyOf(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})

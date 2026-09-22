@@ -11,6 +11,8 @@ FOUR SEPARATE BOOKS — never add them into one number:
 - JBM bill (supplier invoices / deliveries): ${yen(books.jbm?.amount)}
 - Staff wages (hours × rate + 25% late-night 22:00–05:00 JST): ${yen(books.staff?.amount)} · ${s.hoursTotal || 0}h
 - Rent / lease for this bar: ${yen(books.rent?.amount)} (${s.rent?.note || 'no note'})
+Sundry spend (NOT a fifth book, never added): ${yen(s.sundry?.monthTotal)} · ${s.sundry?.count || 0} photo notes
+CAST per person (tagged POS only): ${JSON.stringify(s.cast?.people || [])}
 
 Source health:
 - JBM postgres: ${s.sources?.jbm?.ok ? 'ok' : 'fail'} · ${s.sources?.jbm?.vendas || 0} supplier sales, ${s.sources?.jbm?.pedidos || 0} orders, ${s.sources?.jbm?.faturas || 0} invoices
@@ -48,6 +50,19 @@ export function localHqAnswer(question, snapshot, lang = 'en') {
   const books = s.books || {}
   const q = String(question || '').toLowerCase()
   const ja = lang === 'ja'
+
+  if (/sundry|雑費|gasto|random spend|receipt photo/.test(q)) {
+    const n = s.sundry?.count || 0
+    return ja
+      ? `雑費台帳のみ：今月 ${yen(s.sundry?.monthTotal)}（${n}件）。POSでもJBMでも給与でも家賃でもない。4帳簿に足しません。`
+      : `Sundry register only: ${yen(s.sundry?.monthTotal)} this month (${n} notes). Not POS, not JBM, not wages, not rent. Not added into the four books.`
+  }
+  if (/cast|hostess|ドリンクバック|promoter|break-?even|損益分岐/.test(q)) {
+    const rows = (s.cast?.people || []).map(p => `${p.nome}: night ${yen(p.night)} · month ${yen(p.month)} · B/E ${yen(p.breakeven)} · ${p.status}`).join('\n')
+    return ja
+      ? `CASTは人ごと（合算しない）：\n${rows || 'CAST売上なし'}`
+      : `CAST is per person (not mixed):\n${rows || 'No CAST sales tagged.'}`
+  }
 
   const four = ja
     ? `4つの帳簿（合算しない） ${s.mes || ''}：\n- POSレジ ${yen(books.pos?.amount)}\n- JBM請求 ${yen(books.jbm?.amount)}\n- スタッフ給与 ${yen(books.staff?.amount)}（${s.hoursTotal || 0}h）\n- 家賃 ${yen(books.rent?.amount)}${s.rent?.note ? `（${s.rent.note}）` : ''}`

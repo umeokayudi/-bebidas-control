@@ -43,10 +43,12 @@ const GERENTE_NAV = [
   { id: 'clientes', labelKey: 'nav.portalGuests', icon: '🥂' },
   { id: 'ponto', labelKey: 'nav.portalClock', icon: '🕒' },
   { id: 'equipe', labelKey: 'nav.portalTeam', icon: '👥' },
+  { id: 'cast', labelKey: 'nav.portalCast', icon: '💃' },
   { id: 'estoque', labelKey: 'nav.portalInventory', icon: '📊' },
   { id: 'entregas', labelKey: 'nav.portalDeliveries', icon: '📦' },
   { id: 'faturas', labelKey: 'nav.portalInvoices', icon: '💳' },
   { id: 'custos', labelKey: 'nav.portalCosts', icon: '🏛️' },
+  { id: 'gastos', labelKey: 'nav.portalSpend', icon: '🧾' },
   { id: 'precos', labelKey: 'nav.portalPrices', icon: '💰' },
   { id: 'recibos', labelKey: 'nav.portalReceipts', icon: '🧾' },
   { id: 'ia', labelKey: 'nav.portalAi', icon: '🤖' },
@@ -54,9 +56,9 @@ const GERENTE_NAV = [
 
 const NAV_GROUPS = [
   { id: 'tonight', labelKey: 'nav.groupTonight', ids: ['inicio', 'pos', 'pedidos', 'espacos', 'clientes'] },
-  { id: 'people', labelKey: 'nav.groupPeople', ids: ['ponto', 'equipe'] },
+  { id: 'people', labelKey: 'nav.groupPeople', ids: ['ponto', 'equipe', 'cast'] },
   { id: 'supply', labelKey: 'nav.groupSupply', ids: ['estoque', 'entregas', 'faturas'] },
-  { id: 'office', labelKey: 'nav.groupOffice', ids: ['custos', 'precos', 'recibos', 'ia'] },
+  { id: 'office', labelKey: 'nav.groupOffice', ids: ['custos', 'gastos', 'precos', 'recibos', 'ia'] },
 ]
 
 const CAIXA_NAV = [

@@ -5,7 +5,9 @@ import { filterJbmDrinksFaturas, faturaRemaining, faturaValor, faturaPago } from
 import { payrollFromPunches } from '../src/lib/timeClock.js'
 import { tokyoMonthKey, monthRange, recentMonthKeys } from '../src/lib/tokyo.js'
 import { splitCostBooks, rentForMonth, lastKnownRent } from '../src/lib/costBooks.js'
-import { monthKeyOf, explainJbmGap, buildMonthSeries, invoiceOverlapsMonth, lowStockFromLedger } from '../src/lib/hqFilters.js'
+import { scoreCastRoster } from '../src/lib/castScore.js'
+import { sundryMonthRows, sundryNightRows, sundryTotal, normalizeSundry } from '../src/lib/sundrySpend.js'
+import { tokyoNightKey } from '../src/lib/tokyo.js'
 import { coalesceStockMoves, deliveryNoteMoves, posPourMoves } from '../src/lib/barStock.js'
 import {
   isMissingSchemaError,
@@ -93,7 +95,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   const range = monthRange(`${mes}-01`)
   const monthKeys = recentMonthKeys(6)
 
-  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR, itemR, posItemR, priceR] = await Promise.all([
+  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR, itemR, posItemR, priceR, agentR, sundryR, metaR] = await Promise.all([
     admin.from('vendas').select('id,data,data_venda,total,obs,bar_id,cast_id,criado_em').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
     admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(200),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
@@ -111,6 +113,9 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     admin.from('vendas_itens').select('produto_id,qtd,venda_id').limit(5000),
     pgOrLive(admin, 'pos_vendas_itens', [], 'produto_id,nome,qtd,pos_venda_id'),
     admin.from('bar_pricing').select('produto_id,drinks_por_garrafa').eq('bar_id', barId).limit(400),
+    pgOrLive(admin, 'drink_back_agents', [{ op: 'eq', k: 'bar_id', v: barId }]),
+    pgOrLive(admin, 'bar_sundry', [{ op: 'eq', k: 'bar_id', v: barId }]),
+    pgOrLive(admin, 'bar_hq_meta', [{ op: 'eq', k: 'bar_id', v: barId }]),
   ])
 
   const jbmOk = !vendasR.error && !fatR.error
@@ -217,6 +222,10 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
       via: rentR.via,
       error: rentR.error,
     }),
+    sundry: source(!sundryR.error, {
+      via: sundryR.via,
+      error: sundryR.error,
+    }),
     inventory: source(!regrasR.error && !movR.error, {
       via: 'postgres',
       regras: regrasR.error ? 0 : (regrasR.data || []).length,
@@ -227,8 +236,18 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   }
 
   const syncedAt = new Date().toISOString()
+  const nightNow = tokyoNightKey()
+  const sundryRows = (sundryR.rows || []).map(r => normalizeSundry(r))
+  const sundryMonth = sundryMonthRows(sundryRows, mes)
+  const sundryNight = sundryNightRows(sundryRows, nightNow)
+  const existingGoals = (metaR.rows || [])[0]?.cast_goals || {}
+  const castBoard = scoreCastRoster(agentR.rows || [], posRows, {
+    nightKey: nightNow,
+    monthKey: mes,
+    goals: existingGoals,
+  })
   try {
-    await persistHqMeta(admin, barId, { last_sync: syncedAt, sources })
+    await persistHqMeta(admin, barId, { last_sync: syncedAt, sources, cast_goals: existingGoals })
   } catch {
     // Snapshot still returns even if meta write is blocked.
   }
@@ -299,6 +318,39 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
       gap,
       estoqueBaixo,
     },
+    sundry: {
+      mixed: false,
+      monthTotal: sundryTotal(sundryMonth),
+      nightTotal: sundryTotal(sundryNight),
+      count: sundryMonth.length,
+      rows: sundryMonth.slice(0, 12).map(r => ({
+        id: r.id,
+        amount: r.amount,
+        what: r.what,
+        photo_url: r.photo_url,
+        night_key: r.night_key,
+        spent_at: r.spent_at,
+      })),
+    },
+    cast: {
+      nightKey: nightNow,
+      monthKey: mes,
+      people: castBoard.people.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        comissao_pct: p.comissao_pct,
+        night: p.night.total,
+        month: p.month.total,
+        tickets: p.night.count,
+        commission: p.night.commission,
+        breakeven: p.goal.breakeven,
+        goalNight: p.goal.night,
+        goalMonth: p.goal.month,
+        status: p.lane.status,
+        peak: p.night.peakHour?.label || null,
+      })),
+      hourlyNight: castBoard.all.night.nightHours,
+    },
   }
 }
 
@@ -310,6 +362,7 @@ async function persistHqMeta(admin, barId, patch) {
     sources: patch.sources,
     atualizado_em: new Date().toISOString(),
   }
+  if (patch.cast_goals) row.cast_goals = patch.cast_goals
   const pg = await admin.from('bar_hq_meta').upsert(row).eq('id', barId)
   if (!pg.error) return { via: 'postgres' }
   if (!isMissingSchemaError(pg.error)) return { via: 'postgres', error: pg.error.message }

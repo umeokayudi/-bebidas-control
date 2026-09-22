@@ -14,6 +14,8 @@ import { costAccessForRole } from '../lib/access'
 import { fetchHqSnapshot, saveHqRent } from '../lib/hqSnapshot'
 import { useI18n } from '../lib/i18n'
 import HqAiDock from './HqAiDock'
+import BarSundryTab from './BarSundryTab'
+import CastScoreTab from './CastScoreTab'
 import BarOpsGlance from './BarOpsGlance'
 import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
@@ -26,8 +28,10 @@ const ACTIONS = [
   { id: 'ponto', icon: '🕒', labelKey: 'portal.home.goClock', hintKey: 'portal.home.goClockHint' },
   { id: 'custos', icon: '🏛️', labelKey: 'portal.home.goHq', hintKey: 'portal.home.goHqHint' },
   { id: 'equipe', icon: '👥', labelKey: 'nav.portalTeam' },
+  { id: 'cast', icon: '💃', labelKey: 'nav.portalCast' },
   { id: 'estoque', icon: '📊', labelKey: 'nav.portalInventory' },
   { id: 'faturas', icon: '💳', labelKey: 'nav.portalInvoices' },
+  { id: 'gastos', icon: '🧾', labelKey: 'portal.home.goSpend', hintKey: 'portal.home.goSpendHint' },
 ]
 
 function BookCard({ kicker, value, hint, tone = 'navy', active, onClick }) {
@@ -375,6 +379,9 @@ export default function BarCostsTab({ bar, onTab }) {
           <span className={`hq-src${hq.sources.jbm?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceJbm')} · {t('portal.hq.notesCount', { count: hq.sources.jbm?.vendasMes || 0 })} / {t('portal.hq.ordersCount', { count: hq.sources.jbm?.pedidosMes || 0 })}</span>
           <span className={`hq-src${hq.sources.clock?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceClock')} · {hq.hoursTotal || 0}h</span>
           <span className={`hq-src${hq.sources.rent?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceRent')}</span>
+          {hq.sources.sundry && (
+            <span className={`hq-src${hq.sources.sundry?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceSundry')} · {fmtYen(hq.sundry?.monthTotal || 0)}</span>
+          )}
           {hq.sources.inventory && (
             <span className={`hq-src${hq.sources.inventory?.ok ? ' ok' : ' bad'}`}>● {t('portal.hq.sourceStock')} · {t('portal.hq.lowCount', { count: hq.sources.inventory?.low || 0 })}</span>
           )}
@@ -544,6 +551,18 @@ export default function BarCostsTab({ bar, onTab }) {
               ) : <div className="hq-empty">{t('portal.hq.emptyTickets')}</div>}
               <button type="button" className="hq-chip" style={{ marginTop: 10 }} onClick={() => onTab?.('pos')}>{t('portal.hq.linkPos')}</button>
             </div>
+          )}
+          {book === 'all' && (
+            <>
+              <div className="hq-panel">
+                <CastScoreTab bar={bar} compact />
+                <button type="button" className="hq-chip" style={{ marginTop: 10 }} onClick={() => onTab?.('cast')}>{t('cast.openFull')}</button>
+              </div>
+              <div className="hq-panel">
+                <BarSundryTab bar={bar} compact />
+                <button type="button" className="hq-chip" style={{ marginTop: 10 }} onClick={() => onTab?.('gastos')}>{t('sundry.openFull')}</button>
+              </div>
+            </>
           )}
         </div>
         <HqAiDock snapshot={hq} />

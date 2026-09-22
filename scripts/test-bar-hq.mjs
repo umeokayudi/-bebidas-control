@@ -88,6 +88,10 @@ assert('JBM answer is bill only', /JBM bill/.test(jbmA) && /88,000/.test(jbmA) &
 assert('hours answer is wages only', /Hours book/.test(wageA) && /12,750/.test(wageA) && !/88,000/.test(wageA))
 assert('rent answer is rent only', /Rent book/.test(rentA) && /450,000/.test(rentA) && !/2,400/.test(rentA))
 assert('fallback lists four books not a sum', /not added together/.test(localHqAnswer('overview', snap)))
+const sundryA = localHqAnswer('sundry spend photo', { ...snap, sundry: { monthTotal: 1280, count: 1 } })
+assert('sundry answer is not a fifth book', /Sundry register/.test(sundryA) && /1,280/.test(sundryA) && !/88,000/.test(sundryA))
+const castA = localHqAnswer('CAST break-even', { ...snap, cast: { people: [{ nome: 'Aya', night: 15000, month: 23000, breakeven: 8000, status: 'covering' }] } })
+assert('CAST answer is per person', /Aya/.test(castA) && /15,000/.test(castA) && /not mixed/.test(castA))
 
 const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 assert('HQ command CSS is present', css.includes('.hq-actions') && css.includes('.hq-ai-dock') && css.includes('.hq-filters'))

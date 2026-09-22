@@ -10,13 +10,14 @@ import {
   buildStockMap,
   generateDiscountCode,
   resolveItemPrice,
-  todayKey,
   validateDiscountCode,
   pricingMapFromShots,
   isRestockPedido,
   commitPosSale,
   lineUnitPrice,
 } from '../lib/atomicPos'
+import HourlyBars from './HourlyBars'
+import { scoreCastRoster } from '../lib/castScore'
 import { syncPosStockAndReorder } from '../lib/posSupply'
 import { isSupplierProduct } from './utils'
 import { includedTaxBreakdown } from '../lib/consumptionTax'
@@ -1164,75 +1165,36 @@ function StatCard({ label, value, sub, color }) {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function HourlyChart({ data, height = 100 }) {
-  const { t } = useI18n()
-  const activeHours = data.filter(h => h.total > 0 || h.count > 0)
-  if (!activeHours.length) return <div style={{ color: 'var(--text3)', fontSize: 13, padding: 20, textAlign: 'center' }}>—</div>
-  const max = Math.max(...data.map(d => d.total), 1)
-  return (
-    <div className="hourly-chart" style={{ height: height + 32 }}>
-      {data.map((d, i) => {
-        const barH = Math.max(2, (d.total / max) * height)
-        const hasData = d.total > 0
-        return (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            {hasData && <div style={{ fontSize: 9, color: 'var(--text2)', fontWeight: 600 }}>{fmtYen(d.total)}</div>}
-            <div style={{
-              width: '100%', maxWidth: 28, height: barH, borderRadius: '4px 4px 0 0',
-              background: hasData ? 'var(--navy)' : 'var(--bg3)', opacity: hasData ? 1 : 0.3,
-            }} title={`${d.label}: ${fmtYen(d.total)} (${d.count} ${t('atomicPos.salesWord')})`} />
-            <div style={{ fontSize: 9, color: 'var(--text3)' }}>{d.label.slice(0, 2)}h</div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
+function PosDashboardTab({ bar, todaySales, salesList, drinkBackAgents, onOrder }) {
   const { t } = useI18n()
   const [lowStock, setLowStock] = useState([])
-  const [agentStats, setAgentStats] = useState([])
   const [openRestock, setOpenRestock] = useState([])
   const [loading, setLoading] = useState(true)
+  const [goals, setGoals] = useState({})
 
   const metrics = useMemo(() => computeDayMetrics(salesList || []), [salesList])
+  const castBoard = useMemo(
+    () => scoreCastRoster(drinkBackAgents || [], salesList || [], { nightKey: tokyoNightKey(), goals }),
+    [drinkBackAgents, salesList, goals],
+  )
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [mR, rR, pR, aR, sR, pedR] = await Promise.all([
+      const [mR, rR, pR, pedR, metaR] = await Promise.all([
         supabase.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', bar.id),
         supabase.from('estoque_regras').select('produto_id,minimo').eq('bar_id', bar.id),
         supabase.from('produtos_public').select('id,nome,categoria').eq('ativo', true),
-        supabase.from('drink_back_agents').select('id,nome,comissao_pct').eq('bar_id', bar.id).eq('ativo', true),
-        supabase.from('pos_vendas').select('total,drink_back_agent_id').eq('bar_id', bar.id).eq('data', todayKey()).not('drink_back_agent_id', 'is', null),
         supabase.from('pedidos').select('id,status,obs,total_estimado,pedidos_itens(produto_id,qtd,produtos(nome))').eq('bar_id', bar.id).in('status', ['pendente', 'confirmado']),
+        supabase.from('bar_hq_meta').select('cast_goals').eq('bar_id', bar.id).maybeSingle(),
       ])
 
       const stockMap = buildStockMap(mR.data || [])
       const regras = Object.fromEntries((rR.data || []).map(r => [r.produto_id, r.minimo]))
       const prods = (pR.data || []).filter(isSupplierProduct)
       setLowStock(findLowStockProducts(prods, stockMap, regras))
-
-      const agents = aR.data || []
-      const sales = sR.data || []
-      const agentMap = {}
-      for (const s of sales) {
-        if (!s.drink_back_agent_id) continue
-        if (!agentMap[s.drink_back_agent_id]) agentMap[s.drink_back_agent_id] = { total: 0, count: 0 }
-        agentMap[s.drink_back_agent_id].total += +s.total || 0
-        agentMap[s.drink_back_agent_id].count += 1
-      }
-      setAgentStats(agents.map(a => ({
-        ...a,
-        vendas: agentMap[a.id]?.count || 0,
-        faturamento: agentMap[a.id]?.total || 0,
-        comissao: Math.round((agentMap[a.id]?.total || 0) * (+a.comissao_pct || 0) / 100),
-      })).filter(a => a.vendas > 0).sort((a, b) => b.faturamento - a.faturamento))
-
       setOpenRestock((pedR.data || []).filter(isRestockPedido))
-
+      setGoals(metaR.data?.cast_goals || {})
       setLoading(false)
     }
     load()
@@ -1307,21 +1269,32 @@ function PosDashboardTab({ bar, todaySales, salesList, onOrder }) {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <SectionTitle>{t('atomicPos.hourlyRevenue')}</SectionTitle>
-        <HourlyChart data={metrics.hourly} />
+        <div className="hq-panel-hint">{t('cast.hourlyNight')}</div>
+        <HourlyBars data={castBoard.all.night.nightHours} height={100} className="is-night" />
+        <div className="cast-pay" style={{ marginTop: 10 }}>
+          {['cash', 'card', 'paypay'].map(k => (
+            <span key={k}>{t(`cast.pay.${k}`)} {fmtYen(castBoard.all.night.pay[k])}</span>
+          ))}
+        </div>
       </div>
 
-      {agentStats.length > 0 && (
+      {castBoard.people.length > 0 && (
         <div className="card">
           <SectionTitle>{t('atomicPos.drinkBackToday')}</SectionTitle>
-          {agentStats.map(a => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+          {castBoard.people.map(a => (
+            <div key={a.id} className="cast-dash-row">
               <div>
                 <strong>{a.nome}</strong>
-                <div style={{ fontSize: 11, color: 'var(--text2)' }}>{a.vendas} {t('atomicPos.salesWord')} · {t('atomicPos.commissionShort', { pct: a.comissao_pct })}</div>
+                <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+                  {a.night.count} {t('atomicPos.salesWord')} · {t('atomicPos.commissionShort', { pct: a.comissao_pct })}
+                  {a.goal.breakeven ? ` · ${t('cast.beShort')} ${fmtYen(a.goal.breakeven)}` : ''}
+                </div>
+                <HourlyBars data={a.night.nightHours} height={56} className="is-night is-mini" />
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700 }}>{fmtYen(a.faturamento)}</div>
-                <div style={{ fontSize: 11, color: 'var(--gold)' }}>{t('atomicPos.commission')} {fmtYen(a.comissao)}</div>
+                <div style={{ fontWeight: 700 }}>{fmtYen(a.night.total)}</div>
+                <div style={{ fontSize: 11, color: 'var(--gold)' }}>{t('atomicPos.commission')} {fmtYen(a.night.commission)}</div>
+                <div className={`cast-lane is-${a.lane.status}`}>{a.lane.status === 'below_be' ? t('cast.belowBe') : a.lane.status === 'hit_goal' ? t('cast.hitGoal') : a.lane.status === 'covering' ? t('cast.covering') : a.goal.night ? t('cast.toGoal') : t('cast.openLane')}</div>
               </div>
             </div>
           ))}
@@ -1338,7 +1311,7 @@ function PosDrinkBackTab({ bar, onUpdate }) {
   const { t } = useI18n()
   const [agents, setAgents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ nome: '', regiao: '', comissao_pct: '10', notas: '' })
+  const [form, setForm] = useState({ nome: '', regiao: '', comissao_pct: '10', notas: '', meta_noite: '', meta_mes: '', breakeven: '' })
   const [saving, setSaving] = useState(false)
   const [schemaOk, setSchemaOk] = useState(true)
 
@@ -1361,10 +1334,13 @@ function PosDrinkBackTab({ bar, onUpdate }) {
       regiao: form.regiao || null,
       comissao_pct: +form.comissao_pct || 10,
       notas: form.notas || null,
+      meta_noite: Math.round(+form.meta_noite || 0),
+      meta_mes: Math.round(+form.meta_mes || 0),
+      breakeven: Math.round(+form.breakeven || 0),
       ativo: true,
     })
     if (error) { alert(error.message); setSaving(false); return }
-    setForm({ nome: '', regiao: '', comissao_pct: '10', notas: '' })
+    setForm({ nome: '', regiao: '', comissao_pct: '10', notas: '', meta_noite: '', meta_mes: '', breakeven: '' })
     setSaving(false)
     load()
     onUpdate?.()
@@ -1393,6 +1369,9 @@ function PosDrinkBackTab({ bar, onUpdate }) {
         <input placeholder={t('atomicPos.agentName')} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
         <input placeholder={t('atomicPos.region')} value={form.regiao} onChange={e => setForm({ ...form, regiao: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
         <input type="number" placeholder={t('atomicPos.commissionPct')} value={form.comissao_pct} onChange={e => setForm({ ...form, comissao_pct: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+        <input type="number" placeholder={t('cast.goalNight')} value={form.meta_noite} onChange={e => setForm({ ...form, meta_noite: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+        <input type="number" placeholder={t('cast.goalMonth')} value={form.meta_mes} onChange={e => setForm({ ...form, meta_mes: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
+        <input type="number" placeholder={t('cast.breakeven')} value={form.breakeven} onChange={e => setForm({ ...form, breakeven: e.target.value })} style={{ width: '100%', marginBottom: 8 }} />
         <button className="btn-primary" onClick={saveAgent} disabled={saving} style={{ width: '100%', padding: 12 }}>
           {saving ? t('common.saving') : t('atomicPos.addAgent')}
         </button>
@@ -1407,6 +1386,7 @@ function PosDrinkBackTab({ bar, onUpdate }) {
                 <div style={{ fontWeight: 700 }}>{a.nome}</div>
                 <div style={{ fontSize: 12, color: 'var(--text2)' }}>
                   {a.regiao || '—'} · {t('atomicPos.commissionShort', { pct: a.comissao_pct })}
+                  {a.breakeven ? ` · ${t('cast.beShort')} ${fmtYen(a.breakeven)}` : ''}
                 </div>
               </div>
               <button onClick={() => toggleAgent(a.id, a.ativo)} style={{ fontSize: 11 }}>
@@ -1495,7 +1475,7 @@ export default function AtomicPosPanel({ bar, onOrder, access = 'owner' }) {
       )}
 
       {subTab === 'dashboard' && (
-        <PosDashboardTab bar={bar} todaySales={todaySales} salesList={salesList} onOrder={onOrder} />
+        <PosDashboardTab bar={bar} todaySales={todaySales} salesList={salesList} drinkBackAgents={drinkBackAgents} onOrder={onOrder} />
       )}
 
       {!ready && subTab === 'checkout' && (

@@ -18,6 +18,7 @@ export const LIVE_TABLES = new Set([
   'drink_menu',
   'bar_pricing',
   'bar_overhead',
+  'bar_sundry',
   'bar_hq_meta',
   'pos_shifts',
   'pos_settings',

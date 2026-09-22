@@ -22,6 +22,7 @@ export const LIVE_TABLES = [
   'bar_logins',
   'bar_sessions',
   'bar_overhead',
+  'bar_sundry',
   'bar_hq_meta',
   'pos_shifts',
   'pos_settings',
@@ -387,7 +388,9 @@ async function seedAtomic(admin) {
     opened_on: '2026-08-20', expires_on: '2026-10-20', ativo: true, criado_em: new Date().toISOString(),
   }])
   await saveTable(admin, 'drink_back_agents', [{
-    id: agentId, bar_id: barId, nome: 'Aya', regiao: 'Roppongi', comissao_pct: 10, ativo: true, criado_em: new Date().toISOString(),
+    id: agentId, bar_id: barId, nome: 'Aya', regiao: 'Roppongi', comissao_pct: 10,
+    meta_noite: 20000, meta_mes: 400000, breakeven: 8000,
+    ativo: true, criado_em: new Date().toISOString(),
   }])
   await saveTable(admin, 'discount_codes', [{
     id: codeId, bar_id: barId, codigo: 'WELCOME-10', tipo: 'percent', valor: 10, ativo: true,
@@ -396,6 +399,7 @@ async function seedAtomic(admin) {
   await saveTable(admin, 'pos_vendas', [{
     id: saleId, bar_id: barId, data: '2026-09-18', subtotal: 2400, desconto_total: 0, total: 2400,
     metodo_pagamento: 'Cash', tipo: 'balcao', guest_id: guestKenji, space_id: space1, visit_id: visitId,
+    drink_back_agent_id: agentId,
     obs: 'Demo POS (not JBM)', criado_em: new Date().toISOString(),
   }])
   await saveTable(admin, 'pos_vendas_itens', [{
@@ -410,6 +414,7 @@ async function seedAtomic(admin) {
   await saveTable(admin, 'bar_logins', [])
   await saveTable(admin, 'bar_sessions', [])
   await saveTable(admin, 'bar_overhead', [])
+  await saveTable(admin, 'bar_sundry', [])
   await saveTable(admin, 'bar_hq_meta', [])
   await saveTable(admin, 'pos_shifts', [])
   await saveTable(admin, 'pos_settings', [])

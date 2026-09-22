@@ -30,6 +30,8 @@ import TimeClockPanel from './TimeClock'
 import BarTeamTab from './BarTeamTab'
 import BarGuestsTab from './BarGuestsTab'
 import BarSpacesTab from './BarSpacesTab'
+import BarSundryTab from './BarSundryTab'
+import CastScoreTab from './CastScoreTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
 import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, posPourMoves, stockFlow, stockGlance } from '../lib/barStock'
 import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
@@ -2203,6 +2205,8 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         {tab==='pos'       && posAccess !== 'none' && <AtomicPosPanel bar={bar} onOrder={posAccess === 'owner' ? () => selectTab('pedidos') : undefined} access={posAccess} />}
         {tab==='ponto'     && <TimeClockPanel bar={bar} />}
         {tab==='equipe'    && canManageBarTeam(perfil?.role) && <BarTeamTab bar={bar} />}
+        {tab==='cast'      && canManageBarTeam(perfil?.role) && <CastScoreTab bar={bar} />}
+        {tab==='gastos'    && canManageBarTeam(perfil?.role) && <BarSundryTab bar={bar} />}
         {tab==='clientes'  && canManageBarTeam(perfil?.role) && <BarGuestsTab bar={bar} />}
         {tab==='espacos'   && canManageBarTeam(perfil?.role) && <BarSpacesTab bar={bar} />}
         {tab==='pedidos'   && canManageBarTeam(perfil?.role) && <BarOrdersTab bar={bar} />}
