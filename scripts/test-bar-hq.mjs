@@ -109,6 +109,7 @@ assert('HQ empty book ignores open AR', hqUi.includes('emptyBook') && hqUi.inclu
 assert('HQ never queries public.estoque', !hqApi.includes("from('estoque')"))
 assert('HQ stock from regras + movimentos', hqApi.includes("from('estoque_regras')") && hqApi.includes("from('estoque_movimentos')"))
 assert('HQ stock also reads delivery line items', hqApi.includes('vendas_itens') && hqApi.includes('coalesceStockMoves'))
+assert('HQ stock also subtracts POS pours', hqApi.includes('posPourMoves') && hqApi.includes('pos_vendas_itens'))
 const home = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
 assert('home has command actions and AI slot', home.includes('BarCommandActions') && home.includes('HqAiDock'))
 assert('home window is not HQ month', home.includes('portal.home.filterWindow') && home.includes('portal.home.windowHint'))

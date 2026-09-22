@@ -102,8 +102,23 @@ const lateGlance = buildBarOpsGlance({
   nightKey: '2026-09-18',
 })
 assert('Home POS tonight uses 06:00 night key', lateGlance.posToday === 1500)
+const morning = buildBarOpsGlance({
+  posTickets: [{ data: '2026-09-21', total: 3900 }],
+  today: '2026-09-22',
+  nightKey: '2026-09-22',
+})
+assert('after 06:00 tonight is empty', morning.posToday === 0)
+assert('last night stays on the glance', morning.posLastNight === 3900 && morning.lastNightKey === '2026-09-21')
 
 const fmt = n => `¥${n}`
+const morningItems = opsGlanceItems(morning, (k, vars) => {
+  const path = k.split('.').slice(2)
+  let cur = en.portal.home
+  for (const p of path) cur = cur?.[p]
+  if (typeof cur !== 'string') return k
+  return cur.replace(/\{(\w+)\}/g, (_, n) => vars?.[n] ?? '')
+}, fmt)
+assert('empty tonight shows last night hint', /last night/i.test(morningItems.find(it => it.id === 'posToday')?.hint || ''))
 const items = opsGlanceItems(glance, (k, vars) => {
   const path = k.split('.').slice(2)
   let cur = en.portal.home
@@ -119,8 +134,9 @@ assert('every KPI has a tab', items.every(it => it.tab))
 assert('warn on AR / overdue / orders / stock', items.filter(it => it.warn).map(it => it.id).join() === 'ar,pending,overdue,orders,stock')
 assert('AR hint is JBM not till', /JBM invoices/i.test(items.find(it => it.id === 'ar')?.hint || ''))
 assert('loading glance is not ready', buildBarOpsGlance({ ready: false }).ready === false)
-assert('EN labels exist', !!(en.portal.home.opsTitle && en.portal.home.kpiPosToday && en.notifications.delete))
-assert('JA labels exist', !!(ja.portal.home.opsTitle && ja.portal.home.kpiOverdue && ja.notifications.delete))
+assert('EN labels exist', !!(en.portal.home.opsTitle && en.portal.home.kpiPosToday && en.portal.home.kpiLastNight && en.notifications.delete))
+assert('JA labels exist', !!(ja.portal.home.opsTitle && ja.portal.home.kpiOverdue && ja.portal.home.kpiLastNight && ja.notifications.delete))
+assert('split / stock copy exists', !!(en.atomicPos.restOnCard && ja.atomicPos.restOnPaypay && en.portal.inventory.flowHint && ja.auth.openingLane))
 assert('birthday copy is explicit', /birthday/i.test(en.portal.home.birthdaysMonth))
 
 const fallback = buildBarOpsGlance({

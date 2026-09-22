@@ -31,7 +31,7 @@ import BarTeamTab from './BarTeamTab'
 import BarGuestsTab from './BarGuestsTab'
 import BarSpacesTab from './BarSpacesTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
-import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, stockGlance } from '../lib/barStock'
+import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, posPourMoves, stockFlow, stockGlance } from '../lib/barStock'
 import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
@@ -100,7 +100,7 @@ function HomeTab({ bar, onTab }) {
       supabase.from('vendas_itens').select('*, produtos(nome,categoria,preco_venda,volume_ml), vendas(data,bar_id,obs)').eq('vendas.bar_id', bar.id),
       supabase.from('bar_pricing').select('produto_id,drinks_por_garrafa,preco_drink').eq('bar_id', bar.id),
       supabase.from('faturas').select('*').eq('bar_id', bar.id).order('data_vencimento', { ascending:false }),
-      supabase.from('pos_vendas').select('total,data').eq('bar_id', bar.id),
+      supabase.from('pos_vendas').select('total,data,criado_em').eq('bar_id', bar.id),
     ])
     setVendas(filterSupplierVendas(vR.data || []))
     setPedidos(pR.data || [])
@@ -719,6 +719,9 @@ function InventoryTab({ bar, onOrder }) {
   const [movimentos, setMovimentos] = useState([])
   const [regras,     setRegras]     = useState({}) // prodId -> minimo
   const [notes,      setNotes]      = useState([])
+  const [pours,      setPours]      = useState([])
+  const [pricing,    setPricing]    = useState({})
+  const [showUnknown, setShowUnknown] = useState(false)
   const [loading,    setLoading]    = useState(true)
   const [selected,   setSelected]   = useState(null) // prodId for modal
   const [modalQty,   setModalQty]   = useState(1)
@@ -732,15 +735,21 @@ function InventoryTab({ bar, onOrder }) {
   async function load() {
     setLoading(true)
     try {
-      const [movimentos, pR, rR, vR] = await Promise.all([
+      const [movimentos, pR, rR, vR, pourR, priceR] = await Promise.all([
         fetchAllStockMovements(supabase, bar.id, '*').catch(() => []),
         supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
         supabase.from('estoque_regras').select('*').eq('bar_id', bar.id),
         supabase.from('vendas').select('*, vendas_itens(*, produtos(id,nome))').eq('bar_id', bar.id).order('data', { ascending: false }),
+        supabase.from('pos_vendas_itens').select('produto_id,nome,qtd,pos_venda_id'),
+        supabase.from('bar_pricing').select('produto_id,drinks_por_garrafa').eq('bar_id', bar.id),
       ])
       setProdutos((pR.data || []).filter(isSupplierProduct))
       setMovimentos(movimentos || [])
       setNotes(filterSupplierVendas(vR.data || []))
+      setPours(pourR?.data || [])
+      const pMap = {}
+      ;(priceR.data || []).forEach(r => { pMap[r.produto_id] = { drinks_por_garrafa: +r.drinks_por_garrafa || 0 } })
+      setPricing(pMap)
       const rMap = {}
       ;(rR.data || []).forEach(r => { rMap[r.produto_id] = r.minimo })
       setRegras(rMap)
@@ -773,10 +782,13 @@ function InventoryTab({ bar, onOrder }) {
     load()
   }
 
-  const moves = coalesceStockMoves(movimentos, deliveryNoteMoves(notes))
+  const moves = coalesceStockMoves(movimentos, deliveryNoteMoves(notes), posPourMoves(pours, pricing))
   const list = decorateStockList(produtos, moves, regras)
+  const flow = stockFlow(moves)
+  const unknownCount = list.filter(p => p.unknown).length
 
-  const filtered = search ? list.filter(p => p.nome.toLowerCase().includes(search.toLowerCase()) || p.categoria.toLowerCase().includes(search.toLowerCase())) : list
+  const searched = search ? list.filter(p => p.nome.toLowerCase().includes(search.toLowerCase()) || p.categoria.toLowerCase().includes(search.toLowerCase())) : list
+  const filtered = showUnknown ? searched : searched.filter(p => p.hasCount)
 
   const glance = stockGlance(filtered)
   const critical = filtered.filter(p => p.crit)
@@ -872,8 +884,16 @@ function InventoryTab({ bar, onOrder }) {
         ))}
       </div>
       <div className="stock-from-hint">{t('portal.inventory.fromDeliveries')}</div>
-      {glance.unknown > 0 && (
-        <div className="stock-from-hint">{t('portal.inventory.unknownCount', { count: glance.unknown })}</div>
+      <div className="stock-from-hint">{t('portal.inventory.flowHint', { in: flow.delivered, out: flow.poured })}</div>
+      {unknownCount > 0 && (
+        <div className="stock-from-hint">
+          {t('portal.inventory.unknownCount', { count: unknownCount })}
+          <button type="button" className="stock-catalog-toggle" onClick={() => setShowUnknown(v => !v)}>
+            {showUnknown
+              ? t('portal.inventory.hideCatalog')
+              : t('portal.inventory.showCatalog', { count: unknownCount })}
+          </button>
+        </div>
       )}
 
       {/* Product list */}

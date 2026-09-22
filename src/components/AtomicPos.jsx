@@ -24,8 +24,8 @@ import { tokyoMonthKey, tokyoNightKey } from '../lib/tokyo'
 import { useI18n } from '../lib/i18n'
 import { matchCheckoutVisit, spacesByZone, activeKeeps } from '../lib/barCrm'
 import { packTicketObs, ticketChargeLines, settingsFromRow, DEFAULT_POS_SETTINGS, effectiveServicePct } from '../lib/nightTicket'
-import { summarizeNight, closeVariance, saleOnNight } from '../lib/nightClose'
-import { CASH_CHIPS, cashChange, isCashMethod, payRecordNote } from '../lib/posPay'
+import { summarizeNight, closeVariance, saleOnNight, prevTokyoDateKey } from '../lib/nightClose'
+import { CASH_CHIPS, cashSettle, isCashMethod, payRecordNote } from '../lib/posPay'
 import { printGuestReceipt } from '../lib/guestReceipt'
 
 const SUB_TAB_IDS = [
@@ -63,6 +63,7 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
   const { t } = useI18n()
   const { user } = useAuth()
   const nightKey = tokyoNightKey()
+  const lastNightKey = prevTokyoDateKey(nightKey)
   const [shift, setShift] = useState(null)
   const [counted, setCounted] = useState('')
   const [busy, setBusy] = useState(false)
@@ -73,20 +74,25 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
   useEffect(() => {
     Promise.all([
       supabase.from('pos_shifts').select('*').eq('bar_id', bar.id).eq('night_key', nightKey).maybeSingle(),
-      supabase.from('pos_vendas').select('id,total,data,criado_em,metodo_pagamento').eq('bar_id', bar.id).gte('data', nightKey),
+      supabase.from('pos_vendas').select('id,total,data,criado_em,metodo_pagamento,obs').eq('bar_id', bar.id).gte('data', lastNightKey),
     ]).then(([sh, sl]) => {
       setShift(sh.data || null)
       setNightSales(sl.data || salesHint || [])
     }).catch(() => setShift(null))
-  }, [bar.id, nightKey, salesHint.length])
+  }, [bar.id, nightKey, lastNightKey, salesHint.length])
 
   const summary = summarizeNight(nightSales, nightKey)
+  const lastNight = summarizeNight(nightSales, lastNightKey)
   const closed = shift?.status === 'closed'
+  const miniTotal = summary.ticketCount > 0 ? summary.drinksTotal : lastNight.drinksTotal
+  const miniCount = summary.ticketCount > 0 ? summary.ticketCount : lastNight.ticketCount
 
   if (compact && !open) {
     return (
       <button type="button" className="pos-close-mini" onClick={() => setOpen(true)}>
-        {t('atomicPos.nightClose')} · {summary.ticketCount} · {fmtYen(summary.drinksTotal)}
+        {summary.ticketCount > 0
+          ? `${t('atomicPos.nightClose')} · ${summary.ticketCount} · ${fmtYen(summary.drinksTotal)}`
+          : t('atomicPos.lastNight', { date: lastNightKey, count: miniCount, amount: fmtYen(miniTotal) })}
       </button>
     )
   }
@@ -95,9 +101,9 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
     setBusy(true)
     setMsg('')
     const { data: rows } = await supabase.from('pos_vendas')
-      .select('id,total,data,criado_em,metodo_pagamento')
+      .select('id,total,data,criado_em,metodo_pagamento,obs')
       .eq('bar_id', bar.id)
-      .gte('data', nightKey)
+      .gte('data', lastNightKey)
     const sum = summarizeNight(rows || salesHint, nightKey)
     const countedCash = counted === '' ? sum.expectedCash : +counted
     const row = {
@@ -145,6 +151,22 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
               paypay: fmtYen(summary.paypayTotal || 0),
             })}
           </div>
+          {summary.ticketCount === 0 && lastNight.ticketCount > 0 && (
+            <div className="pos-close-last">
+              {t('atomicPos.lastNight', {
+                date: lastNightKey,
+                count: lastNight.ticketCount,
+                amount: fmtYen(lastNight.drinksTotal),
+              })}
+              <div className="pos-close-split">
+                {t('atomicPos.paySplit', {
+                  cash: fmtYen(lastNight.cashTotal),
+                  card: fmtYen(lastNight.cardTotal),
+                  paypay: fmtYen(lastNight.paypayTotal || 0),
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {closed ? (
@@ -195,6 +217,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   const [agents, setAgents] = useState(drinkBackAgents || [])
   const [payMethod, setPayMethod] = useState('Cash')
   const [cashTendered, setCashTendered] = useState('')
+  const [restMethod, setRestMethod] = useState('')
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState(DEFAULT_POS_SETTINGS)
   const [servicePct, setServicePct] = useState(String(DEFAULT_POS_SETTINGS.service_pct))
@@ -310,7 +333,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
   })
   const ticketTotal = charges.total
   const checkoutCart = [...cart, ...charges.lines]
-  const cash = isCashMethod(payMethod) ? cashChange(ticketTotal, cashTendered) : null
+  const cash = isCashMethod(payMethod) ? cashSettle(ticketTotal, cashTendered, restMethod) : null
   const cashShort = !!(cash && cash.short)
 
   async function completeSale() {
@@ -340,12 +363,18 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       roomMin: space?.tipo === 'vip_room' ? settings.room_min : 0,
       keepId,
       keepPourPct: +keepPourPct || 0,
-      payNote: payRecordNote({ method: payMethod, total: ticketTotal, tendered: isCashMethod(payMethod) ? cashTendered : undefined }),
+      payNote: payRecordNote({
+        method: payMethod,
+        total: ticketTotal,
+        tendered: isCashMethod(payMethod) ? cashTendered : undefined,
+        restMethod: cash?.restMethod,
+      }),
     })
+    const recordedMethod = cash?.restMethod ? `Cash+${cash.restMethod}` : payMethod
     const result = await commitPosSale(supabase, {
       bar,
       cart: checkoutCart,
-      payMethod,
+      payMethod: recordedMethod,
       priceType,
       vipId: priceType === 'vip' ? (vipId || guest?.vip_member_id || null) : null,
       activeCode,
@@ -376,7 +405,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       guestNome: guest?.nome || '',
       castNome: agent?.nome || '',
       spaceNome: space?.nome || '',
-      payMethod,
+      payMethod: recordedMethod,
       cash,
     }
     setLastSale(snapshot)
@@ -392,6 +421,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
     setKeepId('')
     setKeepPourPct('')
     setCashTendered('')
+    setRestMethod('')
     onSale?.()
   }
 
@@ -609,9 +639,15 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             <span>{t('atomicPos.saleRegisteredShort', { amount: fmtYen(lastSale.total) })}</span>
             {lastSale.cash && (
               <div className="pos-receipt-cash">
-                {lastSale.cash.exact
-                  ? t('atomicPos.cashExact')
-                  : t('atomicPos.cashOnReceipt', { tendered: fmtYen(lastSale.cash.tendered), change: fmtYen(lastSale.cash.change) })}
+                {lastSale.cash.restMethod
+                  ? t('atomicPos.restOnReceipt', {
+                    cash: fmtYen(lastSale.cash.tendered),
+                    method: lastSale.cash.restMethod,
+                    rest: fmtYen(lastSale.cash.rest),
+                  })
+                  : lastSale.cash.exact
+                    ? t('atomicPos.cashExact')
+                    : t('atomicPos.cashOnReceipt', { tendered: fmtYen(lastSale.cash.tendered), change: fmtYen(lastSale.cash.change) })}
               </div>
             )}
             {!lastSale.cash && (
@@ -683,7 +719,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                 key={m.id}
                 type="button"
                 className={`pos-pay-method${payMethod === m.id ? ' is-on' : ''}`}
-                onClick={() => setPayMethod(m.id)}
+                onClick={() => { setPayMethod(m.id); setRestMethod('') }}
               >{t(`atomicPos.${m.key}`)}</button>
             ))}
           </div>
@@ -691,7 +727,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
             <div className="pos-cash-box">
               <div className="pos-pay-hint">{t('atomicPos.payCashHint')}</div>
               <div className="pos-cash-chips">
-                <button type="button" className={`pos-cash-chip${!cashTendered ? ' is-on' : ''}`} onClick={() => setCashTendered('')}>
+                <button type="button" className={`pos-cash-chip${!cashTendered ? ' is-on' : ''}`} onClick={() => { setCashTendered(''); setRestMethod('') }}>
                   {t('atomicPos.cashExact')}
                 </button>
                 {CASH_CHIPS.map(n => (
@@ -699,7 +735,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                     key={n}
                     type="button"
                     className={`pos-cash-chip${String(cashTendered) === String(n) ? ' is-on' : ''}`}
-                    onClick={() => setCashTendered(String(n))}
+                    onClick={() => { setCashTendered(String(n)); if (+n >= ticketTotal) setRestMethod('') }}
                   >{fmtYen(n)}</button>
                 ))}
               </div>
@@ -711,15 +747,39 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
                 min="0"
                 inputMode="numeric"
                 value={cashTendered}
-                onChange={e => setCashTendered(e.target.value)}
+                onChange={e => {
+                  setCashTendered(e.target.value)
+                  if (e.target.value === '' || +e.target.value >= ticketTotal) setRestMethod('')
+                }}
                 placeholder={fmtYen(ticketTotal)}
               />
-              {cash && !cash.short && (
+              {cash && !cash.short && !cash.restMethod && (
                 <div className={`pos-cash-change${cash.exact ? ' is-exact' : ''}`}>
                   {cash.exact ? t('atomicPos.cashExact') : t('atomicPos.cashChange', { amount: fmtYen(cash.change) })}
                 </div>
               )}
-              {cashShort && <div className="pos-cash-short">{t('atomicPos.cashShort')}</div>}
+              {cash?.restMethod && (
+                <div className="pos-cash-change">
+                  {t('atomicPos.restOnReceipt', { cash: fmtYen(cash.tendered), method: cash.restMethod, rest: fmtYen(cash.rest) })}
+                </div>
+              )}
+              {(cashShort || (cash && cash.due > (cash.tendered || 0) && !cash.restMethod && cashTendered !== '')) && (
+                <div className="pos-rest-pay">
+                  {['Card', 'PayPay'].map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`pos-rest-chip${restMethod === m ? ' is-on' : ''}`}
+                      onClick={() => setRestMethod(m)}
+                    >
+                      {t(m === 'Card' ? 'atomicPos.restOnCard' : 'atomicPos.restOnPaypay', {
+                        amount: fmtYen(Math.max(0, ticketTotal - (+cashTendered || 0))),
+                      })}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {cashShort && <div className="pos-cash-short">{t('atomicPos.cashShortRest')}</div>}
             </div>
           ) : (
             <div className="pos-pay-hint">{t('atomicPos.payRecordHint')}</div>

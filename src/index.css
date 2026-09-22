@@ -3063,6 +3063,32 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   font-weight: 800;
   color: #b91c1c;
 }
+.pos-rest-pay {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pos-rest-chip {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pos-rest-chip.is-on {
+  border-color: var(--gold);
+  background: rgba(193, 156, 86, 0.16);
+  color: var(--navy);
+}
+.pos-close-last {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text2);
+}
 .pos-head-bar {
   font-size: 12px;
   font-weight: 700;
@@ -3085,6 +3111,17 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   color: var(--text2);
   margin: 0 0 10px;
   line-height: 1.4;
+}
+.stock-catalog-toggle {
+  display: inline-block;
+  margin-left: 8px;
+  border: 0;
+  background: none;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .clock-not-tablet {
   font-size: 12px;

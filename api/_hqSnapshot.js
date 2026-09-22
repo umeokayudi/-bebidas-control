@@ -6,7 +6,7 @@ import { payrollFromPunches } from '../src/lib/timeClock.js'
 import { tokyoMonthKey, monthRange, recentMonthKeys } from '../src/lib/tokyo.js'
 import { splitCostBooks, rentForMonth, lastKnownRent } from '../src/lib/costBooks.js'
 import { monthKeyOf, explainJbmGap, buildMonthSeries, invoiceOverlapsMonth, lowStockFromLedger } from '../src/lib/hqFilters.js'
-import { coalesceStockMoves, deliveryNoteMoves } from '../src/lib/barStock.js'
+import { coalesceStockMoves, deliveryNoteMoves, posPourMoves } from '../src/lib/barStock.js'
 import {
   isMissingSchemaError,
   isMissingTableError,
@@ -93,7 +93,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   const range = monthRange(`${mes}-01`)
   const monthKeys = recentMonthKeys(6)
 
-  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR, itemR] = await Promise.all([
+  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR, itemR, posItemR, priceR] = await Promise.all([
     admin.from('vendas').select('id,data,data_venda,total,obs,bar_id,cast_id,criado_em').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
     admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(200),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
@@ -109,6 +109,8 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     admin.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', barId).limit(4000),
     admin.from('produtos').select('id,nome').limit(400),
     admin.from('vendas_itens').select('produto_id,qtd,venda_id').limit(5000),
+    pgOrLive(admin, 'pos_vendas_itens', [], 'produto_id,nome,qtd,pos_venda_id'),
+    admin.from('bar_pricing').select('produto_id,drinks_por_garrafa').eq('bar_id', barId).limit(400),
   ])
 
   const jbmOk = !vendasR.error && !fatR.error
@@ -133,7 +135,17 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     ...v,
     vendas_itens: noteItems.filter(it => it.venda_id === v.id),
   }))
-  const stockMoves = coalesceStockMoves(movR.error ? [] : (movR.data || []), deliveryNoteMoves(notesWithItems))
+  const pricing = {}
+  for (const r of priceR?.error ? [] : (priceR.data || [])) {
+    if (r?.produto_id) pricing[r.produto_id] = { drinks_por_garrafa: +r.drinks_por_garrafa || 0 }
+  }
+  const posIds = new Set(posRows.map(s => s.id))
+  const posItems = (posItemR?.rows || []).filter(it => !it.pos_venda_id || posIds.has(it.pos_venda_id))
+  const stockMoves = coalesceStockMoves(
+    movR.error ? [] : (movR.data || []),
+    deliveryNoteMoves(notesWithItems),
+    posPourMoves(posItems, pricing),
+  )
   const estoqueBaixo = !regrasR.error
     ? lowStockFromLedger({
       regras: regrasR.data || [],

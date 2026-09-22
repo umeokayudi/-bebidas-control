@@ -17,7 +17,7 @@ import {
   deliveryStockObs,
 } from '../src/lib/posSupply.js'
 import { pedidoVendaObs } from '../src/lib/pedidoVenda.js'
-import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, stockGlance } from '../src/lib/barStock.js'
+import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, posPourMoves, stockFlow, stockGlance } from '../src/lib/barStock.js'
 
 let failed = 0
 function assert(name, cond, extra) {
@@ -107,6 +107,29 @@ const byName = decorateStockList(
   {}
 )
 assert('name match when produto_id missing', byName[0].stock === 60 && byName[0].hasCount)
+const nameOnlyMerged = decorateStockList(
+  [{ id: 'prod-asahi', nome: 'Asahi Beer 330ml' }],
+  coalesceStockMoves([], deliveryNoteMoves([{ id: 'n3', vendas_itens: [{ qtd: 60, produtos: { nome: 'Asahi Beer 330ml' } }] }])),
+  {}
+)
+assert('coalesce keeps name-only implied', nameOnlyMerged[0].stock === 60 && nameOnlyMerged[0].hasCount)
+const pours = posPourMoves(
+  [{ produto_id: 'asahi', qtd: 16, pos_venda_id: 'sale-1' }],
+  { asahi: { drinks_por_garrafa: 16 } }
+)
+assert('16 shots is 1 bottle saida', pours.length === 1 && pours[0].tipo === 'saida' && pours[0].qtd === 1)
+assert('no pricing means no whole-bottle eat', posPourMoves([{ produto_id: 'asahi', qtd: 3 }], {}).length === 0)
+const afterPour = decorateStockList(
+  [{ id: 'asahi', nome: 'Asahi' }],
+  coalesceStockMoves([], implied, pours),
+  {}
+)
+assert('cellar is deliveries minus pours', afterPour[0].stock === 59)
+const flow = stockFlow(coalesceStockMoves([], implied, pours))
+assert('flow keeps in/out separate', flow.delivered === 84 && flow.poured === 1)
+const explicitSaida = [{ produto_id: 'asahi', tipo: 'entrada', qtd: 10 }, { produto_id: 'asahi', tipo: 'saida', qtd: 2 }]
+const noDoublePour = decorateStockList([{ id: 'asahi', nome: 'Asahi' }], coalesceStockMoves(explicitSaida, implied, pours), {})
+assert('explicit saida wins over implied pour', noDoublePour[0].stock === 8)
 
 if (failed) {
   console.log(`\n${failed} teste(s) falharam`)

@@ -72,9 +72,12 @@ export async function resolveBarActor(req, admin) {
 
 export async function loginLane(email, password) {
   const admin = drinksAdminClient()
-  await ensureBarLiveReady(admin)
   const wanted = String(email || '').trim().toLowerCase()
-  const { data: logins } = await runLiveOp(admin, { table: 'bar_logins', mode: 'select', columns: '*' })
+  let { data: logins } = await runLiveOp(admin, { table: 'bar_logins', mode: 'select', columns: '*' })
+  if (!logins?.length) {
+    await ensureBarLiveReady(admin)
+    ;({ data: logins } = await runLiveOp(admin, { table: 'bar_logins', mode: 'select', columns: '*' }))
+  }
   const login = (logins || []).find(l => String(l.email || '').toLowerCase() === wanted && l.ativo !== false)
   if (!login || !secretsMatch(password, login.password_hash)) {
     return { error: 'Incorrect email or password', status: 401 }
@@ -90,14 +93,12 @@ export async function loginLane(email, password) {
     exp: Date.now() + 12 * 60 * 60 * 1000,
   }
   const token = signLanePayload(perfil)
-  try {
-    await runLiveOp(admin, {
-      table: 'bar_sessions',
-      mode: 'insert',
-      insertRows: [{ ...perfil, id: newId(), login_id: login.id }],
-      wantSingle: true,
-    })
-  } catch {}
+  void runLiveOp(admin, {
+    table: 'bar_sessions',
+    mode: 'insert',
+    insertRows: [{ ...perfil, id: newId(), login_id: login.id }],
+    wantSingle: true,
+  }).catch(() => {})
   return {
     ok: true,
     token,

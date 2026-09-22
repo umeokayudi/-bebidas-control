@@ -14,6 +14,23 @@ export function nextTokyoDateKey(dateKey) {
   return tokyoDateKey(next)
 }
 
+export function prevTokyoDateKey(dateKey) {
+  const [y, m, d] = String(dateKey).slice(0, 10).split('-').map(Number)
+  const prev = new Date(tokyoWallToUtcMs(y, m, d, 12) - 86400000)
+  return tokyoDateKey(prev)
+}
+
+/** Split tender packed into ticket obs. Cash stays cash; Card/PayPay stay record-only. */
+export function paySplitFromObs(obs) {
+  const m = String(obs || '').match(/Pay:\s*Cash\s+(\d+)\s*\+\s*(Card|PayPay|Credit card)\s+(\d+)/i)
+  if (!m) return null
+  return {
+    Cash: +m[1],
+    other: +m[3],
+    otherBucket: /paypay/i.test(m[2]) ? 'paypay' : 'card',
+  }
+}
+
 /** Inclusive ISO bounds: 06:00 JST on nightKey → 05:59:59.999 next calendar day. */
 export function nightWindow(nightKey) {
   const [y, m, d] = String(nightKey || tokyoNightKey()).slice(0, 10).split('-').map(Number)
@@ -39,8 +56,20 @@ export function summarizeNight(sales = [], nightKey = tokyoNightKey()) {
   const rows = (sales || []).filter(s => saleOnNight(s, nightKey))
   const pay = { Cash: 0, card: 0, paypay: 0, other: 0 }
   for (const s of rows) {
+    const split = paySplitFromObs(s.obs)
+    if (split) {
+      pay.Cash += split.Cash
+      pay[split.otherBucket] += split.other
+      continue
+    }
     const method = String(s.metodo_pagamento || s.pay_method || 'Cash')
     const total = +s.total || 0
+    if (/\+/.test(method)) {
+      if (/paypay|ペイペイ/i.test(method)) pay.paypay += total
+      else if (/card|credit|debit|visa|クレジット/i.test(method)) pay.card += total
+      else pay.other += total
+      continue
+    }
     if (/cash|現金/i.test(method)) pay.Cash += total
     else if (/paypay|ペイペイ/i.test(method)) pay.paypay += total
     else if (/card|credit|debit|visa|クレジット/i.test(method)) pay.card += total

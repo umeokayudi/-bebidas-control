@@ -243,7 +243,9 @@ export function LoginPage() {
 
           <button className="btn-gold" onClick={submit} disabled={busy}
             style={{ width: '100%', padding: 13, fontSize: 14, borderRadius: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            {busy ? <><span className="spinner" />{t('common.wait')}</> : t('auth.enter')}
+            {busy
+              ? <><span className="spinner" />{isLaneEmail(email) ? t('auth.openingLane') : t('common.wait')}</>
+              : t('auth.enter')}
           </button>
         </div>
 

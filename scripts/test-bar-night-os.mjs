@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs'
 import { tokyoNightKey, tokyoDateKey } from '../src/lib/tokyo.js'
-import { summarizeNight, saleOnNight, nightWindow, closeVariance, pourKeep } from '../src/lib/nightClose.js'
-import { cashChange, isCashMethod, payRecordNote } from '../src/lib/posPay.js'
+import { summarizeNight, saleOnNight, nightWindow, closeVariance, pourKeep, prevTokyoDateKey, paySplitFromObs } from '../src/lib/nightClose.js'
+import { cashChange, cashSettle, isCashMethod, payRecordNote } from '../src/lib/posPay.js'
 import { packTicketObs, readTicketMeta, ticketChargeLines, effectiveServicePct } from '../src/lib/nightTicket.js'
 import { withOrderCast, orderCastIdFromObs, orderDetailsFromObs } from '../src/lib/orderMeta.js'
 import { arAging } from '../src/lib/barPortal.js'
@@ -50,6 +50,14 @@ assert('short cash blocks Charge', cashChange(2200, 1000).short && cashChange(22
 assert('Cash is cash', isCashMethod('Cash') && isCashMethod('現金') && !isCashMethod('PayPay'))
 assert('cash note packs tender', payRecordNote({ method: 'Cash', total: 2200, tendered: 5000 }) === 'Pay: Cash tendered 5000 change 2800')
 assert('card note is record-only', payRecordNote({ method: 'Credit card', total: 2200 }) === 'Pay: Credit card record-only')
+assert('short cash + Card is not blocked', cashSettle(7200, 5000, 'Card').short === false && cashSettle(7200, 5000, 'Card').rest === 2200)
+assert('split note keeps cash and record-only rest', payRecordNote({ method: 'Cash', total: 7200, tendered: 5000, restMethod: 'Card' }) === 'Pay: Cash 5000 + Card 2200 record-only')
+assert('split obs parses', paySplitFromObs('Pay: Cash 5000 + Card 2200 record-only').Cash === 5000)
+const splitNight = summarizeNight([
+  { total: 7200, data: '2026-09-18', criado_em: '2026-09-18T22:00:00+09:00', metodo_pagamento: 'Cash+Card', obs: 'Pay: Cash 5000 + Card 2200 record-only' },
+], '2026-09-18')
+assert('night close books split cash not the whole ticket', splitNight.cashTotal === 5000 && splitNight.cardTotal === 2200 && splitNight.expectedCash === 5000)
+assert('previous nightlife day', prevTokyoDateKey('2026-09-22') === '2026-09-21')
 
 console.log('\n== CAST id + ticket extras in obs ==')
 const packed = packTicketObs({
@@ -104,6 +112,14 @@ const html = buildGuestReceiptHtml({
 assert('guest receipt is 領収書', html.includes('領　収　書'))
 assert('guest receipt is not JBM invoice', !html.includes('JBM Drinks') && html.includes('JBM請求ではありません') && html.includes('Atomic Bar'))
 assert('guest receipt shows cash change', html.includes('預かり') && html.includes('お釣り'))
+const splitHtml = buildGuestReceiptHtml({
+  barNome: 'Atomic Bar',
+  sale: { id: 'sale-2', total: 7200, data: tokyoDateKey() },
+  items: [{ nome: 'Asahi', qtd: 2, preco_unitario: 3600 }],
+  payMethod: 'Cash+Card',
+  cash: { tendered: 5000, rest: 2200, restMethod: 'Card', exact: false, change: 0 },
+})
+assert('guest receipt shows split tender', splitHtml.includes('現金') && splitHtml.includes('Card') && splitHtml.includes('記録のみ'))
 assert('POS number not RY-', buildPosReceiptNumero({ id: 'abc' }).startsWith('POS-') && !buildPosReceiptNumero({ id: 'abc' }).startsWith('RY-'))
 
 console.log('\n== AR war room stays on JBM invoices ==')
@@ -137,6 +153,9 @@ assert('pay methods are buttons', posUi.includes('pos-pay-methods') && posUi.inc
 assert('cash tender + short blocks Charge', posUi.includes('pos-cash-box') && posUi.includes('cashShort') && posUi.includes('payRecordHint'))
 assert('till shows cash/card/PayPay split', posUi.includes('paySplit'))
 assert('stock uses JBM notes when movimentos empty', readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8').includes('deliveryNoteMoves'))
+assert('stock also subtracts POS pours', readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8').includes('posPourMoves'))
+assert('till can put rest on Card/PayPay', posUi.includes('restOnCard') && posUi.includes('cashSettle'))
+assert('till shows last night after 06:00', posUi.includes('lastNight') && posUi.includes('prevTokyoDateKey'))
 assert('no fake PayPay gateway', !posUi.includes('paypay.com') && !posUi.includes('PayPay API'))
 assert('no leftover pay select', !posUi.includes("['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer']"))
 assert('sale errors are inline not alert', posUi.includes('setSaleErr') && !posUi.includes("alert(t('atomicPos.saleRegistered"))
