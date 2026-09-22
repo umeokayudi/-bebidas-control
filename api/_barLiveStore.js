@@ -23,6 +23,7 @@ export const LIVE_TABLES = [
   'bar_sessions',
   'bar_overhead',
   'bar_sundry',
+  'bar_floor_orders',
   'bar_hq_meta',
   'pos_shifts',
   'pos_settings',
@@ -415,6 +416,7 @@ async function seedAtomic(admin) {
   await saveTable(admin, 'bar_sessions', [])
   await saveTable(admin, 'bar_overhead', [])
   await saveTable(admin, 'bar_sundry', [])
+  await saveTable(admin, 'bar_floor_orders', [])
   await saveTable(admin, 'bar_hq_meta', [])
   await saveTable(admin, 'pos_shifts', [])
   await saveTable(admin, 'pos_settings', [])

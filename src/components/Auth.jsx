@@ -155,7 +155,7 @@ function LoginLanguagePicker() {
 
 function loginFormDoorId(hashDoor, pref) {
   if (hashDoor === 'live') return 'gerente'
-  if (hashDoor === 'make') return 'pos'
+  if (hashDoor === 'make' || hashDoor === 'send') return 'pos'
   return hashDoor || pref || ''
 }
 
@@ -203,6 +203,7 @@ export function LoginPage() {
       if (error) setErr(t('auth.wrongCredentials'))
       else if (loginDoorFromHash() === 'live') setDoorHash('live')
       else if (loginDoorFromHash() === 'make') setDoorHash('make')
+      else if (loginDoorFromHash() === 'send') setDoorHash('send')
       else if (doorId) setDoorHash(doorId)
     } finally { setBusy(false) }
   }
@@ -275,6 +276,7 @@ export function LoginPage() {
               <div className="login-door-hint">{t(door.hintKey)}</div>
               {door.id === 'pos' && <div className="login-door-hint">{t('auth.posBookmark')}</div>}
               {door.id === 'pos' && <div className="login-door-hint">{t('auth.makeBookmark')}</div>}
+              {door.id === 'pos' && <div className="login-door-hint">{t('auth.sendBookmark')}</div>}
               {door.id === 'clock' && <div className="login-door-hint">{t('auth.clockBookmark')}</div>}
               {door.id === 'gerente' && <div className="login-door-hint">{t('auth.liveBookmark')}</div>}
 

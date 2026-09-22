@@ -48,37 +48,72 @@ function poursOf(ticketId, items = []) {
     }))
 }
 
+function floorPours(order) {
+  return (order?.items || [])
+    .filter(isPourLine)
+    .map(it => ({
+      nome: String(it.nome || '').trim(),
+      qtd: Math.max(1, Math.round(+it.qtd || 1)),
+    }))
+}
+
+function floorOnNight(order, nightKey) {
+  if (!order) return false
+  if (order.night_key) return String(order.night_key) === String(nightKey)
+  return saleOnNight({ data: order.data, criado_em: order.criado_em }, nightKey)
+}
+
 export function buildDrinkBoard({
   tickets = [],
   items = [],
   spaces = [],
+  floorOrders = [],
   now = new Date(),
   windowMs = MAKE_WINDOW_MS,
   nightKey = tokyoNightKey(now),
 } = {}) {
   const at = now instanceof Date ? now : new Date(now)
-  const night = (tickets || [])
-    .filter(s => saleOnNight(s, nightKey))
-    .slice()
-    .sort((a, b) => new Date(a.criado_em || a.data) - new Date(b.criado_em || b.data))
+  const nights = []
 
-  const sequenced = []
-  for (const sale of night) {
+  for (const sale of tickets || []) {
+    if (!saleOnNight(sale, nightKey)) continue
     const pours = poursOf(sale.id, items)
     if (!pours.length) continue
-    sequenced.push({
+    nights.push({
       id: sale.id,
-      seq: sequenced.length + 1,
-      seqLabel: padSeq(sequenced.length + 1),
       at: sale.criado_em || sale.data,
-      clock: clockLabel(sale.criado_em || sale.data),
       pours,
-      pourCount: pours.reduce((a, p) => a + p.qtd, 0),
       space: spaceName(sale, spaces),
       cast: orderCastFromObs(sale.obs),
       note: orderDetailsFromObs(sale.obs).slice(0, 80),
+      source: 'till',
     })
   }
+
+  for (const order of floorOrders || []) {
+    if ((order.status || 'sent') !== 'sent') continue
+    if (!floorOnNight(order, nightKey)) continue
+    const pours = floorPours(order)
+    if (!pours.length) continue
+    nights.push({
+      id: order.id,
+      at: order.criado_em || order.data,
+      pours,
+      space: order.space_nome || spaceName(order, spaces),
+      cast: String(order.cast || '').trim(),
+      note: String(order.note || '').trim().slice(0, 80),
+      source: 'phone',
+    })
+  }
+
+  nights.sort((a, b) => new Date(a.at) - new Date(b.at))
+  const sequenced = nights.map((row, i) => ({
+    ...row,
+    seq: i + 1,
+    seqLabel: padSeq(i + 1),
+    clock: clockLabel(row.at),
+    pourCount: row.pours.reduce((a, p) => a + p.qtd, 0),
+  }))
 
   const cutoff = at.getTime() - Math.max(30_000, +windowMs || MAKE_WINDOW_MS)
   const pending = sequenced.filter(t => {

@@ -84,7 +84,7 @@ assert('Gemini prompt forbids mixed books', /never add/i.test(sys) && /not a fif
 assert('Gemini prompt has this-hour numbers', sys.includes('2,000') && sys.includes('3,500'))
 
 console.log('\n== Devices: 4 password doors + live watch hash ==')
-assert('four login doors', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'live'))
+assert('four login doors', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'live' && d.id !== 'send'))
 assert('live hash', loginDoorFromHash('#/live') === 'live' && hashForDoor('live') === '#/live')
 assert('watch alias', loginDoorFromHash('#/watch') === 'live')
 assert('gerente live kiosk', isLiveKiosk('cliente', 'live') && isLiveKiosk('gerente', 'live'))

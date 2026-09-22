@@ -37,7 +37,7 @@ assert('gerente dock is Home POS Orders Clock', primaryDockForRole('cliente').ma
 assert('caixa has no extra dock', primaryDockForRole('caixa').length === 0)
 assert('POS hash is till door', loginDoorFromHash('#/pos') === 'pos' && hashForDoor('pos') === '#/pos')
 assert('clock hash is staff door', loginDoorFromHash('#/clock') === 'clock')
-assert('live watch is not a 5th password door', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'live' && d.id !== 'make'))
+assert('live watch is not a 5th password door', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'live' && d.id !== 'make' && d.id !== 'send'))
 assert('live hash is gerente watch', loginDoorFromHash('#/live') === 'live' && hashForDoor('live') === '#/live')
 assert('make hash is drinks board', loginDoorFromHash('#/make') === 'make' && hashForDoor('make') === '#/make')
 assert('gerente can open live watch', isLiveKiosk('cliente', 'live') && doorAllowsRole('live', 'cliente') && !isLiveKiosk('caixa', 'live'))

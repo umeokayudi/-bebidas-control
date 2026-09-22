@@ -51,7 +51,7 @@ const empty = buildDrinkBoard({ tickets: [old], items, spaces, now, windowMs: 8 
 assert('waiting when nothing in window', empty.waiting && empty.current == null && empty.lastSeq === '01')
 
 console.log('\n== Devices stay 4 passwords ==')
-assert('four login doors', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'make' && d.id !== 'live'))
+assert('four login doors', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'make' && d.id !== 'live' && d.id !== 'send'))
 assert('make hash', loginDoorFromHash('#/make') === 'make' && hashForDoor('make') === '#/make')
 assert('pour alias', loginDoorFromHash('#/pour') === 'make')
 assert('caixa drinks board', isMakeKiosk('caixa', 'make') && !isTillKiosk('caixa', 'make'))
@@ -64,7 +64,7 @@ assert('no mixed books', booksGrandTotal(splitCostBooks({ posMonthTotal: 1, jbmM
 console.log('\n== Wiring ==')
 const portal = readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8')
 const kiosk = readFileSync(new URL('../src/components/DrinkMakeKiosk.jsx', import.meta.url), 'utf8')
-assert('portal mounts drinks kiosk', portal.includes('DrinkMakeKiosk') && portal.includes("setDoorHash('make')"))
+assert('portal mounts drinks kiosk', portal.includes('DrinkMakeKiosk') && (portal.includes("setDoorHash('make')") || portal.includes("openLane('make')")))
 assert('board has no bump/done buttons', !/bump|markDone|doneTicket|onPourDone/i.test(kiosk))
 assert('no-touch copy', en.portal.make.noTouch.toLowerCase().includes('no touch') && ja.portal.make.noTouch.includes('タッチ不要'))
 assert('make is not a fifth book in copy', /no touch/i.test(en.auth.makeBookmark))

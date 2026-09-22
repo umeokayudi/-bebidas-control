@@ -6,6 +6,7 @@ import { useI18n } from '../lib/i18n'
 import { callGeminiChat } from '../lib/ai'
 import { fetchHqSnapshot } from '../lib/hqSnapshot'
 import { setDoorHash } from '../lib/barDoors'
+import DeviceStrip from './DeviceStrip'
 import {
   LIVE_POLL_MS,
   LIVE_PUNCH_LOOKBACK_MS,
@@ -212,6 +213,7 @@ export default function LivePulseBand({ bar, compact = false, onTab }) {
         <div className="live-pulse-links">
           <button type="button" onClick={() => setDoorHash('live')} data-live-open-watch>{t('portal.live.openWatch')}</button>
           <button type="button" onClick={() => setDoorHash('make')}>{t('auth.openDrinksBoard')}</button>
+          <button type="button" onClick={() => setDoorHash('send')}>{t('auth.openSendPhone')}</button>
           {onTab && <button type="button" onClick={() => onTab('ponto')}>{t('portal.hq.linkClock')}</button>}
         </div>
       </div>
@@ -219,7 +221,7 @@ export default function LivePulseBand({ bar, compact = false, onTab }) {
   )
 }
 
-export function LiveWatchKiosk({ bar, onHq, onTill, onMake, onLock }) {
+export function LiveWatchKiosk({ bar, role, onHq, onTill, onMake, onSend, onLock }) {
   const { t } = useI18n()
   const { pulse } = useLivePulse(bar)
   const color = pulse?.color || 'idle'
@@ -230,10 +232,18 @@ export function LiveWatchKiosk({ bar, onHq, onTill, onMake, onLock }) {
           <div className="till-kiosk-name">{bar.nome}</div>
           <div className="till-kiosk-lane">{t('auth.laneLive')}</div>
         </div>
+        <DeviceStrip
+          role={role}
+          current="live"
+          compact
+          onPick={id => {
+            if (id === 'pos') onTill?.()
+            else if (id === 'send') onSend?.()
+            else if (id === 'make') onMake?.()
+            else if (id === 'gerente') onHq?.()
+          }}
+        />
         <div className="till-kiosk-actions">
-          {onMake && <button type="button" onClick={onMake}>{t('auth.openDrinksBoard')}</button>}
-          {onHq && <button type="button" onClick={onHq}>{t('auth.openHq')}</button>}
-          {onTill && <button type="button" onClick={onTill}>{t('auth.openTillTablet')}</button>}
           {onLock && <button type="button" onClick={onLock}>{t('atomicPos.lockTill')}</button>}
         </div>
       </header>

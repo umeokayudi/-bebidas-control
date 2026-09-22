@@ -105,6 +105,7 @@ assert('gerente has CAST and sundry tabs', gerNav.includes('cast') && gerNav.inc
 assert('caixa still POS only', navForBarRole('caixa').map(n => n.id).join() === 'pos')
 assert('staff still clock only', navForBarRole('bar_staff').map(n => n.id).join() === 'ponto')
 assert('live client has bar_sundry', clientTables.has('bar_sundry'))
+assert('live client has floor orders', clientTables.has('bar_floor_orders'))
 const store = readFileSync(new URL('../api/_barLiveStore.js', import.meta.url), 'utf8')
 assert('live store seeds bar_sundry', store.includes("'bar_sundry'"))
 assert('sundry seed is empty not JBM', store.includes("saveTable(admin, 'bar_sundry', [])"))

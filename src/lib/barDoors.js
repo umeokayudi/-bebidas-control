@@ -45,6 +45,7 @@ export function loginDoorFromHash(hash = typeof location !== 'undefined' ? locat
   if (h === 'jbm' || h === 'supply') return 'jbm'
   if (h === 'live' || h === 'watch' || h === 'pulse') return 'live'
   if (h === 'make' || h === 'pour' || h === 'drinks') return 'make'
+  if (h === 'send' || h === 'phone' || h === 'floor') return 'send'
   return ''
 }
 
@@ -55,6 +56,7 @@ export function hashForDoor(id) {
   if (id === 'jbm') return '#/jbm'
   if (id === 'live') return '#/live'
   if (id === 'make') return '#/make'
+  if (id === 'send') return '#/send'
   return '#/'
 }
 
@@ -81,7 +83,7 @@ export function setDoorHash(id) {
 
 /** POS till tablet chrome — caixa always, or owner covering the floor via /#/pos. */
 export function isTillKiosk(role, door = loginDoorFromHash()) {
-  if (door === 'make' || door === 'live') return false
+  if (door === 'make' || door === 'live' || door === 'send') return false
   if (role === 'caixa') return true
   if (door === 'pos' && (role === 'cliente' || role === 'gerente')) return true
   return false
@@ -102,6 +104,12 @@ export function isMakeKiosk(role, door = loginDoorFromHash()) {
   return role === 'caixa' || role === 'cliente' || role === 'gerente'
 }
 
+/** Floor phone — tap drinks, SEND to the bar. Same POS/Manager login. Not a charge. */
+export function isSendKiosk(role, door = loginDoorFromHash()) {
+  if (door !== 'send') return false
+  return role === 'caixa' || role === 'cliente' || role === 'gerente'
+}
+
 export function doorAllowsRole(door, role) {
   if (!door) return true
   if (door === 'pos') return role === 'caixa' || role === 'cliente' || role === 'gerente'
@@ -109,6 +117,7 @@ export function doorAllowsRole(door, role) {
   if (door === 'gerente') return role === 'cliente' || role === 'gerente'
   if (door === 'live') return role === 'cliente' || role === 'gerente'
   if (door === 'make') return role === 'caixa' || role === 'cliente' || role === 'gerente'
+  if (door === 'send') return role === 'caixa' || role === 'cliente' || role === 'gerente'
   if (door === 'jbm') return role === 'admin' || role === 'funcionario' || role === 'staff'
   return true
 }

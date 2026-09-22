@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useI18n } from '../lib/i18n'
 import { tokyoNightKey } from '../lib/tokyo.js'
 import { MAKE_POLL_MS, MAKE_WINDOW_MS, buildDrinkBoard, padSeq, clockLabel } from '../lib/drinkBoard.js'
+import DeviceStrip from './DeviceStrip'
 
 export function useDrinkBoard(bar, { intervalMs = MAKE_POLL_MS } = {}) {
   const [board, setBoard] = useState(null)
@@ -12,15 +13,17 @@ export function useDrinkBoard(bar, { intervalMs = MAKE_POLL_MS } = {}) {
     if (!bar?.id) return
     try {
       const night = tokyoNightKey()
-      const [salesR, itemsR, spacesR] = await Promise.all([
+      const [salesR, itemsR, spacesR, floorR] = await Promise.all([
         supabase.from('pos_vendas').select('id,total,data,criado_em,obs,space_id').eq('bar_id', bar.id).order('criado_em', { ascending: true }).limit(220),
         supabase.from('pos_vendas_itens').select('pos_venda_id,nome,qtd,tipo_preco').limit(900),
         supabase.from('bar_spaces').select('id,nome').eq('bar_id', bar.id),
+        supabase.from('bar_floor_orders').select('*').eq('bar_id', bar.id).eq('night_key', night).order('criado_em', { ascending: true }).limit(80),
       ])
       const tickets = salesR.error ? [] : (salesR.data || [])
       const items = itemsR.error ? [] : (itemsR.data || [])
       const spaces = spacesR.error ? [] : (spacesR.data || [])
-      setBoard(buildDrinkBoard({ tickets, items, spaces, nightKey: night, windowMs: MAKE_WINDOW_MS }))
+      const floorOrders = floorR.error ? [] : (floorR.data || [])
+      setBoard(buildDrinkBoard({ tickets, items, spaces, floorOrders, nightKey: night, windowMs: MAKE_WINDOW_MS }))
       setErr('')
     } catch (e) {
       setErr(e.message || 'make')
@@ -49,7 +52,7 @@ function PourLines({ pours, size = 'lg' }) {
   )
 }
 
-export default function DrinkMakeKiosk({ bar, onHq, onTill, onLive, onLock }) {
+export default function DrinkMakeKiosk({ bar, role, onHq, onTill, onLive, onSend, onLock }) {
   const { t } = useI18n()
   const { board } = useDrinkBoard(bar)
   const prevId = useRef('')
@@ -87,9 +90,18 @@ export default function DrinkMakeKiosk({ bar, onHq, onTill, onLive, onLock }) {
         </div>
         <div className="make-clock" data-make-clock>{clock}</div>
         <div className="till-kiosk-actions make-top-actions">
-          {onTill && <button type="button" onClick={onTill}>{t('auth.openTillTablet')}</button>}
-          {onLive && <button type="button" onClick={onLive}>{t('auth.openLiveWatch')}</button>}
-          {onHq && <button type="button" onClick={onHq}>{t('auth.openHq')}</button>}
+          <DeviceStrip
+            role={role}
+            current="make"
+            compact
+            dim
+            onPick={id => {
+              if (id === 'pos') onTill?.()
+              else if (id === 'send') onSend?.()
+              else if (id === 'live') onLive?.()
+              else if (id === 'gerente') onHq?.()
+            }}
+          />
           {onLock && <button type="button" onClick={onLock}>{t('atomicPos.lockTill')}</button>}
         </div>
       </header>
@@ -102,7 +114,12 @@ export default function DrinkMakeKiosk({ bar, onHq, onTill, onLive, onLock }) {
           </div>
         ) : (
           <div className="make-now">
-            <div className="make-kicker">{t('portal.make.now')} · {current.clock}{current.space ? ` · ${current.space}` : ''}{current.cast ? ` · ${current.cast}` : ''}</div>
+            <div className="make-kicker" data-make-source={current.source || 'till'}>
+              {t('portal.make.now')} · {current.clock}
+              {current.space ? ` · ${current.space}` : ''}
+              {current.cast ? ` · ${current.cast}` : ''}
+              {current.source === 'phone' ? ` · ${t('auth.laneSend')}` : ''}
+            </div>
             <div className="make-seq" data-make-seq={current.seqLabel}>{current.seqLabel}</div>
             <PourLines pours={current.pours} size="xl" />
             {current.note ? <div className="make-note">{current.note}</div> : null}
