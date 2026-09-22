@@ -101,6 +101,12 @@ assert('well stocked is 2 not 3', glance.wellStocked === 2 && glance.unknown ===
 const explicit = [{ produto_id: 'asahi', tipo: 'entrada', qtd: 10 }, { produto_id: 'asahi', tipo: 'saida', qtd: 2 }]
 const trustExplicit = decorateStockList([{ id: 'asahi', nome: 'Asahi' }], coalesceStockMoves(explicit, implied), {})
 assert('explicit entrada wins over implied', trustExplicit[0].stock === 8)
+const byName = decorateStockList(
+  [{ id: 'prod-asahi', nome: 'Asahi Beer 330ml' }],
+  deliveryNoteMoves([{ id: 'n2', vendas_itens: [{ qtd: 60, produtos: { nome: 'Asahi Beer 330ml' } }] }]),
+  {}
+)
+assert('name match when produto_id missing', byName[0].stock === 60 && byName[0].hasCount)
 
 if (failed) {
   console.log(`\n${failed} teste(s) falharam`)

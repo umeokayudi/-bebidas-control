@@ -160,15 +160,28 @@ export default function TimeClockPanel({ bar }) {
 
   async function load() {
     setLoading(true)
-    const [pR, sR] = await Promise.all([
-      staffFetch(`/api/time-clock?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`, { signal: AbortSignal.timeout(8000) }).then(r => r.json()).catch(() => ({ punches: [] })),
+    const fallbackStaff = canManageBarTeam(perfil?.role)
+      ? []
+      : [{ id: perfil?.id, nome: perfil?.nome, cargo: perfil?.cargo, salario_hora: perfil?.salario_hora || 0 }]
+    const work = Promise.all([
+      staffFetch(`/api/time-clock?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`).then(r => r.json()).catch(() => ({ punches: [] })),
       canManageBarTeam(perfil?.role)
-        ? staffFetch('/api/bar-staff', { signal: AbortSignal.timeout(8000) }).then(r => r.json()).catch(() => ({ staff: [] }))
-        : Promise.resolve({ staff: [{ id: perfil?.id, nome: perfil?.nome, cargo: perfil?.cargo, salario_hora: perfil?.salario_hora || 0 }] }),
+        ? staffFetch('/api/bar-staff').then(r => r.json()).catch(() => ({ staff: [] }))
+        : Promise.resolve({ staff: fallbackStaff }),
     ])
-    setPunches(pR.punches || [])
-    setStaff(sR.staff || [])
-    setLoading(false)
+    try {
+      const timed = await Promise.race([
+        work,
+        new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), 8000)),
+      ])
+      setPunches(timed[0].punches || [])
+      setStaff(timed[1].staff || fallbackStaff)
+    } catch {
+      setPunches([])
+      setStaff(fallbackStaff)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [bar.id])

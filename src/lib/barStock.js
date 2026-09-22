@@ -12,9 +12,11 @@ export function deliveryNoteMoves(notes = []) {
     const items = v.vendas_itens || v.itens || []
     for (const it of items) {
       const id = it.produto_id || it.produtos?.id
-      if (!id || !(+it.qtd > 0)) continue
+      const nome = it.produtos?.nome || it.nome || ''
+      if ((!id && !nome) || !(+it.qtd > 0)) continue
       out.push({
-        produto_id: id,
+        produto_id: id || null,
+        nome,
         tipo: 'entrada',
         qtd: +it.qtd,
         obs: `JBM note ${String(v.id || '').slice(0, 8)}`,
@@ -46,14 +48,22 @@ export function stockMapFromMoves(moves = []) {
 
 export function decorateStockList(produtos = [], moves = [], regras = {}) {
   const map = stockMapFromMoves(moves)
+  const byName = {}
   const counted = new Set()
   for (const m of moves) {
     if (m?.produto_id) counted.add(m.produto_id)
+    const n = String(m?.nome || '').trim().toLowerCase()
+    if (n) {
+      byName[n] = (byName[n] || 0) + qtyOfMove(m)
+      counted.add(`name:${n}`)
+    }
   }
   return (produtos || []).map(p => {
-    const stock = Math.max(0, Math.round((map[p.id] || 0) * 100) / 100)
+    const nameKey = String(p.nome || '').trim().toLowerCase()
+    const raw = map[p.id] != null ? map[p.id] : byName[nameKey]
+    const stock = Math.max(0, Math.round((raw || 0) * 100) / 100)
     const minimo = +regras[p.id] || 0
-    const hasCount = counted.has(p.id)
+    const hasCount = counted.has(p.id) || counted.has(`name:${nameKey}`)
     const empty = hasCount && stock === 0
     const low = hasCount && minimo > 0 && stock > 0 && stock < minimo
     const crit = hasCount && minimo > 0 && stock === 0

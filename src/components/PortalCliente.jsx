@@ -736,7 +736,7 @@ function InventoryTab({ bar, onOrder }) {
         fetchAllStockMovements(supabase, bar.id, '*').catch(() => []),
         supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
         supabase.from('estoque_regras').select('*').eq('bar_id', bar.id),
-        supabase.from('vendas').select('id,obs,origem,cast_id,vendas_itens(produto_id,qtd,produtos(id))').eq('bar_id', bar.id).order('data', { ascending: false }),
+        supabase.from('vendas').select('*, vendas_itens(*, produtos(id,nome))').eq('bar_id', bar.id).order('data', { ascending: false }),
       ])
       setProdutos((pR.data || []).filter(isSupplierProduct))
       setMovimentos(movimentos || [])
