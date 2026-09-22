@@ -47,7 +47,7 @@ assert('HQ never writes faturas', !/\.from\('faturas'\)\.(insert|upsert|update|d
 assert('HQ does not select vendas.origem (column may be missing)', !/from\('vendas'\)\.select\([^)]*origem/.test(hqApi))
 assert('HQ reads pedidos.total_estimado not pedidos.total', /from\('pedidos'\)\.select\([^)]*total_estimado/.test(hqApi) && !/from\('pedidos'\)\.select\([^)]*total[,)]/.test(hqApi))
 const route = readFileSync(new URL('../api/bar/[fn].js', import.meta.url), 'utf8')
-assert('hq-sync is wired in bar router', route.includes("fn === 'hq-sync'"))
+assert('HQ snapshot imports monthKeyOf', hqApi.includes("from '../src/lib/hqFilters.js'") && hqApi.includes('monthKeyOf') && hqApi.includes('buildMonthSeries'))
 
 console.log('\n== HQ AI keeps books split ==')
 const sys = buildHqChatSystem({

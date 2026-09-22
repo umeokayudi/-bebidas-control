@@ -196,7 +196,7 @@ export default function BarSundryTab({ bar, compact = false }) {
           <label>{t('sundry.what')}<input value={what} onChange={e => setWhat(e.target.value)} placeholder={t('sundry.whatPh')} /></label>
         </div>
         <label>{t('common.notes')}<input value={note} onChange={e => setNote(e.target.value)} /></label>
-        <button type="button" className="btn-primary" disabled={busy || scanning} onClick={save}>
+        <button type="button" className="btn-primary" data-sundry-save disabled={busy || scanning} onClick={save}>
           {busy ? t('common.saving') : t('sundry.save')}
         </button>
         {msg && <div className="sundry-msg">{msg}</div>}

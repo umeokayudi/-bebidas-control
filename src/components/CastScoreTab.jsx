@@ -153,7 +153,7 @@ export default function CastScoreTab({ bar, compact = false, salesHint, agentsHi
                 <label>{t('cast.goalNight')}<input type="number" min="0" step="1000" value={draft.night} onChange={e => setDraft(d => ({ ...d, night: e.target.value }))} /></label>
                 <label>{t('cast.goalMonth')}<input type="number" min="0" step="1000" value={draft.month} onChange={e => setDraft(d => ({ ...d, month: e.target.value }))} /></label>
                 <label>{t('cast.breakeven')}<input type="number" min="0" step="1000" value={draft.breakeven} onChange={e => setDraft(d => ({ ...d, breakeven: e.target.value }))} /></label>
-                <button type="button" className="btn-primary" disabled={busy} onClick={saveGoals}>{t('cast.saveGoals')}</button>
+        <button type="button" className="btn-primary" data-cast-save disabled={busy} onClick={saveGoals}>{t('cast.saveGoals')}</button>
               </div>
               {selected.lane.night.has && (
                 <div className="cast-progress">
