@@ -68,8 +68,8 @@ export function useLivePulse(bar, { intervalMs = LIVE_POLL_MS } = {}) {
 }
 
 function CutCards({ pulse, t }) {
-  const cuts = pulse?.cuts || []
-  if (!cuts.length) return null
+  const cuts = (pulse?.cuts || []).filter(c => c.kind !== 'none')
+  if (!cuts.length || pulse?.color === 'idle') return null
   return (
     <div className="live-cuts">
       <div className="live-cuts-title">{t('portal.live.cutsTitle')}</div>
@@ -83,7 +83,11 @@ function CutCards({ pulse, t }) {
             </div>
             {c.savedYen > 0 && <div className="live-cut-saved">{t('portal.live.saved', { amount: fmtYen(c.savedYen) })}</div>}
             <div className="live-cut-after">{t('portal.live.after', { amount: fmtYen(c.afterBurn) })}</div>
-            <div className="live-cut-flag">{c.afterColor === 'blue' ? t('portal.live.covers') : c.kind === 'keep' ? t('portal.live.blue') : t('portal.live.stillRed')}</div>
+            <div className="live-cut-flag">
+              {c.kind === 'keep'
+                ? (pulse.color === 'blue' ? t('portal.live.blue') : t('portal.live.idle'))
+                : c.afterColor === 'blue' ? t('portal.live.covers') : t('portal.live.stillRed')}
+            </div>
           </div>
         ))}
       </div>

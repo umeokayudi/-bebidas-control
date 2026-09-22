@@ -74,6 +74,7 @@ const keep = localCutSuggestions({ hourTill: 5000, hourWageBurn: 3500, openStaff
 assert('blue suggests keep', keep[0].kind === 'keep')
 const none = localCutSuggestions({ hourTill: 0, hourWageBurn: 0, openStaff: [], color: 'idle' })
 assert('idle has none', none[0].kind === 'none')
+assert('idle cut is not a red send-home', none.every(c => c.kind === 'none' || c.kind === 'keep'))
 const localEn = localStaffCutAnswer(red, 'en')
 const localJa = localStaffCutAnswer(red, 'ja')
 assert('local English says RED', /RED this hour/i.test(localEn) && /Ken/.test(localEn))
