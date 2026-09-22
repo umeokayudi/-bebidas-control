@@ -302,6 +302,7 @@ export default function BarCostsTab({ bar, onTab }) {
           floor: floorGlance,
           openOrders: localOps.openOrders,
           invoices: localOps.invoices,
+          ready: !!(hq || books),
         })}
         onTab={onTab}
       />

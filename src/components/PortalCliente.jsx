@@ -31,6 +31,7 @@ import BarTeamTab from './BarTeamTab'
 import BarGuestsTab from './BarGuestsTab'
 import BarSpacesTab from './BarSpacesTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
+import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, stockGlance } from '../lib/barStock'
 import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
@@ -717,6 +718,7 @@ function InventoryTab({ bar, onOrder }) {
   const [produtos,   setProdutos]   = useState([])
   const [movimentos, setMovimentos] = useState([])
   const [regras,     setRegras]     = useState({}) // prodId -> minimo
+  const [notes,      setNotes]      = useState([])
   const [loading,    setLoading]    = useState(true)
   const [selected,   setSelected]   = useState(null) // prodId for modal
   const [modalQty,   setModalQty]   = useState(1)
@@ -728,17 +730,23 @@ function InventoryTab({ bar, onOrder }) {
   useEffect(() => { load() }, [bar])
 
   async function load() {
-    const movimentos = await fetchAllStockMovements(supabase, bar.id, '*')
-    const [pR, rR] = await Promise.all([
-      supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
-      supabase.from('estoque_regras').select('*').eq('bar_id', bar.id),
-    ])
-    setProdutos((pR.data || []).filter(isSupplierProduct))
-    setMovimentos(movimentos || [])
-    const rMap = {}
-    ;(rR.data || []).forEach(r => { rMap[r.produto_id] = r.minimo })
-    setRegras(rMap)
-    setLoading(false)
+    setLoading(true)
+    try {
+      const [movimentos, pR, rR, vR] = await Promise.all([
+        fetchAllStockMovements(supabase, bar.id, '*').catch(() => []),
+        supabase.from('produtos_public').select('*').eq('ativo', true).order('categoria').order('nome'),
+        supabase.from('estoque_regras').select('*').eq('bar_id', bar.id),
+        supabase.from('vendas').select('id,obs,origem,cast_id,vendas_itens(produto_id,qtd,produtos(id))').eq('bar_id', bar.id).order('data', { ascending: false }),
+      ])
+      setProdutos((pR.data || []).filter(isSupplierProduct))
+      setMovimentos(movimentos || [])
+      setNotes(filterSupplierVendas(vR.data || []))
+      const rMap = {}
+      ;(rR.data || []).forEach(r => { rMap[r.produto_id] = r.minimo })
+      setRegras(rMap)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function saveMinimo(prodId, val) {
@@ -765,23 +773,14 @@ function InventoryTab({ bar, onOrder }) {
     load()
   }
 
-  const stockMap = {}
-  movimentos.forEach(m => {
-    if (!stockMap[m.produto_id]) stockMap[m.produto_id] = 0
-    stockMap[m.produto_id] += m.tipo === 'entrada' ? m.qtd : -m.qtd
-  })
-
-  const list = produtos.map(p => ({
-    ...p,
-    stock: Math.max(0, stockMap[p.id] || 0),
-    minimo: regras[p.id] || 0
-  }))
+  const moves = coalesceStockMoves(movimentos, deliveryNoteMoves(notes))
+  const list = decorateStockList(produtos, moves, regras)
 
   const filtered = search ? list.filter(p => p.nome.toLowerCase().includes(search.toLowerCase()) || p.categoria.toLowerCase().includes(search.toLowerCase())) : list
 
-  const critical = filtered.filter(p => p.minimo > 0 && p.stock === 0)
-  const low      = filtered.filter(p => p.minimo > 0 && p.stock > 0 && p.stock < p.minimo)
-  const good     = filtered.filter(p => p.minimo === 0 || p.stock >= p.minimo)
+  const glance = stockGlance(filtered)
+  const critical = filtered.filter(p => p.crit)
+  const low      = filtered.filter(p => p.low)
   const selectedProd = list.find(p => p.id === selected)
 
   if (loading) return <Spinner text={t('portal.inventory.loading')} />
@@ -858,9 +857,9 @@ function InventoryTab({ bar, onOrder }) {
       {/* Summary */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, margin:'20px 0' }}>
         {[
-          { label:t('portal.inventory.totalProducts'), value:list.length, icon:'📦', color:'var(--navy)' },
-          { label:t('portal.inventory.needAttention'), value:critical.length+low.length, icon:critical.length>0?'🚨':'⚠️', color:critical.length>0?'#ff3b30':low.length>0?'#ff9500':'var(--green)' },
-          { label:t('portal.inventory.wellStocked'), value:good.filter(p=>p.stock>0).length, icon:'✅', color:'#34c759' },
+          { label:t('portal.inventory.totalProducts'), value:glance.total, icon:'📦', color:'var(--navy)' },
+          { label:t('portal.inventory.needAttention'), value:glance.needAttention, icon:critical.length>0?'🚨':'⚠️', color:critical.length>0?'#ff3b30':low.length>0?'#ff9500':'var(--green)' },
+          { label:t('portal.inventory.wellStocked'), value:glance.wellStocked, icon:'✅', color:'#34c759' },
         ].map(s => (
           <div key={s.label} style={{
             background:'var(--bg2)', border:'1px solid var(--border)',
@@ -872,6 +871,10 @@ function InventoryTab({ bar, onOrder }) {
           </div>
         ))}
       </div>
+      <div className="stock-from-hint">{t('portal.inventory.fromDeliveries')}</div>
+      {glance.unknown > 0 && (
+        <div className="stock-from-hint">{t('portal.inventory.unknownCount', { count: glance.unknown })}</div>
+      )}
 
       {/* Product list */}
       {[...new Set(filtered.map(p=>p.categoria))].map(cat => (
@@ -879,10 +882,10 @@ function InventoryTab({ bar, onOrder }) {
           <div style={{ fontSize:11, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, paddingLeft:4 }}>{cat}</div>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {filtered.filter(p=>p.categoria===cat).map(p => {
-              const isCrit = p.minimo>0 && p.stock===0
-              const isLow  = p.minimo>0 && p.stock>0 && p.stock<p.minimo
-              const dotColor = isCrit?'#ff3b30':isLow?'#ff9500':'#34c759'
-              const pct = p.minimo>0 ? Math.min(p.stock/p.minimo*100,100) : null
+              const isCrit = p.crit
+              const isLow  = p.low
+              const dotColor = isCrit ? '#ff3b30' : isLow ? '#ff9500' : p.good ? '#34c759' : '#c5c5c7'
+              const pct = p.hasCount && p.minimo > 0 ? Math.min(p.stock / p.minimo * 100, 100) : null
               return (
                 <div key={p.id} style={{
                   background:'var(--bg2)',
@@ -910,8 +913,8 @@ function InventoryTab({ bar, onOrder }) {
 
                   {/* Stock */}
                   <div style={{ textAlign:'center', minWidth:44 }}>
-                    <div style={{ fontSize:22, fontWeight:800, color:dotColor, lineHeight:1 }}>{p.stock}</div>
-                    <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:2 }}>{t('portal.inventory.stock')}</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:dotColor, lineHeight:1 }}>{p.hasCount ? p.stock : '—'}</div>
+                    <div style={{ fontSize:9, color:'var(--text2)', textTransform:'uppercase', marginTop:2 }}>{p.hasCount ? t('portal.inventory.stock') : t('portal.inventory.noCount')}</div>
                   </div>
 
                   {/* Min rule */}

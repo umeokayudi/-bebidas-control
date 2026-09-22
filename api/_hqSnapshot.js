@@ -6,6 +6,7 @@ import { payrollFromPunches } from '../src/lib/timeClock.js'
 import { tokyoMonthKey, monthRange, recentMonthKeys } from '../src/lib/tokyo.js'
 import { splitCostBooks, rentForMonth, lastKnownRent } from '../src/lib/costBooks.js'
 import { monthKeyOf, explainJbmGap, buildMonthSeries, invoiceOverlapsMonth, lowStockFromLedger } from '../src/lib/hqFilters.js'
+import { coalesceStockMoves, deliveryNoteMoves } from '../src/lib/barStock.js'
 import {
   isMissingSchemaError,
   isMissingTableError,
@@ -92,7 +93,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   const range = monthRange(`${mes}-01`)
   const monthKeys = recentMonthKeys(6)
 
-  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR] = await Promise.all([
+  const [vendasR, pedR, fatR, posR, clockR, rentR, staff, regrasR, movR, prodR, itemR] = await Promise.all([
     admin.from('vendas').select('id,data,data_venda,total,obs,bar_id,cast_id,criado_em').eq('bar_id', barId).order('data', { ascending: false }).limit(400),
     admin.from('pedidos').select('id,status,total_estimado,criado_em,obs').eq('bar_id', barId).order('criado_em', { ascending: false }).limit(200),
     admin.from('faturas').select('*').eq('bar_id', barId).order('data_vencimento', { ascending: false }).limit(24),
@@ -107,6 +108,7 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
     admin.from('estoque_regras').select('produto_id,minimo').eq('bar_id', barId).limit(400),
     admin.from('estoque_movimentos').select('produto_id,tipo,qtd').eq('bar_id', barId).limit(4000),
     admin.from('produtos').select('id,nome').limit(400),
+    admin.from('vendas_itens').select('produto_id,qtd,venda_id').limit(5000),
   ])
 
   const jbmOk = !vendasR.error && !fatR.error
@@ -125,10 +127,17 @@ export async function buildHqSnapshot(admin, barId, barNome = '', monthKey) {
   const rentAmount = rentForMonth(rentR.rows || [], mes)
   const rentRow = (rentR.rows || []).find(r => r.kind === 'rent' && r.month_key === mes) || null
   const rentPrev = lastKnownRent(rentR.rows || [], mes)
-  const estoqueBaixo = (!regrasR.error && !movR.error)
+  const supplierIds = new Set(supplier.map(v => v.id))
+  const noteItems = (!itemR?.error ? (itemR.data || []) : []).filter(it => supplierIds.has(it.venda_id))
+  const notesWithItems = supplier.map(v => ({
+    ...v,
+    vendas_itens: noteItems.filter(it => it.venda_id === v.id),
+  }))
+  const stockMoves = coalesceStockMoves(movR.error ? [] : (movR.data || []), deliveryNoteMoves(notesWithItems))
+  const estoqueBaixo = !regrasR.error
     ? lowStockFromLedger({
       regras: regrasR.data || [],
-      movimentos: movR.data || [],
+      movimentos: stockMoves,
       produtos: prodR.error ? [] : (prodR.data || []),
     }).slice(0, 8)
     : []

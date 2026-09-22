@@ -17,6 +17,7 @@ import {
   deliveryStockObs,
 } from '../src/lib/posSupply.js'
 import { pedidoVendaObs } from '../src/lib/pedidoVenda.js'
+import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, stockGlance } from '../src/lib/barStock.js'
 
 let failed = 0
 function assert(name, cond, extra) {
@@ -78,6 +79,28 @@ assert('pedido restock entregue não recebe merge', !findOpenRestockPedido([{ id
 console.log('\n== Obs de estoque isoladas ==')
 assert('saída POS marcada caixa', posStockObs('abc').startsWith('POS caixa'))
 assert('entrada entrega marcada JBM', deliveryStockObs('xyz').startsWith('JBM delivery'))
+
+console.log('\n== Stock counts JBM notes when movimentos are empty ==')
+const notes = [{
+  id: 'note-1',
+  obs: 'Auto: order abcdef12',
+  vendas_itens: [{ produto_id: 'asahi', qtd: 60 }, { produto_id: 'heineken', qtd: 24 }],
+}]
+const implied = deliveryNoteMoves(notes)
+assert('implied two entradas', implied.length === 2 && implied.every(m => m.tipo === 'entrada'))
+const merged = coalesceStockMoves([], implied)
+const list = decorateStockList(
+  [{ id: 'asahi', nome: 'Asahi' }, { id: 'heineken', nome: 'Heineken' }, { id: 'unknown', nome: 'Mystery' }],
+  merged,
+  { asahi: 12 }
+)
+assert('Asahi 60 from deliveries', list.find(p => p.id === 'asahi')?.stock === 60 && list.find(p => p.id === 'asahi')?.good)
+assert('uncounted is not well-stocked', list.find(p => p.id === 'unknown')?.unknown && !list.find(p => p.id === 'unknown')?.good)
+const glance = stockGlance(list)
+assert('well stocked is 2 not 3', glance.wellStocked === 2 && glance.unknown === 1)
+const explicit = [{ produto_id: 'asahi', tipo: 'entrada', qtd: 10 }, { produto_id: 'asahi', tipo: 'saida', qtd: 2 }]
+const trustExplicit = decorateStockList([{ id: 'asahi', nome: 'Asahi' }], coalesceStockMoves(explicit, implied), {})
+assert('explicit entrada wins over implied', trustExplicit[0].stock === 8)
 
 if (failed) {
   console.log(`\n${failed} teste(s) falharam`)

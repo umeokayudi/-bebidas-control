@@ -23,6 +23,7 @@ export function buildGuestReceiptHtml({
   castNome = '',
   spaceNome = '',
   payMethod = 'Cash',
+  cash = null,
 } = {}) {
   const total = Math.round(+sale.total || items.reduce((a, it) => a + (+it.preco_unitario || +it.preco || 0) * (it.qtd || 1), 0))
   const tax = includedTaxBreakdown(total)
@@ -61,6 +62,9 @@ td,th{padding:6px 4px;border-bottom:1px solid #eee;text-align:left}
   ${cast ? `<div><strong>CAST：</strong>${String(cast).replace(/</g, '')}</div>` : ''}
   ${spaceNome ? `<div><strong>席：</strong>${String(spaceNome).replace(/</g, '')}</div>` : ''}
   <div><strong>支払方法：</strong>${String(payMethod || sale.metodo_pagamento || 'Cash').replace(/</g, '')}</div>
+  ${cash && !cash.exact ? `<div><strong>預かり：</strong>${yen(cash.tendered)}　<strong>お釣り：</strong>${yen(cash.change)}</div>` : ''}
+  ${cash?.exact ? `<div><strong>預かり：</strong>${yen(cash.tendered)}（ちょうど）</div>` : ''}
+  ${!cash && payMethod && !/cash|現金/i.test(payMethod) ? `<div><strong>記録のみ：</strong>端末・PayPay連携なし</div>` : ''}
   ${details ? `<div><strong>備考：</strong>${String(details).replace(/</g, '')}</div>` : ''}
 </div>
 <table>

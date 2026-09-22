@@ -2662,6 +2662,11 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   border-color: rgba(192, 57, 43, 0.35);
   background: #fff8f7;
 }
+.ops-kpi.is-skel {
+  cursor: default;
+  opacity: 0.55;
+}
+.ops-kpis.is-loading .ops-kpis-title { color: var(--navy); }
 .ops-kpi-kicker {
   font-size: 10px;
   font-weight: 800;
@@ -3063,6 +3068,30 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   font-weight: 700;
   color: var(--text2);
   margin-top: 4px;
+}
+.pos-close-split {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+}
+.pos-receipt-cash {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--navy);
+}
+.stock-from-hint {
+  font-size: 12px;
+  color: var(--text2);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+.clock-not-tablet {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  line-height: 1.45;
+  margin: 0 0 10px;
 }
 .floor-stale-banner {
   display: flex;

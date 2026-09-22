@@ -99,9 +99,11 @@ const html = buildGuestReceiptHtml({
   guestNome: 'Kenji',
   castNome: 'Yuki',
   payMethod: 'Cash',
+  cash: { tendered: 5000, change: 1700, exact: false },
 })
 assert('guest receipt is 領収書', html.includes('領　収　書'))
 assert('guest receipt is not JBM invoice', !html.includes('JBM Drinks') && html.includes('JBM請求ではありません') && html.includes('Atomic Bar'))
+assert('guest receipt shows cash change', html.includes('預かり') && html.includes('お釣り'))
 assert('POS number not RY-', buildPosReceiptNumero({ id: 'abc' }).startsWith('POS-') && !buildPosReceiptNumero({ id: 'abc' }).startsWith('RY-'))
 
 console.log('\n== AR war room stays on JBM invoices ==')
@@ -133,6 +135,8 @@ assert('walk-up skips auto service', posUi.includes('effectiveServicePct') && po
 assert('qty minus can remove', posUi.includes('function bumpCart'))
 assert('pay methods are buttons', posUi.includes('pos-pay-methods') && posUi.includes('chargeNow') && posUi.includes('PAY_METHODS'))
 assert('cash tender + short blocks Charge', posUi.includes('pos-cash-box') && posUi.includes('cashShort') && posUi.includes('payRecordHint'))
+assert('till shows cash/card/PayPay split', posUi.includes('paySplit'))
+assert('stock uses JBM notes when movimentos empty', readFileSync(new URL('../src/components/PortalCliente.jsx', import.meta.url), 'utf8').includes('deliveryNoteMoves'))
 assert('no fake PayPay gateway', !posUi.includes('paypay.com') && !posUi.includes('PayPay API'))
 assert('no leftover pay select', !posUi.includes("['Cash', 'Credit card', 'Debit card', 'PayPay', 'Transfer']"))
 assert('sale errors are inline not alert', posUi.includes('setSaleErr') && !posUi.includes("alert(t('atomicPos.saleRegistered"))

@@ -72,6 +72,7 @@ function PunchKiosk({ bar, staffIdLocked, onPunched }) {
       <div className="card" style={{ maxWidth: 420 }}>
         <SectionTitle>{t('clock.pairTablet')}</SectionTitle>
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>{t('clock.pairHint')}</p>
+        <p className="clock-not-tablet">{t('clock.notThisDevice')}</p>
         <input value={tokenInput} onChange={e => setTokenInput(e.target.value.toUpperCase())} placeholder="XXXXXXXX" style={{ width: '100%', marginBottom: 10, letterSpacing: 2, fontWeight: 800 }} />
         <button className="btn-primary" onClick={pair} style={{ width: '100%', padding: 12 }}>{t('clock.pairSave')}</button>
       </div>
@@ -160,9 +161,9 @@ export default function TimeClockPanel({ bar }) {
   async function load() {
     setLoading(true)
     const [pR, sR] = await Promise.all([
-      staffFetch(`/api/time-clock?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`).then(r => r.json()).catch(() => ({ punches: [] })),
+      staffFetch(`/api/time-clock?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`, { signal: AbortSignal.timeout(8000) }).then(r => r.json()).catch(() => ({ punches: [] })),
       canManageBarTeam(perfil?.role)
-        ? staffFetch('/api/bar-staff').then(r => r.json()).catch(() => ({ staff: [] }))
+        ? staffFetch('/api/bar-staff', { signal: AbortSignal.timeout(8000) }).then(r => r.json()).catch(() => ({ staff: [] }))
         : Promise.resolve({ staff: [{ id: perfil?.id, nome: perfil?.nome, cargo: perfil?.cargo, salario_hora: perfil?.salario_hora || 0 }] }),
     ])
     setPunches(pR.punches || [])
@@ -187,6 +188,7 @@ export default function TimeClockPanel({ bar }) {
           <SectionTitle>{t('clock.monthPay')}</SectionTitle>
           {loading ? <Spinner /> : (
             <>
+              <div className="clock-not-tablet">{t('clock.notThisDevice')}</div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.5 }}>
                 {canManageBarTeam(perfil?.role) ? t('clock.staffCostHint') : t('clock.ownPayHint')}
               </div>

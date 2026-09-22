@@ -138,7 +138,13 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
         <div className="pos-ticket-label">{t('atomicPos.nightClose')}</div>
         <div className="pos-close-meta">
           {t('atomicPos.nightOpen', { date: nightKey })} · {summary.ticketCount} · {fmtYen(summary.drinksTotal)}
-          {summary.paypayTotal > 0 ? ` · PayPay ${fmtYen(summary.paypayTotal)}` : ''}
+          <div className="pos-close-split">
+            {t('atomicPos.paySplit', {
+              cash: fmtYen(summary.cashTotal),
+              card: fmtYen(summary.cardTotal),
+              paypay: fmtYen(summary.paypayTotal || 0),
+            })}
+          </div>
         </div>
       </div>
       {closed ? (
@@ -371,6 +377,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
       castNome: agent?.nome || '',
       spaceNome: space?.nome || '',
       payMethod,
+      cash,
     }
     setLastSale(snapshot)
     setCart([])
@@ -600,6 +607,16 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
         {lastSale && (
           <div className="pos-receipt-bar">
             <span>{t('atomicPos.saleRegisteredShort', { amount: fmtYen(lastSale.total) })}</span>
+            {lastSale.cash && (
+              <div className="pos-receipt-cash">
+                {lastSale.cash.exact
+                  ? t('atomicPos.cashExact')
+                  : t('atomicPos.cashOnReceipt', { tendered: fmtYen(lastSale.cash.tendered), change: fmtYen(lastSale.cash.change) })}
+              </div>
+            )}
+            {!lastSale.cash && (
+              <div className="pos-receipt-cash">{t('atomicPos.recordOnlyShort', { method: lastSale.payMethod })}</div>
+            )}
             <button type="button" className="btn-primary" onClick={() => printGuestReceipt({
               barNome: bar.nome,
               sale: { ...lastSale.sale, total: lastSale.total },
@@ -608,6 +625,7 @@ function PosCheckoutTab({ bar, drinks, shots, discountCodes, vipMembers, drinkBa
               castNome: lastSale.castNome,
               spaceNome: lastSale.spaceNome,
               payMethod: lastSale.payMethod,
+              cash: lastSale.cash,
             })}>{t('atomicPos.printReceipt')}</button>
             <div className="pos-receipt-hint">{t('atomicPos.guestReceiptHint')}</div>
           </div>

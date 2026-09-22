@@ -37,6 +37,7 @@ export function buildBarOpsGlance({
   invoices = null,
   today = tokyoDateKey(),
   nightKey = tokyoNightKey(),
+  ready = true,
 } = {}) {
   const ledgers = hq?.books || books || {}
   const jbm = hq?.jbm || {}
@@ -50,6 +51,7 @@ export function buildBarOpsGlance({
   const fromInvoices = invoiceGlance(invoices, today)
   const hasJbm = jbm && (jbm.totalPendente != null || jbm.faturasPendentes != null || jbm.faturasAtraso != null)
   return {
+    ready,
     mixed: false,
     posToday,
     tonightCount,
@@ -107,9 +109,9 @@ export function opsGlanceItems(g, t, fmtYen) {
       value: fmtYen(g.jbmBill),
       hint: t('portal.home.kpiNotes', { count: g.jbmNotes }),
     },
-    { id: 'ar', tab: 'faturas', kicker: t('portal.home.kpiAr'), value: fmtYen(g.openAr), warn: g.openAr > 0 },
-    { id: 'pending', tab: 'faturas', kicker: t('portal.home.kpiPending'), value: String(g.pendingInvoices), warn: g.pendingInvoices > 0 },
-    { id: 'overdue', tab: 'faturas', kicker: t('portal.home.kpiOverdue'), value: String(g.overdue), warn: g.overdue > 0 },
+    { id: 'ar', tab: 'faturas', kicker: t('portal.home.kpiAr'), value: fmtYen(g.openAr), hint: t('portal.home.kpiArHint'), warn: g.openAr > 0 },
+    { id: 'pending', tab: 'faturas', kicker: t('portal.home.kpiPending'), value: String(g.pendingInvoices), hint: t('portal.home.kpiArHint'), warn: g.pendingInvoices > 0 },
+    { id: 'overdue', tab: 'faturas', kicker: t('portal.home.kpiOverdue'), value: String(g.overdue), hint: t('portal.home.kpiArHint'), warn: g.overdue > 0 },
     { id: 'orders', tab: 'pedidos', kicker: t('portal.home.kpiOrders'), value: String(g.openOrders), warn: g.openOrders > 0 },
     { id: 'floor', tab: 'espacos', kicker: t('portal.home.kpiFloor'), value: `${g.seated}`, hint: floorText },
     { id: 'hours', tab: 'ponto', kicker: t('portal.home.kpiHours'), value: `${g.hours}h` },
