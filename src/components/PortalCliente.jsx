@@ -35,7 +35,7 @@ import CastScoreTab from './CastScoreTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
 import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, posPourMoves, stockFlow, stockGlance } from '../lib/barStock'
 import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
-import { isTillKiosk, isClockKiosk, loginDoorFromHash, setDoorHash, doorAllowsRole } from '../lib/barDoors'
+import { isTillKiosk, isClockKiosk, isLiveKiosk, loginDoorFromHash, setDoorHash, doorAllowsRole } from '../lib/barDoors'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
@@ -44,6 +44,7 @@ import BarCostsTab, { CostBooksHero, loadCostBooks, BarCommandActions } from './
 import BarOpsGlance from './BarOpsGlance'
 import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import HqAiDock from './HqAiDock'
+import LivePulseBand, { LiveWatchKiosk } from './LivePulseBand'
 import { fetchHqSnapshot } from '../lib/hqSnapshot'
 import { NotificationBell, useBarOverdueAlerts } from './Notifications'
 import BarOrdersTab from './BarOrdersTab'
@@ -252,6 +253,10 @@ function HomeTab({ bar, onTab }) {
       <section className="home-band">
         <div className="hq-actions-label">{t('portal.home.doTonight')}</div>
         <BarCommandActions onTab={onTab} ids={['pos', 'pedidos', 'espacos', 'clientes', 'ponto', 'custos']} />
+      </section>
+
+      <section className="home-band">
+        <LivePulseBand bar={bar} compact onTab={onTab} />
       </section>
 
       <section className="home-band">
@@ -2110,19 +2115,31 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   const posAccess = posAccessForRole(perfil?.role)
   const tillKiosk = isTillKiosk(perfil?.role, door)
   const clockKiosk = isClockKiosk(perfil?.role)
+  const liveKiosk = isLiveKiosk(perfil?.role, door)
   const footerKey = perfil?.role === 'caixa' ? 'portal.footerCaixa' : perfil?.role === 'bar_staff' ? 'portal.footerStaff' : 'portal.footerHint'
   const dockOn = DOCK.some(d => d.id === tab)
   const kioskAccess = tillKiosk ? 'cashier' : posAccess
 
-  if (!doorAllowsRole(door, perfil?.role) && (door === 'pos' || door === 'clock')) {
+  if (!doorAllowsRole(door, perfil?.role) && (door === 'pos' || door === 'clock' || door === 'live')) {
     return (
       <div className="till-kiosk-wrong">
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{t(door === 'pos' ? 'auth.doorPosTitle' : 'auth.doorStaffTitle')}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{t(door === 'pos' ? 'auth.doorPosTitle' : door === 'live' ? 'auth.laneLive' : 'auth.doorStaffTitle')}</div>
           <p>{t('auth.wrongDoor')}</p>
           <button className="btn-gold" onClick={signOut}>{t('common.signOut')}</button>
         </div>
       </div>
+    )
+  }
+
+  if (liveKiosk) {
+    return (
+      <LiveWatchKiosk
+        bar={bar}
+        onHq={() => { setDoorHash('gerente'); setDoor('gerente') }}
+        onTill={() => { setDoorHash('pos'); setDoor('pos') }}
+        onLock={signOut}
+      />
     )
   }
 
@@ -2136,7 +2153,10 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           </div>
           <div className="till-kiosk-actions">
             {tillKiosk && isGerente(perfil?.role) && (
-              <button type="button" onClick={() => { setDoorHash('gerente'); setDoor('gerente') }}>{t('auth.openHq')}</button>
+              <>
+                <button type="button" onClick={() => { setDoorHash('live'); setDoor('live') }}>{t('auth.openLiveWatch')}</button>
+                <button type="button" onClick={() => { setDoorHash('gerente'); setDoor('gerente') }}>{t('auth.openHq')}</button>
+              </>
             )}
             <button type="button" onClick={signOut}>{t('atomicPos.lockTill')}</button>
           </div>
@@ -2190,9 +2210,14 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           </div>
           <UiPrefsPanel />
           {isGerente(perfil?.role) && (
-            <button type="button" className="sidebar-signout" onClick={() => { setDoorHash('pos'); setDoor('pos') }}>
-              {t('auth.openTillTablet')}
-            </button>
+            <>
+              <button type="button" className="sidebar-signout" onClick={() => { setDoorHash('live'); setDoor('live') }}>
+                {t('auth.openLiveWatch')}
+              </button>
+              <button type="button" className="sidebar-signout" onClick={() => { setDoorHash('pos'); setDoor('pos') }}>
+                {t('auth.openTillTablet')}
+              </button>
+            </>
           )}
           <button onClick={signOut} className="sidebar-signout">{t('common.signOut')}</button>
         </div>

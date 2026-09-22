@@ -19,6 +19,7 @@ import CastScoreTab from './CastScoreTab'
 import BarOpsGlance from './BarOpsGlance'
 import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import { birthdayThisMonth, decorateSpaces } from '../lib/barCrm'
+import LivePulseBand from './LivePulseBand'
 
 const ACTIONS = [
   { id: 'pos', icon: '🧾', labelKey: 'portal.home.goPos', hintKey: 'portal.home.goPosHint' },
@@ -298,6 +299,8 @@ export default function BarCostsTab({ bar, onTab }) {
         </button>
       </div>
       {err && <div style={{ color: 'var(--red)', marginBottom: 12 }}>{err}</div>}
+
+      <LivePulseBand bar={bar} compact onTab={onTab} />
 
       <BarOpsGlance
         glance={buildBarOpsGlance({

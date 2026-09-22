@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { navForBarRole, isBarRole, isJbmRole, posAccessForRole, canSeeJbmSupply, defaultBarTab, costAccessForRole, primaryDockForRole, groupedNavForRole } from '../src/lib/access.js'
 import { haversineMeters, isInsideGeofence, hoursBetween, calcPay, pairPunches, payrollFromPunches } from '../src/lib/timeClock.js'
 import { WRITTEN_LOGINS } from '../src/lib/barLanes.js'
-import { loginDoorFromHash, isTillKiosk, isClockKiosk, doorAllowsRole, hashForDoor } from '../src/lib/barDoors.js'
+import { loginDoorFromHash, isTillKiosk, isClockKiosk, isLiveKiosk, doorAllowsRole, hashForDoor, LOGIN_DOORS } from '../src/lib/barDoors.js'
 import { splitCostBooks, booksAreSeparate, booksGrandTotal } from '../src/lib/costBooks.js'
 import { signLanePayload, verifyLaneToken } from '../api/_hash.js'
 
@@ -37,6 +37,9 @@ assert('gerente dock is Home POS Orders Clock', primaryDockForRole('cliente').ma
 assert('caixa has no extra dock', primaryDockForRole('caixa').length === 0)
 assert('POS hash is till door', loginDoorFromHash('#/pos') === 'pos' && hashForDoor('pos') === '#/pos')
 assert('clock hash is staff door', loginDoorFromHash('#/clock') === 'clock')
+assert('live watch is not a 5th password door', LOGIN_DOORS.length === 4 && LOGIN_DOORS.every(d => d.id !== 'live'))
+assert('live hash is gerente watch', loginDoorFromHash('#/live') === 'live' && hashForDoor('live') === '#/live')
+assert('gerente can open live watch', isLiveKiosk('cliente', 'live') && doorAllowsRole('live', 'cliente') && !isLiveKiosk('caixa', 'live'))
 assert('caixa is always till kiosk', isTillKiosk('caixa', ''))
 assert('gerente on /#/pos is till kiosk', isTillKiosk('cliente', 'pos') && !isTillKiosk('cliente', 'gerente'))
 assert('staff is clock kiosk', isClockKiosk('bar_staff') && !isClockKiosk('caixa'))

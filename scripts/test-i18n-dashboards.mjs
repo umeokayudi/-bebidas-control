@@ -42,6 +42,9 @@ assert('home tile hints exist', en.portal.home.goPosHint.includes('Till') && ja.
 assert('floor/guest load errors exist', en.spaces.loadError.includes('floor') && ja.guests.loadError.includes('ゲスト'))
 assert('sundry and CAST keys exist', !!(en.sundry?.title && ja.sundry?.title && en.cast?.breakeven && ja.nav.portalCast))
 assert('sundry is not a fifth book in copy', /not added|never added|not POS/i.test(en.sundry.hint))
+assert('live pulse keys exist', !!(en.portal.live?.title && ja.portal.live?.title && en.auth.openLiveWatch && ja.auth.laneLive))
+assert('live pulse is not a fifth book in copy', /not a fifth book/i.test(en.portal.live.hint))
+assert('four password doors only', !!(en.auth.doorPosTitle && en.auth.doorGerenteTitle && en.auth.doorStaffTitle && en.auth.doorJbmTitle && en.auth.devicesHint))
 
 console.log('\n== Locale key parity (en vs ja) ==')
 const enKeys = flatten(en)

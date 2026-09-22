@@ -43,6 +43,7 @@ export function loginDoorFromHash(hash = typeof location !== 'undefined' ? locat
   if (h === 'clock' || h === 'ponto' || h === 'staff') return 'clock'
   if (h === 'hq' || h === 'office' || h === 'gerente') return 'gerente'
   if (h === 'jbm' || h === 'supply') return 'jbm'
+  if (h === 'live' || h === 'watch' || h === 'pulse') return 'live'
   return ''
 }
 
@@ -51,6 +52,7 @@ export function hashForDoor(id) {
   if (id === 'clock') return '#/clock'
   if (id === 'gerente') return '#/hq'
   if (id === 'jbm') return '#/jbm'
+  if (id === 'live') return '#/live'
   return '#/'
 }
 
@@ -86,11 +88,17 @@ export function isClockKiosk(role) {
   return role === 'bar_staff'
 }
 
+/** Gerente watch tablet — last sale / live till / this-hour blue-red. Not a 5th password door. */
+export function isLiveKiosk(role, door = loginDoorFromHash()) {
+  return door === 'live' && (role === 'cliente' || role === 'gerente')
+}
+
 export function doorAllowsRole(door, role) {
   if (!door) return true
   if (door === 'pos') return role === 'caixa' || role === 'cliente' || role === 'gerente'
   if (door === 'clock') return role === 'bar_staff'
   if (door === 'gerente') return role === 'cliente' || role === 'gerente'
+  if (door === 'live') return role === 'cliente' || role === 'gerente'
   if (door === 'jbm') return role === 'admin' || role === 'funcionario' || role === 'staff'
   return true
 }

@@ -3378,6 +3378,164 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   text-align: center;
   padding: 24px;
 }
+.live-pulse {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px 14px;
+  margin-bottom: 16px;
+}
+.live-pulse.is-blue { border-color: rgba(26,58,107,0.35); box-shadow: inset 4px 0 0 var(--blue); }
+.live-pulse.is-red { border-color: rgba(160,41,28,0.35); box-shadow: inset 4px 0 0 var(--red); }
+.live-pulse.is-idle, .live-pulse.is-loading { box-shadow: inset 4px 0 0 var(--bg4); }
+.live-pulse-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.live-pulse-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+.live-pulse-hint {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.live-flag {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg3);
+  color: var(--text2);
+}
+.live-flag.is-blue { background: var(--blue-bg); color: var(--blue); }
+.live-flag.is-red { background: var(--red-bg); color: var(--red); }
+.live-flag.is-xl { font-size: 22px; padding: 10px 16px; }
+.live-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.live-stat-k {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.live-stat-v {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--navy);
+  margin-top: 4px;
+}
+.live-stat-h { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.live-pulse-status {
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.live-pulse-status.is-blue { color: var(--blue); }
+.live-pulse-status.is-red { color: var(--red); }
+.live-pulse-err { color: var(--red); font-size: 12px; margin-top: 8px; }
+.live-cuts { margin-top: 14px; }
+.live-cuts-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  color: var(--navy);
+}
+.live-cuts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+.live-cut {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+}
+.live-cut.is-blue { border-color: rgba(26,58,107,0.28); }
+.live-cut.is-red { border-color: rgba(160,41,28,0.28); }
+.live-cut-name { font-size: 13px; font-weight: 800; color: var(--navy); }
+.live-cut-saved, .live-cut-after, .live-cut-flag { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.live-cut-flag { font-weight: 700; }
+.live-pulse-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  align-items: flex-start;
+}
+.live-ai-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.live-ai-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--navy);
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.live-pulse-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.live-pulse-links button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.app-shell.is-live-kiosk.is-blue { background: var(--blue-bg); }
+.app-shell.is-live-kiosk.is-red { background: var(--red-bg); }
+.live-watch-hero { text-align: center; padding: 18px 8px 8px; }
+.live-watch-hour { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text2); }
+.live-watch-last { font-size: 48px; font-weight: 800; color: var(--navy); margin-top: 8px; }
+.live-watch-last-h { font-size: 13px; color: var(--text2); }
+.live-watch-nums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+.live-roster {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.live-roster li {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg2);
+  border-radius: 8px;
+  font-size: 13px;
+}
+@media (max-width: 800px) {
+  .live-pulse-grid { grid-template-columns: 1fr 1fr; }
+  .live-watch-nums { grid-template-columns: 1fr; }
+  .live-watch-last { font-size: 36px; }
+}
 @media (max-width: 640px) {
   .ord-meta-grid { grid-template-columns: 1fr; }
   .pos-checkout { grid-template-columns: 1fr; }

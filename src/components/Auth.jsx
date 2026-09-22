@@ -153,21 +153,27 @@ function LoginLanguagePicker() {
   )
 }
 
+function loginFormDoorId(hashDoor, pref) {
+  if (hashDoor === 'live') return 'gerente'
+  return hashDoor || pref || ''
+}
+
 export function LoginPage() {
   const { signIn } = useAuth()
   const { t } = useI18n()
-  const [doorId, setDoorId] = useState(() => loginDoorFromHash() || readDoorPref() || '')
+  const [doorId, setDoorId] = useState(() => loginFormDoorId(loginDoorFromHash(), readDoorPref()))
   const door = doorById(doorId)
-  const [email, setEmail] = useState(() => doorById(loginDoorFromHash() || readDoorPref() || '')?.prefillEmail || '')
+  const [email, setEmail] = useState(() => doorById(loginFormDoorId(loginDoorFromHash(), readDoorPref()))?.prefillEmail || '')
   const [pass,  setPass]  = useState('')
-  const [keep,  setKeep]  = useState(() => doorById(loginDoorFromHash() || readDoorPref() || '')?.keep !== false)
+  const [keep,  setKeep]  = useState(() => doorById(loginFormDoorId(loginDoorFromHash(), readDoorPref()))?.keep !== false)
   const [err,   setErr]   = useState('')
   const [busy,  setBusy]  = useState(false)
 
   useEffect(() => {
     const sync = () => {
       const fromHash = loginDoorFromHash()
-      if (fromHash && fromHash !== doorId) pickDoor(fromHash, false)
+      const formId = loginFormDoorId(fromHash, '')
+      if (formId && formId !== doorId) pickDoor(formId, false)
     }
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
@@ -194,6 +200,7 @@ export function LoginPage() {
     try {
       const { error } = await signIn(email, pass, { keep: !!(door?.keep && keep) })
       if (error) setErr(t('auth.wrongCredentials'))
+      else if (loginDoorFromHash() === 'live') setDoorHash('live')
       else if (doorId) setDoorHash(doorId)
     } finally { setBusy(false) }
   }
@@ -253,6 +260,7 @@ export function LoginPage() {
                   </button>
                 ))}
               </div>
+              <div className="login-door-hint">{t('auth.devicesHint')}</div>
             </>
           ) : (
             <>
@@ -265,6 +273,7 @@ export function LoginPage() {
               <div className="login-door-hint">{t(door.hintKey)}</div>
               {door.id === 'pos' && <div className="login-door-hint">{t('auth.posBookmark')}</div>}
               {door.id === 'clock' && <div className="login-door-hint">{t('auth.clockBookmark')}</div>}
+              {door.id === 'gerente' && <div className="login-door-hint">{t('auth.liveBookmark')}</div>}
 
               <div style={{ marginBottom: 14, marginTop: 18 }}>
                 <label className="form-label" style={{ color: 'rgba(193,156,86,0.7)' }}>{t('auth.email')}</label>
