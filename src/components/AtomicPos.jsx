@@ -83,11 +83,11 @@ function NightCloseBar({ bar, salesHint = [], compact = false }) {
 
   const summary = summarizeNight(nightSales, nightKey)
   const lastNight = summarizeNight(nightSales, lastNightKey)
-  const busy = lastBusyNight(nightSales, nightKey)
+  const lastBusy = lastBusyNight(nightSales, nightKey)
   const prior = lastNight.ticketCount > 0
     ? { date: lastNightKey, count: lastNight.ticketCount, amount: lastNight.drinksTotal, split: lastNight }
-    : busy.total > 0
-      ? { date: busy.date, count: busy.ticketCount, amount: busy.total, split: summarizeNight(nightSales, busy.date) }
+    : lastBusy.total > 0
+      ? { date: lastBusy.date, count: lastBusy.ticketCount, amount: lastBusy.total, split: summarizeNight(nightSales, lastBusy.date) }
       : null
   const closed = shift?.status === 'closed'
 
