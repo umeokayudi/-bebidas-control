@@ -21,20 +21,44 @@ export default function FloorSendPad({ bar, role, onTill, onMake, onLive, onHq, 
   const [flash, setFlash] = useState('')
   const [err, setErr] = useState('')
   const [slips, setSlips] = useState([])
+  const [ready, setReady] = useState(false)
   const night = tokyoNightKey()
 
   async function loadMenu() {
     if (!bar?.id) return
-    const [dR, aR, sR, oR] = await Promise.all([
-      supabase.from('drink_menu').select('id,nome,categoria,preco_venda').eq('bar_id', bar.id).order('categoria').order('nome'),
+    const [dR, pR, aR, sR, oR] = await Promise.all([
+      supabase.from('drink_menu').select('id,nome,categoria,preco_venda').eq('bar_id', bar.id).order('nome'),
+      supabase.from('bar_pricing').select('produto_id,preco_drink,produtos(nome,categoria)').eq('bar_id', bar.id),
       supabase.from('drink_back_agents').select('id,nome,ativo').eq('bar_id', bar.id).eq('ativo', true),
       supabase.from('bar_spaces').select('id,nome,tipo,zona,ordem,ativo').eq('bar_id', bar.id).eq('ativo', true).order('ordem'),
       supabase.from(FLOOR_TABLE).select('*').eq('bar_id', bar.id).eq('night_key', night).order('criado_em', { ascending: false }).limit(20),
     ])
-    setDrinks(dR.error ? [] : (dR.data || []))
+    const menu = (dR.error ? [] : (dR.data || [])).map(d => ({
+      key: `d-${d.id}`,
+      drink_menu_id: d.id,
+      produto_id: null,
+      nome: d.nome,
+      categoria: d.categoria || '',
+    }))
+    const shots = (pR.error ? [] : (pR.data || [])).map(s => ({
+      key: `p-${s.produto_id}`,
+      drink_menu_id: null,
+      produto_id: s.produto_id,
+      nome: s.produtos?.nome || 'Shot',
+      categoria: s.produtos?.categoria || 'Shot',
+    }))
+    const seen = new Set()
+    const catalog = [...menu, ...shots].filter(d => {
+      const k = d.nome.toLowerCase()
+      if (!d.nome || seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+    setDrinks(catalog)
     setAgents(aR.error ? [] : (aR.data || []))
     setSpaces(sR.error ? [] : (sR.data || []))
     setSlips(floorSlipsTonight(oR.error ? [] : (oR.data || []), night))
+    setReady(true)
   }
 
   useEffect(() => { loadMenu() }, [bar?.id, night])
@@ -49,15 +73,21 @@ export default function FloorSendPad({ bar, role, onTill, onMake, onLive, onHq, 
     setErr('')
     setFlash('')
     setCart(prev => {
-      const ex = prev.find(x => x.drink_menu_id === d.id)
-      if (ex) return prev.map(x => x.drink_menu_id === d.id ? { ...x, qtd: x.qtd + 1 } : x)
-      return [...prev, { drink_menu_id: d.id, nome: d.nome, qtd: 1 }]
+      const ex = prev.find(x => x.key === d.key)
+      if (ex) return prev.map(x => x.key === d.key ? { ...x, qtd: x.qtd + 1 } : x)
+      return [...prev, {
+        key: d.key,
+        drink_menu_id: d.drink_menu_id,
+        produto_id: d.produto_id,
+        nome: d.nome,
+        qtd: 1,
+      }]
     })
   }
 
-  function bump(id, delta) {
+  function bump(key, delta) {
     setCart(prev => prev
-      .map(x => x.drink_menu_id === id ? { ...x, qtd: x.qtd + delta } : x)
+      .map(x => x.key === key ? { ...x, qtd: x.qtd + delta } : x)
       .filter(x => x.qtd > 0))
   }
 
@@ -149,14 +179,15 @@ export default function FloorSendPad({ bar, role, onTill, onMake, onLive, onHq, 
           </div>
         )}
         <div className="send-grid">
-          {visible.length === 0 && (
+          {!ready && <div className="send-empty">{t('common.loading')}</div>}
+          {ready && visible.length === 0 && (
             <div className="send-empty">{t('atomicPos.noMenuYet')}</div>
           )}
           {visible.map(d => {
-            const inCart = cart.find(x => x.drink_menu_id === d.id)
+            const inCart = cart.find(x => x.key === d.key)
             return (
               <button
-                key={d.id}
+                key={d.key}
                 type="button"
                 className={`send-tile${inCart ? ' is-on' : ''}`}
                 data-send-drink={d.nome}
@@ -187,7 +218,7 @@ export default function FloorSendPad({ bar, role, onTill, onMake, onLive, onHq, 
         {flash && <div className="send-ok" data-send-ok>{flash}</div>}
         <div className="send-cart">
           {cart.length === 0 ? t('portal.floor.cartEmpty') : cart.map(it => (
-            <button key={it.drink_menu_id} type="button" className="send-cart-item" onClick={() => bump(it.drink_menu_id, -1)}>
+            <button key={it.key} type="button" className="send-cart-item" onClick={() => bump(it.key, -1)}>
               {it.qtd}× {it.nome}
             </button>
           ))}

@@ -89,7 +89,7 @@ const liveRoute = readFileSync(new URL('../api/_routeBarLive.js', import.meta.ur
 const store = readFileSync(new URL('../api/_barLiveStore.js', import.meta.url), 'utf8')
 assert('portal mounts send pad', portal.includes('FloorSendPad') && portal.includes("openLane('send')"))
 assert('send pad has SEND not Charge', pad.includes('data-send-go') && !pad.includes('commitPosSale') && !pad.includes('chargeNow'))
-assert('send pad writes floor table only', pad.includes("from(FLOOR_TABLE)") && !pad.includes("from('pos_vendas')") && !pad.includes("from('vendas')") && !pad.includes("from('faturas')"))
+assert('send pad writes floor table only', pad.includes("from(FLOOR_TABLE)") && pad.includes('bar_pricing') && !pad.includes("from('pos_vendas')") && !pad.includes("from('vendas')") && !pad.includes("from('faturas')"))
 assert('drinks board reads floor orders', kiosk.includes('bar_floor_orders'))
 assert('live client has floor table', clientTables.has('bar_floor_orders'))
 assert('live store seeds empty floor', store.includes("'bar_floor_orders'") && store.includes("saveTable(admin, 'bar_floor_orders', [])"))
