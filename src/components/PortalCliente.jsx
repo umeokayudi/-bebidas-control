@@ -35,7 +35,7 @@ import CastScoreTab from './CastScoreTab'
 import { fetchAllStockMovements } from '../lib/posSupply'
 import { coalesceStockMoves, decorateStockList, deliveryNoteMoves, posPourMoves, stockFlow, stockGlance } from '../lib/barStock'
 import { groupedNavForRole, primaryDockForRole, defaultBarTab, posAccessForRole, canManageBarTeam, isGerente, costAccessForRole } from '../lib/access'
-import { isTillKiosk, isClockKiosk, isLiveKiosk, loginDoorFromHash, setDoorHash, doorAllowsRole } from '../lib/barDoors'
+import { isTillKiosk, isClockKiosk, isLiveKiosk, isMakeKiosk, loginDoorFromHash, setDoorHash, doorAllowsRole } from '../lib/barDoors'
 import UiPrefsPanel from './UiPrefsPanel'
 import { useI18n } from '../lib/i18n'
 import { tokyoMonthKey } from '../lib/tokyo'
@@ -45,6 +45,7 @@ import BarOpsGlance from './BarOpsGlance'
 import { buildBarOpsGlance } from '../lib/barOpsGlance'
 import HqAiDock from './HqAiDock'
 import LivePulseBand, { LiveWatchKiosk } from './LivePulseBand'
+import DrinkMakeKiosk from './DrinkMakeKiosk'
 import { fetchHqSnapshot } from '../lib/hqSnapshot'
 import { NotificationBell, useBarOverdueAlerts } from './Notifications'
 import BarOrdersTab from './BarOrdersTab'
@@ -2116,19 +2117,32 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
   const tillKiosk = isTillKiosk(perfil?.role, door)
   const clockKiosk = isClockKiosk(perfil?.role)
   const liveKiosk = isLiveKiosk(perfil?.role, door)
+  const makeKiosk = isMakeKiosk(perfil?.role, door)
   const footerKey = perfil?.role === 'caixa' ? 'portal.footerCaixa' : perfil?.role === 'bar_staff' ? 'portal.footerStaff' : 'portal.footerHint'
   const dockOn = DOCK.some(d => d.id === tab)
   const kioskAccess = tillKiosk ? 'cashier' : posAccess
 
-  if (!doorAllowsRole(door, perfil?.role) && (door === 'pos' || door === 'clock' || door === 'live')) {
+  if (!doorAllowsRole(door, perfil?.role) && (door === 'pos' || door === 'clock' || door === 'live' || door === 'make')) {
     return (
       <div className="till-kiosk-wrong">
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{t(door === 'pos' ? 'auth.doorPosTitle' : door === 'live' ? 'auth.laneLive' : 'auth.doorStaffTitle')}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{t(door === 'pos' ? 'auth.doorPosTitle' : door === 'live' ? 'auth.laneLive' : door === 'make' ? 'auth.laneMake' : 'auth.doorStaffTitle')}</div>
           <p>{t('auth.wrongDoor')}</p>
           <button className="btn-gold" onClick={signOut}>{t('common.signOut')}</button>
         </div>
       </div>
+    )
+  }
+
+  if (makeKiosk) {
+    return (
+      <DrinkMakeKiosk
+        bar={bar}
+        onHq={isGerente(perfil?.role) ? () => { setDoorHash('gerente'); setDoor('gerente') } : undefined}
+        onTill={() => { setDoorHash('pos'); setDoor('pos') }}
+        onLive={isGerente(perfil?.role) ? () => { setDoorHash('live'); setDoor('live') } : undefined}
+        onLock={signOut}
+      />
     )
   }
 
@@ -2138,6 +2152,7 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
         bar={bar}
         onHq={() => { setDoorHash('gerente'); setDoor('gerente') }}
         onTill={() => { setDoorHash('pos'); setDoor('pos') }}
+        onMake={() => { setDoorHash('make'); setDoor('make') }}
         onLock={signOut}
       />
     )
@@ -2152,10 +2167,15 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
             <div className="till-kiosk-lane">{tillKiosk ? t('auth.lanePos') : t('auth.laneStaff')}</div>
           </div>
           <div className="till-kiosk-actions">
-            {tillKiosk && isGerente(perfil?.role) && (
+            {tillKiosk && (isGerente(perfil?.role) || perfil?.role === 'caixa') && (
               <>
-                <button type="button" onClick={() => { setDoorHash('live'); setDoor('live') }}>{t('auth.openLiveWatch')}</button>
-                <button type="button" onClick={() => { setDoorHash('gerente'); setDoor('gerente') }}>{t('auth.openHq')}</button>
+                <button type="button" onClick={() => { setDoorHash('make'); setDoor('make') }}>{t('auth.openDrinksBoard')}</button>
+                {isGerente(perfil?.role) && (
+                  <>
+                    <button type="button" onClick={() => { setDoorHash('live'); setDoor('live') }}>{t('auth.openLiveWatch')}</button>
+                    <button type="button" onClick={() => { setDoorHash('gerente'); setDoor('gerente') }}>{t('auth.openHq')}</button>
+                  </>
+                )}
               </>
             )}
             <button type="button" onClick={signOut}>{t('atomicPos.lockTill')}</button>
@@ -2211,6 +2231,9 @@ export default function PortalCliente({ bar, signOut, notifs=[], unread=0, markR
           <UiPrefsPanel />
           {isGerente(perfil?.role) && (
             <>
+              <button type="button" className="sidebar-signout" onClick={() => { setDoorHash('make'); setDoor('make') }}>
+                {t('auth.openDrinksBoard')}
+              </button>
               <button type="button" className="sidebar-signout" onClick={() => { setDoorHash('live'); setDoor('live') }}>
                 {t('auth.openLiveWatch')}
               </button>

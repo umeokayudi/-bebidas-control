@@ -44,6 +44,7 @@ assert('sundry and CAST keys exist', !!(en.sundry?.title && ja.sundry?.title && 
 assert('sundry is not a fifth book in copy', /not added|never added|not POS/i.test(en.sundry.hint))
 assert('live pulse keys exist', !!(en.portal.live?.title && ja.portal.live?.title && en.auth.openLiveWatch && ja.auth.laneLive))
 assert('live pulse is not a fifth book in copy', /not a fifth book/i.test(en.portal.live.hint))
+assert('drinks board keys exist', !!(en.portal.make?.now && ja.portal.make?.now && en.auth.openDrinksBoard && ja.auth.makeBookmark))
 assert('four password doors only', !!(en.auth.doorPosTitle && en.auth.doorGerenteTitle && en.auth.doorStaffTitle && en.auth.doorJbmTitle && en.auth.devicesHint))
 
 console.log('\n== Locale key parity (en vs ja) ==')

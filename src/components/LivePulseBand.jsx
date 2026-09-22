@@ -211,6 +211,7 @@ export default function LivePulseBand({ bar, compact = false, onTab }) {
         <GeminiCutBox pulse={pulse} compact={compact} />
         <div className="live-pulse-links">
           <button type="button" onClick={() => setDoorHash('live')} data-live-open-watch>{t('portal.live.openWatch')}</button>
+          <button type="button" onClick={() => setDoorHash('make')}>{t('auth.openDrinksBoard')}</button>
           {onTab && <button type="button" onClick={() => onTab('ponto')}>{t('portal.hq.linkClock')}</button>}
         </div>
       </div>
@@ -218,7 +219,7 @@ export default function LivePulseBand({ bar, compact = false, onTab }) {
   )
 }
 
-export function LiveWatchKiosk({ bar, onHq, onTill, onLock }) {
+export function LiveWatchKiosk({ bar, onHq, onTill, onMake, onLock }) {
   const { t } = useI18n()
   const { pulse } = useLivePulse(bar)
   const color = pulse?.color || 'idle'
@@ -230,6 +231,7 @@ export function LiveWatchKiosk({ bar, onHq, onTill, onLock }) {
           <div className="till-kiosk-lane">{t('auth.laneLive')}</div>
         </div>
         <div className="till-kiosk-actions">
+          {onMake && <button type="button" onClick={onMake}>{t('auth.openDrinksBoard')}</button>}
           {onHq && <button type="button" onClick={onHq}>{t('auth.openHq')}</button>}
           {onTill && <button type="button" onClick={onTill}>{t('auth.openTillTablet')}</button>}
           {onLock && <button type="button" onClick={onLock}>{t('atomicPos.lockTill')}</button>}
@@ -254,17 +256,20 @@ export function LiveWatchKiosk({ bar, onHq, onTill, onLock }) {
               </div>
             </div>
             <div className="live-watch-nums">
-              <div>
+              <div className="live-watch-card">
                 <div className="live-stat-k">{t('portal.live.tonight')}</div>
                 <div className="live-stat-v" data-live-tonight>{fmtYen(pulse.tonightTill)}</div>
+                <div className="live-stat-h">{t('portal.home.kpiTickets', { count: pulse.tonightCount })}</div>
               </div>
-              <div>
+              <div className="live-watch-card">
                 <div className="live-stat-k">{t('portal.live.hourTill')}</div>
                 <div className="live-stat-v" data-live-hour-till>{fmtYen(pulse.hourTill)}</div>
+                <div className="live-stat-h">{t('portal.home.kpiTickets', { count: pulse.hourCount })}</div>
               </div>
-              <div>
+              <div className={`live-watch-card is-${color}`}>
                 <div className="live-stat-k">{t('portal.live.hourWages')}</div>
                 <div className="live-stat-v" data-live-hour-burn>{fmtYen(pulse.hourWageBurn)}</div>
+                <div className="live-stat-h">{t('portal.live.staffOn', { count: pulse.openCount })}</div>
               </div>
             </div>
             <p className="live-pulse-hint">{t('portal.live.notBooks')}</p>

@@ -3381,13 +3381,177 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
 .live-pulse {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px 18px 14px;
+  border-radius: 18px;
+  padding: 18px 20px 16px;
   margin-bottom: 16px;
 }
-.live-pulse.is-blue { border-color: rgba(26,58,107,0.35); box-shadow: inset 4px 0 0 var(--blue); }
-.live-pulse.is-red { border-color: rgba(160,41,28,0.35); box-shadow: inset 4px 0 0 var(--red); }
-.live-pulse.is-idle, .live-pulse.is-loading { box-shadow: inset 4px 0 0 var(--bg4); }
+.live-pulse.is-blue { border-color: rgba(26,58,107,0.45); box-shadow: inset 6px 0 0 var(--blue); background: linear-gradient(90deg, var(--blue-bg) 0%, var(--bg2) 42%); }
+.live-pulse.is-red { border-color: rgba(160,41,28,0.45); box-shadow: inset 6px 0 0 var(--red); background: linear-gradient(90deg, var(--red-bg) 0%, var(--bg2) 42%); }
+.live-pulse.is-idle, .live-pulse.is-loading { box-shadow: inset 6px 0 0 var(--bg4); }
+.live-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.live-stat {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.live-stat-v {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--navy);
+  margin-top: 4px;
+  letter-spacing: -0.03em;
+}
+.live-flag.is-xl {
+  font-size: 28px;
+  padding: 12px 22px;
+  border-radius: 14px;
+  letter-spacing: 0.18em;
+}
+.app-shell.is-live-kiosk { background: #071018; }
+.app-shell.is-live-kiosk.is-blue { background: radial-gradient(1200px 480px at 50% 0%, #1a3a6b 0%, #071018 62%); }
+.app-shell.is-live-kiosk.is-red { background: radial-gradient(1200px 480px at 50% 0%, #6b1a18 0%, #071018 62%); }
+.app-shell.is-live-kiosk .till-kiosk-main.live-watch {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+  color: #f4efe6;
+}
+.app-shell.is-live-kiosk .live-watch-hero {
+  text-align: center;
+  padding: 28px 16px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px;
+}
+.app-shell.is-live-kiosk .live-watch-hour { margin-top: 12px; font-size: 15px; font-weight: 700; color: rgba(244,239,230,0.65); }
+.app-shell.is-live-kiosk .live-watch-last { font-size: 72px; font-weight: 800; color: #fff; margin-top: 6px; letter-spacing: -0.04em; line-height: 1; }
+.app-shell.is-live-kiosk .live-watch-last-h { font-size: 15px; color: rgba(244,239,230,0.62); margin-top: 8px; }
+.app-shell.is-live-kiosk .live-watch-nums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 22px 0 10px;
+}
+.live-watch-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 18px 16px 16px;
+}
+.app-shell.is-live-kiosk .live-stat-k { color: rgba(244,239,230,0.5); }
+.app-shell.is-live-kiosk .live-stat-v { color: #fff; font-size: 32px; }
+.app-shell.is-live-kiosk .live-stat-h { color: rgba(244,239,230,0.55); }
+.app-shell.is-live-kiosk .live-pulse-hint { color: rgba(244,239,230,0.45); }
+.app-shell.is-live-kiosk .live-roster li { background: rgba(255,255,255,0.06); color: #fff; border-radius: 12px; padding: 12px 14px; font-size: 16px; }
+.app-shell.is-live-kiosk .live-cut { background: rgba(255,255,255,0.05); color: #fff; border-color: rgba(255,255,255,0.12); }
+.app-shell.is-live-kiosk .live-cut-name { color: #fff; }
+.app-shell.is-live-kiosk .live-ai-text { background: rgba(255,255,255,0.06); color: #fff; }
+.app-shell.is-make-kiosk {
+  background: #05070c;
+  color: #f7f1e6;
+}
+.make-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #000;
+  color: #fff;
+  min-height: 44px;
+}
+.make-top .till-kiosk-lane { color: rgba(255,255,255,0.45); }
+.make-clock {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.make-top-actions button {
+  opacity: 0.35;
+  min-height: 32px;
+  font-size: 11px;
+}
+.make-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 28px 28px;
+  min-height: 0;
+}
+.make-kicker {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.make-seq {
+  font-size: clamp(96px, 22vw, 220px);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  margin: 8px 0 12px;
+}
+.make-wait { text-align: center; padding: 40px 12px 24px; }
+.make-wait .make-seq { color: rgba(255,255,255,0.28); }
+.make-wait-h { font-size: 22px; color: rgba(247,241,230,0.55); }
+.make-pours { list-style: none; display: grid; gap: 10px; }
+.make-pours li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 18px;
+}
+.make-qty {
+  min-width: 1.2em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  line-height: 1;
+}
+.make-drink { font-weight: 800; color: #fff; line-height: 1.05; }
+.make-pours.is-xl .make-qty { font-size: clamp(64px, 12vw, 120px); }
+.make-pours.is-xl .make-drink { font-size: clamp(42px, 8vw, 84px); }
+.make-pours.is-md .make-qty { font-size: 36px; }
+.make-pours.is-md .make-drink { font-size: 28px; }
+.make-note { margin-top: 16px; font-size: 22px; color: rgba(247,241,230,0.55); }
+.make-next { margin-top: auto; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08); }
+.make-next-k {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(193,156,86,0.8);
+  margin-bottom: 10px;
+}
+.make-next-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.make-next-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+.make-next-seq { font-size: 42px; font-weight: 800; letter-spacing: -0.04em; color: #fff; }
+.app-shell.is-make-kiosk.is-fresh .make-seq {
+  animation: make-pop 0.8s ease;
+}
+@keyframes make-pop {
+  0% { transform: scale(0.92); color: var(--gold); }
+  100% { transform: scale(1); color: #fff; }
+}
+@media (max-width: 900px) {
+  .make-next-row { grid-template-columns: 1fr 1fr; }
+  .app-shell.is-live-kiosk .live-watch-last { font-size: 52px; }
+  .app-shell.is-live-kiosk .live-watch-nums { grid-template-columns: 1fr; }
+}
 .live-pulse-head {
   display: flex;
   justify-content: space-between;
@@ -3419,24 +3583,12 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
 }
 .live-flag.is-blue { background: var(--blue-bg); color: var(--blue); }
 .live-flag.is-red { background: var(--red-bg); color: var(--red); }
-.live-flag.is-xl { font-size: 22px; padding: 10px 16px; }
-.live-pulse-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
 .live-stat-k {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text3);
-}
-.live-stat-v {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--navy);
-  margin-top: 4px;
 }
 .live-stat-h { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .live-pulse-status {
@@ -3504,11 +3656,8 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
   font-weight: 800;
   cursor: pointer;
 }
-.app-shell.is-live-kiosk.is-blue { background: var(--blue-bg); }
-.app-shell.is-live-kiosk.is-red { background: var(--red-bg); }
 .live-watch-hero { text-align: center; padding: 18px 8px 8px; }
 .live-watch-hour { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--text2); }
-.live-watch-last { font-size: 48px; font-weight: 800; color: var(--navy); margin-top: 8px; }
 .live-watch-last-h { font-size: 13px; color: var(--text2); }
 .live-watch-nums {
   display: grid;
@@ -3534,7 +3683,6 @@ html[data-device="phone"] .clock-kiosk { max-width: none; }
 @media (max-width: 800px) {
   .live-pulse-grid { grid-template-columns: 1fr 1fr; }
   .live-watch-nums { grid-template-columns: 1fr; }
-  .live-watch-last { font-size: 36px; }
 }
 @media (max-width: 640px) {
   .ord-meta-grid { grid-template-columns: 1fr; }

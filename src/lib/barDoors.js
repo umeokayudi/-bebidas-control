@@ -44,6 +44,7 @@ export function loginDoorFromHash(hash = typeof location !== 'undefined' ? locat
   if (h === 'hq' || h === 'office' || h === 'gerente') return 'gerente'
   if (h === 'jbm' || h === 'supply') return 'jbm'
   if (h === 'live' || h === 'watch' || h === 'pulse') return 'live'
+  if (h === 'make' || h === 'pour' || h === 'drinks') return 'make'
   return ''
 }
 
@@ -53,6 +54,7 @@ export function hashForDoor(id) {
   if (id === 'gerente') return '#/hq'
   if (id === 'jbm') return '#/jbm'
   if (id === 'live') return '#/live'
+  if (id === 'make') return '#/make'
   return '#/'
 }
 
@@ -79,6 +81,7 @@ export function setDoorHash(id) {
 
 /** POS till tablet chrome — caixa always, or owner covering the floor via /#/pos. */
 export function isTillKiosk(role, door = loginDoorFromHash()) {
+  if (door === 'make' || door === 'live') return false
   if (role === 'caixa') return true
   if (door === 'pos' && (role === 'cliente' || role === 'gerente')) return true
   return false
@@ -93,12 +96,19 @@ export function isLiveKiosk(role, door = loginDoorFromHash()) {
   return door === 'live' && (role === 'cliente' || role === 'gerente')
 }
 
+/** Drinks-make tablet — big night sequence, no touch. Same POS/Manager login, not a new password. */
+export function isMakeKiosk(role, door = loginDoorFromHash()) {
+  if (door !== 'make') return false
+  return role === 'caixa' || role === 'cliente' || role === 'gerente'
+}
+
 export function doorAllowsRole(door, role) {
   if (!door) return true
   if (door === 'pos') return role === 'caixa' || role === 'cliente' || role === 'gerente'
   if (door === 'clock') return role === 'bar_staff'
   if (door === 'gerente') return role === 'cliente' || role === 'gerente'
   if (door === 'live') return role === 'cliente' || role === 'gerente'
+  if (door === 'make') return role === 'caixa' || role === 'cliente' || role === 'gerente'
   if (door === 'jbm') return role === 'admin' || role === 'funcionario' || role === 'staff'
   return true
 }
